@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "dotenv -e .env.local -o -- next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p ${PORT:-3000}",
     "lint": "eslint"
   },
   "dependencies": {
@@ -13,6 +13,9 @@
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
