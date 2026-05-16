@@ -1,8 +1,14 @@
 @import "tailwindcss";
 
 :root {
+  /* ── AI LP STUDIO brand tokens ── */
+  --brand-accent:   #00AFCC; /* cyan        — primary accent  */
+  --brand-accent-h: #0099B3; /* cyan dark   — hover           */
+  --brand-light:    #E6F8FC; /* cyan-50     — light bg        */
+  --brand-surface:  #F5F5F2; /* app surface — preview bg      */
+
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #222222;
 }
 
 @theme inline {
@@ -12,12 +18,7 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* disable dark-mode override so the tool always renders in light mode */
 
 body {
   background: var(--background);

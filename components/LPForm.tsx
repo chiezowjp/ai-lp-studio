@@ -160,8 +160,7 @@ export default function LPForm({ onSubmit, loading, importedValues }: Props) {
         type="submit"
         disabled={loading}
         className="w-full py-3.5 px-6 rounded-xl font-bold text-white text-lg
-          bg-gradient-to-r from-indigo-600 to-purple-600
-          hover:from-indigo-700 hover:to-purple-700
+          bg-[#00AFCC] hover:bg-[#0099B3]
           disabled:opacity-50 disabled:cursor-not-allowed
           transition-all duration-200 shadow-md hover:shadow-lg"
       >
@@ -184,5 +183,5 @@ function Field({ label, children, required }: { label: string; children: React.R
 }
 
 const inputClass =
-  "w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition";
+  "w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#00AFCC] focus:border-transparent transition";
 const textareaClass = inputClass + " resize-none";

@@ -1,5 +1,6 @@
 export type CTAType = "line" | "phone" | "contact";
-export type ImagePlacement = "hero" | "service" | "testimonial" | "other";
+/** セクションIDの文字列（hero / service / problem / cta / ... / other） */
+export type ImagePlacement = string;
 export type PreviewMode = "desktop" | "mobile";
 
 export interface LPFormData {

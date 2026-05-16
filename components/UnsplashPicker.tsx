@@ -1,9 +1,9 @@
 "use client";
 
-import { UnsplashResult, UnsplashPhoto, UploadedImage, ImagePlacement } from "@/types";
+import { UnsplashResult, UnsplashPhoto, UploadedImage } from "@/types";
 
-// Unsplash カテゴリ → ImagePlacement のマッピング
-const CATEGORY_TO_PLACEMENT: Record<"hero" | "service" | "background", ImagePlacement> = {
+// Unsplash カテゴリ → placement ID のマッピング
+const CATEGORY_TO_PLACEMENT: Record<"hero" | "service" | "background", string> = {
   hero: "hero",
   service: "service",
   background: "other",
@@ -13,11 +13,11 @@ interface Props {
   result: UnsplashResult;
   selectedImages: UploadedImage[];
   onSelect: (image: UploadedImage) => void;
-  onDeselect: (placement: ImagePlacement) => void;
+  onDeselect: (placement: string) => void;
 }
 
 export default function UnsplashPicker({ result, selectedImages, onSelect, onDeselect }: Props) {
-  const getSelected = (placement: ImagePlacement) =>
+  const getSelected = (placement: string) =>
     selectedImages.find((img) => img.placement === placement && img.attribution);
 
   const handleSelect = (photo: UnsplashPhoto, categoryId: "hero" | "service" | "background") => {

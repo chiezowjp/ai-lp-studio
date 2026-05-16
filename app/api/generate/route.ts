@@ -39,15 +39,17 @@ function buildPrompt(data: LPFormData): string {
 1. WordPressのカスタムHTMLブロックに貼り付けられる完全なHTMLを生成すること
 2. CSSはWordPressの「追加CSS」に貼り付けられる形式で別途生成すること
 3. スマホファースト（モバイルレスポンシブ対応）
-4. 以下のセクションを必ず含めること：
-   - ファーストビュー（hero）：キャッチコピー、サブコピー、CTAボタン
-   - お悩みセクション（problem）：ターゲットの悩みを3〜4項目
-   - 選ばれる理由（reason）：強みを3項目
-   - サービス内容（service）：具体的なサービス説明
-   - 料金（price）：価格表
-   - お客様の声（testimonial）：2〜3件の架空レビュー
-   - よくある質問（faq）：3〜5件
-   - CTA（cta）：最終的な行動促進
+4. 以下のセクションを必ず含めること（クラス名は下記の通り厳守）：
+   - <section class="lp-hero"> ：ファーストビュー。キャッチコピー、サブコピー、CTAボタン
+   - <section class="lp-problem"> ：お悩みセクション。ターゲットの悩みを3〜4項目
+   - <section class="lp-reason"> ：選ばれる理由。強みを3項目
+   - <section class="lp-service"> ：サービス内容。具体的なサービス説明
+   - <section class="lp-price"> ：料金。価格表
+   - <section class="lp-testimonial"> ：お客様の声。2〜3件の架空レビュー
+   - <section class="lp-faq"> ：よくある質問。3〜5件
+   - <section class="lp-cta"> ：CTA。最終的な行動促進
+   ※ 各セクションの最外殻要素は必ず上記クラス名のみを使用すること。
+   ※ 内部要素のクラス名は lp-{セクション名}-{部品名} 形式にすること（例: lp-hero-inner, lp-faq-item）
 5. CSSクラス名は "lp-" プレフィックスを使用すること
 6. デザインは「${data.designMood}」の雰囲気に合わせること
 7. 日本語らしい丁寧な文体で統一すること

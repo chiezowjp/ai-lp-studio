@@ -113,7 +113,7 @@ function SliderInput({
         max={max}
         step={step}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full accent-indigo-600 h-1.5"
+        className="w-full accent-[#00AFCC] h-1.5"
       />
     </div>
   );
@@ -169,8 +169,8 @@ function AlignButtons({
             onClick={() => onChange(o.v)}
             className={`flex-1 py-1.5 text-xs rounded border transition-colors font-bold ${
               value === o.v
-                ? "bg-indigo-600 text-white border-indigo-600"
-                : "border-gray-200 text-gray-500 hover:border-indigo-400"
+                ? "bg-[#00AFCC] text-white border-[#00AFCC]"
+                : "border-gray-200 text-gray-500 hover:border-[#00AFCC]"
             }`}
           >
             {["左", "中", "右"][i]}
@@ -492,7 +492,7 @@ function ButtonPanel({
             onClick={() => setTab(t.id)}
             className={`flex-1 py-2 text-[11px] font-semibold transition-colors ${
               tab === t.id
-                ? "bg-indigo-600 text-white"
+                ? "bg-[#00AFCC] text-white"
                 : "bg-white text-gray-600 hover:bg-gray-50"
             }`}
           >
@@ -616,7 +616,7 @@ function ButtonPanel({
                 <button
                   key={opt.label}
                   onClick={() => upd(opt.apply)}
-                  className="py-2.5 text-xs border border-gray-200 rounded-lg hover:border-indigo-400 hover:text-indigo-600 transition-colors font-medium"
+                  className="py-2.5 text-xs border border-gray-200 rounded-lg hover:border-[#00AFCC] hover:text-[#00AFCC] transition-colors font-medium"
                 >
                   {opt.label}
                 </button>
@@ -629,7 +629,7 @@ function ButtonPanel({
               type="checkbox"
               checked={rule.mobileFullWidth || false}
               onChange={(e) => onUpdate({ mobileFullWidth: e.target.checked })}
-              className="w-4 h-4 accent-indigo-600 rounded"
+              className="w-4 h-4 accent-[#00AFCC] rounded"
             />
             <div>
               <p className="text-xs font-semibold text-gray-700">スマホで横幅いっぱい</p>
@@ -657,8 +657,8 @@ function ButtonPanel({
                   title={opt.desc}
                   className={`py-3 text-xs rounded-lg border font-medium transition-colors flex flex-col items-center gap-1 ${
                     rule.animation === opt.v
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "border-gray-200 text-gray-600 hover:border-indigo-400"
+                      ? "bg-[#00AFCC] text-white border-[#00AFCC]"
+                      : "border-gray-200 text-gray-600 hover:border-[#00AFCC]"
                   }`}
                 >
                   <span className="text-base leading-none">{opt.label.split(" ")[0]}</span>
@@ -748,7 +748,7 @@ export default function VisualStylePanel({
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 shrink-0">
-        <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 text-xs font-bold flex items-center justify-center shrink-0">
+        <span className="w-7 h-7 rounded-lg bg-[#E6F8FC] text-[#00AFCC] text-xs font-bold flex items-center justify-center shrink-0">
           {TYPE_ICONS[element.type]}
         </span>
         <div className="flex-1 min-w-0">
@@ -785,8 +785,8 @@ export default function VisualStylePanel({
       {/* Footer */}
       <div className="px-4 py-3 border-t border-gray-100 shrink-0 space-y-2">
         {hasOverrides && (
-          <div className="flex items-center gap-1.5 text-[10px] text-indigo-600 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+          <div className="flex items-center gap-1.5 text-[10px] text-[#00AFCC] font-medium">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00AFCC]" />
             スタイル変更済み
           </div>
         )}

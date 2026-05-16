@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LP自動生成ツール",
+  title: "AI LP STUDIO",
   description: "AIがWordPress対応のランディングページHTMLを自動生成",
 };
 

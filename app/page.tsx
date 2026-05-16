@@ -1,13 +1,11 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import LPForm from "@/components/LPForm";
 import LPPreview from "@/components/LPPreview";
 import CodeBlock from "@/components/CodeBlock";
 import RevisionForm from "@/components/RevisionForm";
-import ImageUploader from "@/components/ImageUploader";
 import SEOChecker from "@/components/SEOChecker";
-import UnsplashPicker from "@/components/UnsplashPicker";
 import ColorThemePicker from "@/components/ColorThemePicker";
 import SectionSorter, { SortableSection } from "@/components/SectionSorter";
 import AddSectionModal from "@/components/AddSectionModal";
@@ -15,27 +13,26 @@ import ImagePromptAssistant from "@/components/ImagePromptAssistant";
 import SiteImporter from "@/components/SiteImporter";
 import VisualStylePanel from "@/components/VisualStylePanel";
 import LPRefAnalyzer from "@/components/LPRefAnalyzer";
-import ImageDirector from "@/components/ImageDirector";
-import { LPFormData, GeneratedLP, UploadedImage, PreviewMode, ImagePlacement, UnsplashResult, SavedImagePrompt, SelectedElement, VisualStyles, StyleRule } from "@/types";
+import SectionImageManager from "@/components/SectionImageManager";
+import { LPFormData, GeneratedLP, UploadedImage, PreviewMode, UnsplashResult, SavedImagePrompt, SelectedElement, VisualStyles, StyleRule } from "@/types";
 import { SECTION_TEMPLATES } from "@/lib/sectionTemplates";
 import { buildVisualCss } from "@/lib/visualStyles";
+import {
+  LPProject, ProjectSnapshot,
+  buildProject, saveToLocal, loadFromLocal, clearLocal,
+  downloadProject, parseProjectFile, formatSavedAt,
+  serializeImages, serializeImagesSync, deserializeImages,
+} from "@/lib/project";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ResultTab = "preview" | "html" | "css" | "netlify";
-type InputMethod = "form" | "url" | "text" | "ref" | "image";
+type InputMethod = "form" | "url" | "text" | "ref";
 type EditMode = "text" | "style";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const RETRY_DELAYS = [2000, 5000, 10000];
-
-const PLACEMENT_CSS: Record<ImagePlacement, string> = {
-  hero: ".lp-hero",
-  service: ".lp-service",
-  testimonial: ".lp-testimonial",
-  other: ".lp-wrapper",
-};
 
 const SECTION_META: Record<string, string> = {
   // AI生成セクション
@@ -80,10 +77,14 @@ async function generateWithRetry(
   throw new Error("生成に失敗しました");
 }
 
+/**
+ * placement が "other" の場合は汎用ラッパー、それ以外は `.lp-{placement}` を使用。
+ * sectionOrder がどう変わっても LP の lp-* クラスに確実にマッチする。
+ */
 function buildImageCss(images: UploadedImage[]): string {
   return images
     .map((img) => {
-      const sel = PLACEMENT_CSS[img.placement];
+      const sel = img.placement === "other" ? ".lp-wrapper" : `.lp-${img.placement}`;
       return `${sel} { background-image: url("${img.url}") !important; background-size: cover !important; background-position: center !important; }`;
     })
     .join("\n");
@@ -226,7 +227,7 @@ function Accordion({ title, children, defaultOpen = false, badge }: {
       >
         <span className="flex items-center gap-2">
           {title}
-          {badge && <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full font-bold">{badge}</span>}
+          {badge && <span className="text-[10px] bg-[#E6F8FC] text-[#00AFCC] px-1.5 py-0.5 rounded-full font-bold">{badge}</span>}
         </span>
         <span className={`text-gray-400 transition-transform text-xs ${open ? "rotate-180" : ""}`}>▾</span>
       </button>
@@ -262,6 +263,15 @@ export default function Home() {
   const [hearingText, setHearingText] = useState("");
   const [hearingLoading, setHearingLoading] = useState(false);
   const [hearingError, setHearingError] = useState<string | null>(null);
+
+  // ── Project save / load ──
+  const [savedProject, setSavedProject] = useState<LPProject | null>(null);
+  const [showRestoreBanner, setShowRestoreBanner] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [saveMenuOpen, setSaveMenuOpen] = useState(false);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadFileRef = useRef<HTMLInputElement>(null);
 
   // ── Undo / Redo ──
   const [htmlHistory, setHtmlHistory] = useState<string[]>([]);
@@ -470,7 +480,7 @@ export default function Home() {
     ]);
   };
 
-  const handleImageDeselect = (placement: ImagePlacement) => {
+  const handleImageDeselect = (placement: string) => {
     setImages((prev) => prev.filter((img) => !(img.placement === placement && img.attribution)));
   };
 
@@ -487,6 +497,102 @@ export default function Home() {
   const handleEditModeToggle = (mode: EditMode) => {
     setEditMode(mode);
     if (mode === "text") setSelectedElement(null);
+  };
+
+  // ─── Project: apply（復元・読み込み共通）────────────────────────────────────
+
+  const applyProject = useCallback((project: LPProject) => {
+    setResult({ html: project.html, css: project.css });
+    setLastFormData(project.formData);
+    setServiceName(project.formData.serviceName);
+    setColorReplacements(project.colorReplacements);
+    setVisualStyles(project.visualStyles);
+    setSectionOrder(project.sectionOrder);
+    setAdditionalCssByType(project.additionalCssByType);
+    setImages(deserializeImages(project.images));
+    setHtmlHistory([]);
+    setHtmlFuture([]);
+    setActiveTab("preview");
+    setEditMode("text");
+    setSelectedElement(null);
+    setUnsplashResult(null);
+    setSavedProject(project);
+    setShowRestoreBanner(false);
+  }, []);
+
+  // ─── Project: ローカル保存（同期・高速）──────────────────────────────────────
+
+  const handleSaveLocal = () => {
+    if (!result || !lastFormData) return;
+    const snap: ProjectSnapshot = {
+      formData: lastFormData,
+      html: result.html, css: result.css,
+      colorReplacements, visualStyles, sectionOrder, additionalCssByType,
+      images: serializeImagesSync(images),
+    };
+    const project = buildProject(snap);
+    saveToLocal(project);
+    setSavedProject(project);
+    setSaveMenuOpen(false);
+    setSaveToast("ローカルに保存しました");
+    setTimeout(() => setSaveToast(null), 2500);
+  };
+
+  // ─── Project: JSON ダウンロード（非同期・blob 変換あり）──────────────────────
+
+  const handleDownloadJSON = async () => {
+    if (!result || !lastFormData) return;
+    setIsSaving(true);
+    setSaveMenuOpen(false);
+    try {
+      const serializedImages = await serializeImages(images);
+      const snap: ProjectSnapshot = {
+        formData: lastFormData,
+        html: result.html, css: result.css,
+        colorReplacements, visualStyles, sectionOrder, additionalCssByType,
+        images: serializedImages,
+      };
+      const project = buildProject(snap);
+      saveToLocal(project);
+      setSavedProject(project);
+      downloadProject(project);
+      setSaveToast("JSON を書き出しました");
+      setTimeout(() => setSaveToast(null), 2500);
+    } catch (e) {
+      setSaveToast("書き出しに失敗しました");
+      setTimeout(() => setSaveToast(null), 2500);
+      console.error(e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // ─── Project: JSON 読み込み ────────────────────────────────────────────────
+
+  const handleLoadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const project = await parseProjectFile(file);
+      applyProject(project);
+      setSaveToast(`「${project.name}」を読み込みました`);
+      setTimeout(() => setSaveToast(null), 3000);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "読み込みに失敗しました");
+    }
+    e.target.value = "";
+  };
+
+  // ─── Project: 復元バナー ─────────────────────────────────────────────────
+
+  const handleRestore = () => {
+    if (savedProject) applyProject(savedProject);
+  };
+
+  const handleDismissRestore = () => {
+    setShowRestoreBanner(false);
+    clearLocal();
+    setSavedProject(null);
   };
 
   // ─── Ref LP complete ──────────────────────────────────────────────────────
@@ -540,6 +646,36 @@ export default function Home() {
     }
   };
 
+  // ─── Project: mount ──────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const p = loadFromLocal();
+    if (p) { setSavedProject(p); setShowRestoreBanner(true); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─── Project: auto-save（2秒デバウンス、LP 生成後のみ）────────────────────
+
+  useEffect(() => {
+    if (!result || !lastFormData) return;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      const snap: ProjectSnapshot = {
+        formData: lastFormData,
+        html: result.html,
+        css: result.css,
+        colorReplacements,
+        visualStyles,
+        sectionOrder,
+        additionalCssByType,
+        images: serializeImagesSync(images),
+      };
+      saveToLocal(buildProject(snap));
+    }, 2000);
+    return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, lastFormData, colorReplacements, visualStyles, sectionOrder, additionalCssByType, images]);
+
   // ─── Tab definitions ──────────────────────────────────────────────────────
 
   const RESULT_TABS: { id: ResultTab; label: string }[] = [
@@ -552,7 +688,7 @@ export default function Home() {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-50">
+    <div className="flex flex-col h-screen overflow-hidden bg-[#F5F5F2]">
       <AddSectionModal
         open={addSectionOpen}
         onClose={() => setAddSectionOpen(false)}
@@ -567,22 +703,95 @@ export default function Home() {
       />
 
       {/* ── Header ── */}
-      <header className="flex-shrink-0 bg-white border-b border-gray-200 shadow-sm z-20">
+      <header className="flex-shrink-0 bg-[#F7F7F4] border-b border-[#D8D8D2] z-20">
         <div className="px-4 h-14 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
-            LP
+          {/* Logo mark */}
+          <div className="w-9 h-9 rounded-xl bg-[#00AFCC] flex items-center justify-center text-white font-black text-[11px] tracking-tight shrink-0">
+            AI
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-base font-bold text-gray-900 leading-tight">LP自動生成ツール</h1>
+            <h1 className="text-[15px] font-black text-gray-900 leading-tight tracking-[0.15em]">AI LP STUDIO</h1>
           </div>
-          {result && (
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="hidden sm:inline text-xs text-gray-400">AI生成完了</span>
-              <span className="w-2 h-2 rounded-full bg-green-400" />
-            </div>
-          )}
+
+          {/* ── 保存・読み込みボタン ── */}
+          <div className="flex items-center gap-1.5 shrink-0">
+
+            {/* 読み込む（常時表示） */}
+            <label className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 cursor-pointer transition-colors">
+              📂
+              <span className="hidden sm:inline">読み込む</span>
+              <input
+                ref={loadFileRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={handleLoadFile}
+              />
+            </label>
+
+            {/* 保存（LP 生成後のみ） */}
+            {result && (
+              <div className="relative">
+                <button
+                  onClick={() => setSaveMenuOpen((o) => !o)}
+                  disabled={isSaving}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold bg-[#00AFCC] hover:bg-[#0099B3] disabled:opacity-50 text-white rounded-lg transition-colors"
+                >
+                  {isSaving
+                    ? <><div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />保存中</>
+                    : <>💾 <span className="hidden sm:inline">保存</span> ▾</>
+                  }
+                </button>
+                {saveMenuOpen && (
+                  <>
+                    {/* オーバーレイ（メニュー外クリックで閉じる） */}
+                    <div className="fixed inset-0 z-40" onClick={() => setSaveMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-50 min-w-[180px]">
+                      <button
+                        onClick={handleSaveLocal}
+                        className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#E6F8FC] transition-colors flex items-center gap-2"
+                      >
+                        <span>💾</span>
+                        <div>
+                          <p className="font-semibold text-gray-800">ローカルに保存</p>
+                          <p className="text-[10px] text-gray-400">ブラウザに即時保存</p>
+                        </div>
+                      </button>
+                      <div className="border-t border-gray-100 my-1" />
+                      <button
+                        onClick={handleDownloadJSON}
+                        disabled={isSaving}
+                        className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#E6F8FC] transition-colors flex items-center gap-2 disabled:opacity-50"
+                      >
+                        <span>⬇</span>
+                        <div>
+                          <p className="font-semibold text-gray-800">JSON をダウンロード</p>
+                          <p className="text-[10px] text-gray-400">ファイルとして書き出し</p>
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {result && (
+              <div className="hidden sm:flex items-center gap-1.5">
+                <span className="text-xs text-gray-400">AI生成完了</span>
+                <span className="w-2 h-2 rounded-full bg-green-400" />
+              </div>
+            )}
+          </div>
         </div>
       </header>
+
+      {/* ── 保存トースト ── */}
+      {saveToast && (
+        <div className="fixed bottom-5 right-5 z-50 bg-gray-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-in">
+          <span className="text-green-400">✓</span>
+          {saveToast}
+        </div>
+      )}
 
       {/* ── Body (up to three panels) ── */}
       <div className="flex flex-1 overflow-hidden">
@@ -597,19 +806,18 @@ export default function Home() {
               <div className="flex border-b border-gray-200 shrink-0">
                 {(
                   [
-                    { id: "form",  label: "✏ フォーム" },
-                    { id: "url",   label: "🌐 URL" },
-                    { id: "text",  label: "📋 貼付" },
-                    { id: "ref",   label: "🔍 参考LP" },
-                    { id: "image", label: "📸 画像" },
+                    { id: "form", label: "✏ フォーム" },
+                    { id: "url",  label: "🌐 URL" },
+                    { id: "text", label: "📋 貼付" },
+                    { id: "ref",  label: "🔍 参考LP" },
                   ] as { id: InputMethod; label: string }[]
                 ).map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setInputMethod(tab.id)}
-                    className={`flex-1 py-2.5 text-[10px] font-semibold transition-colors border-b-2
+                    className={`flex-1 py-2.5 text-[11px] font-semibold transition-colors border-b-2
                       ${inputMethod === tab.id
-                        ? "text-indigo-600 border-indigo-600 bg-indigo-50"
+                        ? "text-[#00AFCC] border-[#00AFCC] bg-[#E6F8FC]"
                         : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50"
                       }`}
                   >
@@ -620,6 +828,33 @@ export default function Home() {
 
               {/* Tab content */}
               <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+                {/* ── 前回の作業を復元バナー ── */}
+                {showRestoreBanner && savedProject && (
+                  <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5">
+                    <p className="text-xs font-bold text-amber-800 mb-0.5">
+                      📂 前回の作業を復元しますか？
+                    </p>
+                    <p className="text-[10px] text-amber-600 mb-2.5">
+                      {savedProject.name} — {formatSavedAt(savedProject.savedAt)}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleRestore}
+                        className="flex-1 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                      >
+                        復元する
+                      </button>
+                      <button
+                        onClick={handleDismissRestore}
+                        className="flex-1 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors"
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* ── フォーム入力 ── */}
                 {inputMethod === "form" && (
                   <>
@@ -650,12 +885,6 @@ export default function Home() {
                   />
                 )}
 
-                {/* ── 画像ディレクション ── */}
-                {inputMethod === "image" && (
-                  <ImageDirector
-                    serviceInfo={lastFormData ?? importedValues ?? undefined}
-                  />
-                )}
 
                 {/* ── ヒアリングシート貼り付け ── */}
                 {inputMethod === "text" && (
@@ -671,7 +900,7 @@ export default function Home() {
                       onChange={(e) => setHearingText(e.target.value)}
                       rows={10}
                       placeholder={"ヒアリングシートや会社概要のテキストを貼り付けてください…\n\n例：\n店舗名：らく楽整骨院\n業種：整骨院\nターゲット：30〜50代の腰痛に悩む女性\n地域：東京都渋谷区\nサービス：産後の骨盤矯正に特化…"}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 transition"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#00AFCC] transition"
                     />
                     {hearingError && (
                       <p className="text-xs text-red-600 bg-red-50 rounded p-2">{hearingError}</p>
@@ -679,7 +908,7 @@ export default function Home() {
                     <button
                       onClick={handleHearingAnalyze}
                       disabled={!hearingText.trim() || hearingLoading}
-                      className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
+                      className="w-full py-3 bg-[#00AFCC] hover:bg-[#0099B3] disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-2"
                     >
                       {hearingLoading ? (
                         <>
@@ -694,7 +923,7 @@ export default function Home() {
                 {/* ── Loading / Error (form tab) ── */}
                 {inputMethod === "form" && loading && (
                   <div className="flex flex-col items-center gap-2 py-4">
-                    <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                    <div className="w-8 h-8 border-4 border-[#D8D8D2] border-t-[#00AFCC] rounded-full animate-spin" />
                     {retryMessage ? (
                       <p className="text-xs font-medium text-amber-600 text-center">{retryMessage}</p>
                     ) : (
@@ -713,16 +942,19 @@ export default function Home() {
             /* ── After generation: editing tools ── */
             <div className="divide-y divide-gray-100">
 
-              {/* 画像ディレクション */}
-              <Accordion title="📸 画像ディレクション" defaultOpen={false}>
-                <ImageDirector serviceInfo={lastFormData ?? undefined} />
-              </Accordion>
+              {/* 自動保存インジケーター */}
+              {savedProject && (
+                <div className="px-4 py-2 flex items-center gap-1.5 text-[10px] text-gray-400 bg-gray-50 border-b border-gray-100">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 shrink-0" />
+                  自動保存済み — {formatSavedAt(savedProject.savedAt)}
+                </div>
+              )}
 
               {/* 画像生成プロンプト */}
               <div className="px-4 py-3 border-b border-gray-100">
                 <button
                   onClick={() => setPromptAssistantOpen(true)}
-                  className="w-full flex items-center justify-between py-2.5 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
+                  className="w-full flex items-center justify-between py-2.5 px-4 bg-[#00AFCC] hover:bg-[#0099B3] text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
                 >
                   <span className="flex items-center gap-2">
                     <span>🎨</span>
@@ -756,7 +988,7 @@ export default function Home() {
                 <div className="space-y-3">
                   <button
                     onClick={() => setAddSectionOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50 text-indigo-600 font-semibold text-sm rounded-xl transition-colors"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-[#D8D8D2] hover:border-[#00AFCC] hover:bg-[#E6F8FC] text-[#00AFCC] font-semibold text-sm rounded-xl transition-colors"
                   >
                     <span className="text-lg leading-none">＋</span>
                     セクションを追加
@@ -765,36 +997,20 @@ export default function Home() {
                 </div>
               </Accordion>
 
-              {/* 画像 */}
-              <Accordion title="画像">
-                <div className="space-y-4">
-                  <ImageUploader images={images} onChange={setImages} />
-                  <div className="border-t border-gray-100 pt-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-700">Unsplash 画像提案</span>
-                      <button
-                        onClick={handleUnsplashFetch}
-                        disabled={unsplashLoading}
-                        className="text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-md transition-colors flex items-center gap-1"
-                      >
-                        {unsplashLoading ? (
-                          <><div className="w-2.5 h-2.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />提案中</>
-                        ) : "提案する"}
-                      </button>
-                    </div>
-                    {unsplashError && (
-                      <p className="text-xs text-red-600 mb-2">{unsplashError}</p>
-                    )}
-                    {unsplashResult && (
-                      <UnsplashPicker
-                        result={unsplashResult}
-                        selectedImages={images}
-                        onSelect={handleImageSelect}
-                        onDeselect={handleImageDeselect}
-                      />
-                    )}
-                  </div>
-                </div>
+              {/* 画像管理 */}
+              <Accordion title="🖼 画像" defaultOpen>
+                <SectionImageManager
+                  sectionOrder={sectionOrder}
+                  images={images}
+                  onImagesChange={setImages}
+                  unsplashResult={unsplashResult}
+                  unsplashLoading={unsplashLoading}
+                  unsplashError={unsplashError}
+                  onUnsplashFetch={handleUnsplashFetch}
+                  onImageSelect={handleImageSelect}
+                  onImageDeselect={handleImageDeselect}
+                  serviceInfo={lastFormData ?? undefined}
+                />
               </Accordion>
 
               {/* AI修正 */}
@@ -805,7 +1021,7 @@ export default function Home() {
                 )}
                 {revisionLoading && (
                   <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                    <div className="w-3 h-3 border-2 border-gray-300 border-t-indigo-500 rounded-full animate-spin" />
+                    <div className="w-3 h-3 border-2 border-gray-300 border-t-[#00AFCC] rounded-full animate-spin" />
                     修正中…
                   </div>
                 )}
@@ -823,7 +1039,7 @@ export default function Home() {
                   <LPForm onSubmit={handleGenerate} loading={loading} importedValues={importedValues} />
                   {loading && (
                     <div className="flex items-center gap-2 py-2">
-                      <div className="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                      <div className="w-4 h-4 border-2 border-[#D8D8D2] border-t-[#00AFCC] rounded-full animate-spin" />
                       <span className="text-xs text-gray-500">
                         {retryMessage ?? "AI生成中…"}
                       </span>
@@ -865,7 +1081,7 @@ export default function Home() {
                       onClick={() => setActiveTab(tab.id)}
                       className={`px-4 py-3 text-sm font-semibold whitespace-nowrap transition-colors border-b-2
                         ${activeTab === tab.id
-                          ? "text-indigo-600 border-indigo-600 bg-indigo-50"
+                          ? "text-[#00AFCC] border-[#00AFCC] bg-[#E6F8FC]"
                           : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50"
                         }`}
                     >
@@ -883,24 +1099,24 @@ export default function Home() {
                         <button
                           onClick={() => handleEditModeToggle("text")}
                           title="テキスト編集モード"
-                          className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "text" ? "bg-indigo-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+                          className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "text" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
                         >✏ テキスト</button>
                         <button
                           onClick={() => handleEditModeToggle("style")}
                           title="スタイル編集モード"
-                          className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "style" ? "bg-purple-600 text-white" : "text-gray-500 hover:bg-gray-50"}`}
+                          className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "style" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
                         >🎨 スタイル</button>
                       </div>
                       <div className="w-px h-5 bg-gray-200 mx-1" />
                       <button
                         onClick={() => setPreviewMode("desktop")}
                         title="デスクトップ"
-                        className={`p-1.5 rounded text-sm transition-colors ${previewMode === "desktop" ? "bg-indigo-100 text-indigo-700" : "text-gray-400 hover:text-gray-600"}`}
+                        className={`p-1.5 rounded text-sm transition-colors ${previewMode === "desktop" ? "bg-[#E6F8FC] text-[#00AFCC]" : "text-gray-400 hover:text-[#00AFCC]"}`}
                       >🖥️</button>
                       <button
                         onClick={() => setPreviewMode("mobile")}
                         title="モバイル"
-                        className={`p-1.5 rounded text-sm transition-colors ${previewMode === "mobile" ? "bg-indigo-100 text-indigo-700" : "text-gray-400 hover:text-gray-600"}`}
+                        className={`p-1.5 rounded text-sm transition-colors ${previewMode === "mobile" ? "bg-[#E6F8FC] text-[#00AFCC]" : "text-gray-400 hover:text-[#00AFCC]"}`}
                       >📱</button>
                       <div className="w-px h-5 bg-gray-200 mx-1" />
                     </>
@@ -909,13 +1125,13 @@ export default function Home() {
                     onClick={handleUndo}
                     disabled={htmlHistory.length === 0}
                     title="元に戻す"
-                    className="p-1.5 rounded text-sm text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 rounded text-sm text-gray-400 hover:text-[#00AFCC] hover:bg-[#E6F8FC] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
                   >↩</button>
                   <button
                     onClick={handleRedo}
                     disabled={htmlFuture.length === 0}
                     title="やり直し"
-                    className="p-1.5 rounded text-sm text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                    className="p-1.5 rounded text-sm text-gray-400 hover:text-[#00AFCC] hover:bg-[#E6F8FC] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
                   >↪</button>
                   {activeTab === "netlify" && (
                     <>
@@ -926,7 +1142,7 @@ export default function Home() {
                           `${serviceName || "lp"}.html`,
                           "text/html"
                         )}
-                        className="text-xs px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors"
+                        className="text-xs px-3 py-1.5 bg-[#00AFCC] hover:bg-[#0099B3] text-white rounded-lg font-semibold transition-colors"
                       >
                         DL
                       </button>
@@ -941,12 +1157,12 @@ export default function Home() {
                   <div className="h-full flex flex-col">
                     <div className="px-3 py-1.5 flex items-center gap-1.5 bg-white border-b border-gray-100 flex-shrink-0">
                       {editMode === "text" ? (
-                        <span className="text-[11px] text-indigo-500 font-medium">✏ テキストをクリックして直接編集</span>
+                        <span className="text-[11px] text-[#00AFCC] font-medium">✏ テキストをクリックして直接編集</span>
                       ) : (
-                        <span className="text-[11px] text-purple-600 font-medium">
+                        <span className="text-[11px] text-[#00AFCC] font-medium">
                           🎨 要素をクリックしてスタイルを編集
                           {selectedElement && (
-                            <span className="ml-2 text-purple-400">
+                            <span className="ml-2 text-[#00AFCC]">
                               — {selectedElement.label || selectedElement.selector}
                             </span>
                           )}
@@ -959,7 +1175,7 @@ export default function Home() {
                         </span>
                       )}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 min-h-0 overflow-y-auto bg-[#F5F5F2]">
                       <LPPreview
                         html={result.html}
                         css={effectiveCss}
@@ -1025,7 +1241,7 @@ export default function Home() {
         {result && editMode === "style" && !selectedElement && (
           <aside className="w-64 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
             <div className="flex flex-col items-center justify-center h-full p-6 text-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center text-2xl">
+              <div className="w-14 h-14 rounded-2xl bg-[#E6F8FC] flex items-center justify-center text-2xl">
                 🎨
               </div>
               <div>
@@ -1043,7 +1259,7 @@ export default function Home() {
                   { icon: "⬜", text: "画像 — 幅・角丸・枠線" },
                 ].map((item) => (
                   <div key={item.text} className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded bg-indigo-100 text-indigo-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                    <span className="w-5 h-5 rounded bg-[#E6F8FC] text-[#00AFCC] text-[10px] font-bold flex items-center justify-center shrink-0">
                       {item.icon}
                     </span>
                     <span>{item.text}</span>

@@ -1,14 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useCallback } from "react";
-import { UploadedImage, ImagePlacement, PreviewMode, SelectedElement } from "@/types";
+import { UploadedImage, PreviewMode, SelectedElement } from "@/types";
 
-const PLACEMENT_CSS: Record<ImagePlacement, string> = {
-  hero: ".lp-hero",
-  service: ".lp-service",
-  testimonial: ".lp-testimonial",
-  other: ".lp-wrapper",
-};
+function placementToSelector(placement: string): string {
+  return placement === "other" ? ".lp-wrapper" : `.lp-${placement}`;
+}
 
 // ─── Style-select injection script ───────────────────────────────────────────
 
@@ -252,7 +249,7 @@ export default function LPPreview({
   const buildContent = useCallback(() => {
     const imageCss = imageOverrides
       .map((img) => {
-        const sel = PLACEMENT_CSS[img.placement];
+        const sel = placementToSelector(img.placement);
         return `${sel} { background-image: url('${img.url}') !important; background-size: cover !important; background-position: center !important; }`;
       })
       .join("\n");
@@ -283,7 +280,7 @@ ${imageCss}
 <body>${html}${editBlock}
 </body>
 </html>`;
-  }, [html, css, imageOverrides, editable]);
+  }, [html, css, imageOverrides, editable, editMode]);
 
   // Sync iframe content — skip when triggered by our own edit
   useEffect(() => {
@@ -335,39 +332,74 @@ ${imageCss}
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, [editable, onHtmlChange, onElementSelect]);
+  }, [editable, editMode, onHtmlChange, onElementSelect]);
 
-  const sharedProps = {
-    ref: iframeRef,
-    sandbox: "allow-same-origin allow-scripts" as const,
-    style: { border: "none", display: "block" as const },
-  };
-
-  if (mode === "mobile") {
-    return (
-      <div className="flex justify-center py-4">
-        <div
-          className="relative border-[6px] border-gray-800 rounded-[2.5rem] overflow-hidden shadow-xl bg-white"
-          style={{ width: 375 }}
-        >
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-5 bg-gray-800 rounded-b-2xl z-10" />
-          <iframe
-            {...sharedProps}
-            className="w-full bg-white"
-            style={{ ...sharedProps.style, height: 667 }}
-            title="LPモバイルプレビュー"
-          />
-        </div>
-      </div>
-    );
-  }
+  // ─── Unified render ───────────────────────────────────────────────────────
+  // IMPORTANT: iframe must never be unmounted/remounted on mode change.
+  // If we return a different JSX tree (e.g. bare <iframe> vs <div><iframe>),
+  // React recreates the iframe DOM node, losing srcdoc since buildContent's
+  // deps don't include `mode`.  We solve this by always rendering the same
+  // outer structure and only changing styles based on mode.
+  const isMobile = mode === "mobile";
 
   return (
-    <iframe
-      {...sharedProps}
-      className="w-full bg-white rounded-lg"
-      style={{ ...sharedProps.style, height: iframeHeight }}
-      title="LPプレビュー"
-    />
+    // Outer wrapper: desktop=h-full, mobile=centered bg area (phone frame scrolls internally)
+    <div
+      className={isMobile ? "flex justify-center py-6" : "h-full"}
+      style={isMobile ? { background: "#f3f4f6" } : {}}
+    >
+      {/* Phone-frame shell — desktop: transparent passthrough, mobile: phone chrome */}
+      <div
+        className="relative"
+        style={
+          isMobile
+            ? {
+                width: 375,
+                border: "6px solid #1f2937",
+                borderRadius: "2.5rem",
+                overflow: "hidden",
+                boxShadow: "0 25px 50px -12px rgba(0,0,0,.25)",
+                flexShrink: 0,
+                // content-box so width:375 = content, border adds visually outside
+                boxSizing: "content-box" as const,
+              }
+            : { width: "100%", height: "100%" }
+        }
+      >
+        {/* Phone notch — always in DOM (keeps iframe at stable child index) */}
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "5rem",
+            height: "1.25rem",
+            background: "#1f2937",
+            borderRadius: "0 0 1rem 1rem",
+            zIndex: 20,
+            pointerEvents: "none",
+            // visible only in mobile; display:none keeps it in DOM so iframe
+            // stays as child[1] regardless of mode
+            display: isMobile ? "block" : "none",
+          }}
+        />
+
+        {/* ── iframe ── always child[1]; never remounts on mode change ── */}
+        <iframe
+          ref={iframeRef}
+          sandbox="allow-same-origin allow-scripts"
+          title={isMobile ? "LPモバイルプレビュー" : "LPプレビュー"}
+          style={{
+            border: "none",
+            display: "block",
+            // mobile: fill the 375px phone content area; desktop: fill container
+            width: "100%",
+            height: iframeHeight,
+          }}
+        />
+      </div>
+    </div>
   );
 }

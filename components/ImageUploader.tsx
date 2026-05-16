@@ -1,22 +1,49 @@
 "use client";
 
 import { useRef } from "react";
-import { UploadedImage, ImagePlacement } from "@/types";
+import { UploadedImage } from "@/types";
 
-const PLACEMENT_LABELS: Record<ImagePlacement, string> = {
-  hero: "ヒーロー（メイン背景）",
-  service: "サービス紹介",
-  testimonial: "お客様の声",
-  other: "その他",
-};
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/** LP 生成前（sectionOrder 未確定）に使うフォールバック選択肢 */
+const DEFAULT_SECTIONS: { id: string; label: string }[] = [
+  { id: "hero",        label: "ヒーロー（メイン背景）" },
+  { id: "service",     label: "サービス紹介" },
+  { id: "testimonial", label: "お客様の声" },
+  { id: "other",       label: "その他（汎用背景）" },
+];
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
   images: UploadedImage[];
   onChange: (images: UploadedImage[]) => void;
+  /**
+   * 生成済みLPのセクション一覧。
+   * 渡された場合はこれを選択肢として使用する（末尾に「その他」を自動追加）。
+   * 未渡しの場合は DEFAULT_SECTIONS にフォールバック。
+   */
+  availableSections?: { id: string; label: string }[];
 }
 
-export default function ImageUploader({ images, onChange }: Props) {
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function ImageUploader({ images, onChange, availableSections }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /** 実際に select に並べる選択肢 */
+  const sections: { id: string; label: string }[] = availableSections && availableSections.length > 0
+    ? [
+        ...availableSections,
+        // 「その他」がまだ含まれていなければ末尾に追加
+        ...(availableSections.some((s) => s.id === "other")
+          ? []
+          : [{ id: "other", label: "その他（汎用背景）" }]),
+      ]
+    : DEFAULT_SECTIONS;
+
+  /** 新規アップロード時のデフォルト配置先 */
+  const defaultPlacement = sections[0]?.id ?? "hero";
 
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
@@ -24,12 +51,12 @@ export default function ImageUploader({ images, onChange }: Props) {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       url: URL.createObjectURL(file),
       name: file.name,
-      placement: "hero",
+      placement: defaultPlacement,
     }));
     onChange([...images, ...added]);
   };
 
-  const updatePlacement = (id: string, placement: ImagePlacement) => {
+  const updatePlacement = (id: string, placement: string) => {
     onChange(images.map((img) => (img.id === id ? { ...img, placement } : img)));
   };
 
@@ -59,7 +86,10 @@ export default function ImageUploader({ images, onChange }: Props) {
         accept="image/*"
         multiple
         className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = "";
+        }}
       />
 
       {images.length === 0 ? (
@@ -70,7 +100,7 @@ export default function ImageUploader({ images, onChange }: Props) {
         >
           クリックして画像を選択（複数可）
           <br />
-          <span className="text-xs">プレビューのヒーロー・各セクション背景に反映します</span>
+          <span className="text-xs">選択したセクションの背景に反映します</span>
         </button>
       ) : (
         <div className="grid grid-cols-2 gap-2">
@@ -90,11 +120,11 @@ export default function ImageUploader({ images, onChange }: Props) {
               <p className="text-xs text-gray-500 truncate">{img.name}</p>
               <select
                 value={img.placement}
-                onChange={(e) => updatePlacement(img.id, e.target.value as ImagePlacement)}
+                onChange={(e) => updatePlacement(img.id, e.target.value)}
                 className="w-full text-xs border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-300 bg-white"
               >
-                {(Object.entries(PLACEMENT_LABELS) as [ImagePlacement, string][]).map(([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
+                {sections.map(({ id, label }) => (
+                  <option key={id} value={id}>{label}</option>
                 ))}
               </select>
             </div>
@@ -104,7 +134,7 @@ export default function ImageUploader({ images, onChange }: Props) {
 
       {images.length > 0 && (
         <p className="text-xs text-gray-400">
-          選択した配置先のセクション背景にプレビュー反映されます
+          選択したセクションの背景画像として反映されます
         </p>
       )}
     </div>
