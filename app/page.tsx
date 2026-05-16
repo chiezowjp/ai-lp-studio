@@ -17,6 +17,7 @@ import SectionImageManager from "@/components/SectionImageManager";
 import { LPFormData, GeneratedLP, UploadedImage, PreviewMode, UnsplashResult, SavedImagePrompt, SelectedElement, VisualStyles, StyleRule } from "@/types";
 import { SECTION_TEMPLATES } from "@/lib/sectionTemplates";
 import { buildVisualCss } from "@/lib/visualStyles";
+import { extractSectionLabel } from "@/lib/sectionLabel";
 import {
   LPProject, ProjectSnapshot,
   buildProject, saveToLocal, loadFromLocal, clearLocal,
@@ -125,7 +126,7 @@ function replaceColors(css: string, replacements: Record<string, string>): strin
 /** HTML からセクション順を検出（DOM全スキャン — ホワイトリスト不要）
  *  .lp-wrapper の直下、なければ body の直下を走査し
  *  "lp-{id}" クラスを持つ要素を出現順に返す。
- *  SECTION_META にないIDも id をそのままラベルとして表示する。
+ *  ラベルは extractSectionLabel() で h2 → h3 → 代表テキスト → SECTION_META → ID の順に解決する。
  */
 function parseSectionOrder(html: string): SortableSection[] {
   if (typeof window === "undefined") return [];
@@ -141,7 +142,8 @@ function parseSectionOrder(html: string): SortableSection[] {
       if (m && !seen.has(m[1])) {
         const id = m[1];
         seen.add(id);
-        result.push({ id, label: SECTION_META[id] ?? id });
+        // h2 → h3 → 代表テキスト → SECTION_META → ID の順で表示名を解決
+        result.push({ id, label: extractSectionLabel(child, id) });
       }
     }
   }
