@@ -593,12 +593,15 @@ export default function Home() {
   // ─── Project: apply（復元・読み込み共通）────────────────────────────────────
 
   const applyProject = useCallback((project: LPProject) => {
+    // セクション順序は保存データから復元するが、ラベルは HTML 再スキャンで上書きする
+    // （useEffect [result?.html] が発火してラベルを最新化する）
+    // ID だけ保持した順序データを先にセットしておく
+    setSectionOrder(project.sectionOrder.map((s) => ({ id: s.id, label: s.id })));
     setResult({ html: project.html, css: project.css });
     setLastFormData(project.formData);
     setServiceName(project.formData.serviceName);
     setColorReplacements(project.colorReplacements);
     setVisualStyles(project.visualStyles);
-    setSectionOrder(project.sectionOrder);
     setAdditionalCssByType(project.additionalCssByType);
     setImages(deserializeImages(project.images));
     setUndoStack([]);
@@ -747,6 +750,24 @@ export default function Home() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleUndo]);
+
+  // ─── セクションラベル再スキャン（result.html が変わるたび）─────────────────
+  // localStorage 復元・JSON ロード・undo・revision いずれの場合も
+  // HTML から h2/h3/代表テキストを再抽出して sectionOrder のラベルを最新化する。
+  // 順序（ドラッグ結果）は保持し、ラベルだけ上書きする。
+  useEffect(() => {
+    if (!result?.html) return;
+    const fresh = parseSectionOrder(result.html);
+    if (fresh.length === 0) return;
+    const labelMap = new Map(fresh.map((s) => [s.id, s.label]));
+    setSectionOrder((prev) => {
+      const next = prev.map((s) => ({ ...s, label: labelMap.get(s.id) ?? s.label }));
+      // ラベルが一件も変わっていなければ参照を変えない（不要な再レンダー防止）
+      const changed = next.some((s, i) => s.label !== prev[i]?.label);
+      return changed ? next : prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result?.html]);
 
   // ─── Project: mount ──────────────────────────────────────────────────────
 
