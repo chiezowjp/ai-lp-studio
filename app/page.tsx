@@ -40,6 +40,7 @@ const SECTION_META: Record<string, string> = {
   problem: "お悩み",
   reason: "選ばれる理由",
   service: "サービス内容",
+  price: "料金",
   testimonial: "お客様の声",
   faq: "FAQ",
   cta: "CTA",
@@ -114,13 +115,30 @@ function replaceColors(css: string, replacements: Record<string, string>): strin
   return result;
 }
 
-/** HTML からセクション順を検出 */
+/** HTML からセクション順を検出（DOM全スキャン — ホワイトリスト不要）
+ *  .lp-wrapper の直下、なければ body の直下を走査し
+ *  "lp-{id}" クラスを持つ要素を出現順に返す。
+ *  SECTION_META にないIDも id をそのままラベルとして表示する。
+ */
 function parseSectionOrder(html: string): SortableSection[] {
   if (typeof window === "undefined") return [];
   const doc = new DOMParser().parseFromString(html, "text/html");
-  return Object.entries(SECTION_META)
-    .filter(([id]) => doc.querySelector(`.lp-${id}`))
-    .map(([id, label]) => ({ id, label }));
+  const wrapper = doc.querySelector(".lp-wrapper") ?? doc.body;
+  const result: SortableSection[] = [];
+  const seen = new Set<string>();
+  // lp-{id} の形式（ハイフン・アンダースコア以外に追加のハイフンを含まない）
+  const sectionClass = /^lp-([a-z][a-z0-9_]*)$/;
+  for (const child of Array.from(wrapper.children)) {
+    for (const cls of Array.from(child.classList)) {
+      const m = cls.match(sectionClass);
+      if (m && !seen.has(m[1])) {
+        const id = m[1];
+        seen.add(id);
+        result.push({ id, label: SECTION_META[id] ?? id });
+      }
+    }
+  }
+  return result;
 }
 
 /** セクション並び替え後の HTML を再構築 */

@@ -208,6 +208,10 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
     const lpAnalysis = json as LPAnalysis;
     setAnalysis(lpAnalysis);
     setSections(lpAnalysis.sections ?? []);
+    // 参考LPのデザインムードをフォームに自動反映（ユーザーが上書き可能）
+    if (lpAnalysis.designMood) {
+      setForm((p) => ({ ...p, designMood: lpAnalysis.designMood }));
+    }
     setImageUrls(imgs);
     setImageAnalyzed(false);
     setImageAnalyses([]);
