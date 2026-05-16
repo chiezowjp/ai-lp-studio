@@ -30,6 +30,13 @@ type ResultTab = "preview" | "html" | "css" | "netlify";
 type InputMethod = "form" | "url" | "text" | "ref";
 type EditMode = "text" | "style";
 
+/** Undo スナップショット — HTML・セクション順・スタイルをまとめて保存 */
+type UndoSnapshot = {
+  html: string;
+  sectionOrder: SortableSection[];
+  visualStyles: VisualStyles;
+};
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const RETRY_DELAYS = [2000, 5000, 10000];
@@ -141,36 +148,54 @@ function parseSectionOrder(html: string): SortableSection[] {
   return result;
 }
 
-/** セクション並び替え後の HTML を再構築 */
+/** セクション並び替え後の HTML を再構築（DOM全スキャン — ホワイトリスト不要）
+ *  parseSectionOrder と同じロジックで wrapper 直下の lp-* 要素を取得し、
+ *  newOrder の順に並べ直す。SECTION_META 外のセクション（追加テンプレート・参考LP由来）も正しく処理する。
+ */
 function reorderHtmlSections(html: string, newOrder: string[]): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const sectionEls = new Map<string, Element>();
-  for (const id of Object.keys(SECTION_META)) {
-    const el = doc.querySelector(`.lp-${id}`);
-    if (el) sectionEls.set(id, el);
-  }
-  const firstEl = sectionEls.values().next().value;
-  if (!firstEl) return html;
-  const parent = (firstEl as Element).parentElement;
-  if (!parent) return html;
+  const wrapper = doc.querySelector(".lp-wrapper") ?? doc.body;
+  const sectionClass = /^lp-([a-z][a-z0-9_]*)$/;
 
+  // wrapper 直下の子要素からセクション要素を収集（出現順マップ）
+  const sectionEls = new Map<string, Element>();
+  for (const child of Array.from(wrapper.children)) {
+    for (const cls of Array.from(child.classList)) {
+      const m = cls.match(sectionClass);
+      if (m && !sectionEls.has(m[1])) {
+        sectionEls.set(m[1], child);
+        break;
+      }
+    }
+  }
+
+  if (sectionEls.size === 0) return html;
+
+  // セクション以外の before / after 要素を分離
   const sectionSet = new Set(sectionEls.values());
   const before: Element[] = [];
   const after: Element[] = [];
   let passedSections = false;
-  for (const child of Array.from(parent.children)) {
+  for (const child of Array.from(wrapper.children)) {
     if (sectionSet.has(child)) { passedSections = true; continue; }
     if (!passedSections) before.push(child);
     else after.push(child);
   }
-  parent.innerHTML = "";
-  for (const el of before) parent.appendChild(el);
+
+  // 全子要素を取り除いてから再挿入
+  while (wrapper.firstChild) wrapper.removeChild(wrapper.firstChild);
+  for (const el of before) wrapper.appendChild(el);
   for (const id of newOrder) {
     const el = sectionEls.get(id);
-    if (el) parent.appendChild(el);
+    if (el) wrapper.appendChild(el);
   }
-  for (const el of after) parent.appendChild(el);
+  // newOrder に含まれなかったセクションを末尾に保護
+  for (const [id, el] of sectionEls) {
+    if (!newOrder.includes(id)) wrapper.appendChild(el);
+  }
+  for (const el of after) wrapper.appendChild(el);
+
   return doc.body.innerHTML;
 }
 
@@ -291,9 +316,8 @@ export default function Home() {
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadFileRef = useRef<HTMLInputElement>(null);
 
-  // ── Undo / Redo ──
-  const [htmlHistory, setHtmlHistory] = useState<string[]>([]);
-  const [htmlFuture, setHtmlFuture] = useState<string[]>([]);
+  // ── Undo（スナップショット方式、最大20件）──
+  const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
 
   // ── Images ──
   const [images, setImages] = useState<UploadedImage[]>([]);
@@ -307,8 +331,17 @@ export default function Home() {
   // ── Section order ──
   const [sectionOrder, setSectionOrder] = useState<SortableSection[]>([]);
 
+  // refs：applyHtml の useCallback 内で最新値を参照するため（deps に加えない）
+  const sectionOrderRef = useRef<SortableSection[]>([]);
+  sectionOrderRef.current = sectionOrder;
+  const visualStylesRef = useRef<VisualStyles>({});
+  visualStylesRef.current = visualStyles;
+
   // ── Add section ──
   const [addSectionOpen, setAddSectionOpen] = useState(false);
+
+  // ── 入力情報フォームのリセットキー（再生成のたびにインクリメントして最新値を反映）──
+  const [regenFormKey, setRegenFormKey] = useState(0);
 
   // ── Image prompt assistant ──
   const [promptAssistantOpen, setPromptAssistantOpen] = useState(false);
@@ -343,36 +376,45 @@ export default function Home() {
 
   const unsplashImages = images.filter((img) => img.attribution);
 
-  // ─── HTML change + Undo / Redo ────────────────────────────────────────────
+  // ─── HTML change + Undo ───────────────────────────────────────────────────
 
+  /** HTML 変更 + 必要に応じてスナップショットを積む。refs 経由で sectionOrder/visualStyles を取得するため deps は空。 */
   const applyHtml = useCallback((newHtml: string, saveHistory = true) => {
     setResult((prev) => {
       if (!prev) return prev;
       if (saveHistory) {
-        setHtmlHistory((h) => [...h.slice(-29), prev.html]);
-        setHtmlFuture([]);
+        const snapshot: UndoSnapshot = {
+          html: prev.html,
+          sectionOrder: [...sectionOrderRef.current],
+          visualStyles: { ...visualStylesRef.current },
+        };
+        setUndoStack((h) => [...h.slice(-19), snapshot]);
       }
       return { ...prev, html: newHtml };
     });
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleHtmlChange = useCallback((newHtml: string) => applyHtml(newHtml, true), [applyHtml]);
 
-  const handleUndo = () => {
-    if (!result || htmlHistory.length === 0) return;
-    const prev = htmlHistory[htmlHistory.length - 1];
-    setHtmlHistory((h) => h.slice(0, -1));
-    setHtmlFuture((f) => [result.html, ...f]);
-    setResult((r) => (r ? { ...r, html: prev } : r));
-  };
+  /** スタイル編集など HTML 以外の変更前にスナップショットを積む */
+  const pushUndo = useCallback(() => {
+    if (!result) return;
+    const snapshot: UndoSnapshot = {
+      html: result.html,
+      sectionOrder: [...sectionOrderRef.current],
+      visualStyles: { ...visualStylesRef.current },
+    };
+    setUndoStack((h) => [...h.slice(-19), snapshot]);
+  }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleRedo = () => {
-    if (!result || htmlFuture.length === 0) return;
-    const next = htmlFuture[0];
-    setHtmlFuture((f) => f.slice(1));
-    setHtmlHistory((h) => [...h, result.html]);
-    setResult((r) => (r ? { ...r, html: next } : r));
-  };
+  const handleUndo = useCallback(() => {
+    if (undoStack.length === 0) return;
+    const snapshot = undoStack[undoStack.length - 1];
+    setUndoStack((h) => h.slice(0, -1));
+    setResult((r) => (r ? { ...r, html: snapshot.html } : r));
+    setSectionOrder(snapshot.sectionOrder);
+    setVisualStyles(snapshot.visualStyles);
+  }, [undoStack]);
 
   // ─── Generate ─────────────────────────────────────────────────────────────
 
@@ -381,8 +423,7 @@ export default function Home() {
     setError(null);
     setResult(null);
     setRetryMessage(null);
-    setHtmlHistory([]);
-    setHtmlFuture([]);
+    setUndoStack([]);
     setColorReplacements({});
     setAdditionalCssByType({});
     setVisualStyles({});
@@ -404,14 +445,41 @@ export default function Home() {
     }
   };
 
+  // ─── Regenerate（カラー・画像設定を引き継いで再生成）─────────────────────────
+
+  const handleRegenerate = async (data: LPFormData) => {
+    setLoading(true);
+    setError(null);
+    setRetryMessage(null);
+    setUndoStack([]);
+    // colorReplacements・images（ユーザーカスタマイズ）は引き継ぐ
+    setVisualStyles({});
+    setSelectedElement(null);
+    setEditMode("text");
+    setServiceName(data.serviceName);
+    setLastFormData(data);
+    setUnsplashResult(null);
+    try {
+      const generated = await generateWithRetry(data, (msg) => setRetryMessage(msg));
+      setResult(generated);
+      setSectionOrder(parseSectionOrder(generated.html));
+      setActiveTab("preview");
+      setRegenFormKey((k) => k + 1); // フォームを最新データで再初期化
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "不明なエラーが発生しました");
+    } finally {
+      setLoading(false);
+      setRetryMessage(null);
+    }
+  };
+
   // ─── Revise ───────────────────────────────────────────────────────────────
 
   const handleRevise = async (instruction: string) => {
     if (!result) return;
     setRevisionLoading(true);
     setRevisionError(null);
-    setHtmlHistory([]);
-    setHtmlFuture([]);
+    setUndoStack([]);
     try {
       const res = await fetch("/api/revise", {
         method: "POST",
@@ -458,9 +526,11 @@ export default function Home() {
   const handleSectionReorder = (newOrder: string[]) => {
     if (!result) return;
     const reordered = reorderHtmlSections(result.html, newOrder);
+    // ラベルは現在の sectionOrder から引き継ぐ（SECTION_META 外のIDも正しく表示）
+    const labelMap = new Map(sectionOrder.map((s) => [s.id, s.label]));
     const nextSections = newOrder
-      .map((id) => ({ id, label: SECTION_META[id] ?? id }))
-      .filter((s) => sectionOrder.some((x) => x.id === s.id));
+      .filter((id) => labelMap.has(id))
+      .map((id) => ({ id, label: labelMap.get(id) ?? SECTION_META[id] ?? id }));
     setSectionOrder(nextSections);
     applyHtml(reordered, true);
   };
@@ -505,6 +575,7 @@ export default function Home() {
   // ─── Visual style update ──────────────────────────────────────────────────
 
   const handleStyleUpdate = (selector: string, rule: StyleRule) => {
+    pushUndo();
     setVisualStyles((prev) => ({ ...prev, [selector]: rule }));
   };
 
@@ -528,8 +599,7 @@ export default function Home() {
     setSectionOrder(project.sectionOrder);
     setAdditionalCssByType(project.additionalCssByType);
     setImages(deserializeImages(project.images));
-    setHtmlHistory([]);
-    setHtmlFuture([]);
+    setUndoStack([]);
     setActiveTab("preview");
     setEditMode("text");
     setSelectedElement(null);
@@ -625,8 +695,7 @@ export default function Home() {
     setVisualStyles({});
     setSelectedElement(null);
     setEditMode("text");
-    setHtmlHistory([]);
-    setHtmlFuture([]);
+    setUndoStack([]);
     setActiveTab("preview");
     setUnsplashResult(null);
     setInputMethod("form");
@@ -663,6 +732,19 @@ export default function Home() {
       setHearingLoading(false);
     }
   };
+
+  // ─── Ctrl+Z キーボードショートカット ────────────────────────────────────────
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleUndo]);
 
   // ─── Project: mount ──────────────────────────────────────────────────────
 
@@ -1050,11 +1132,16 @@ export default function Home() {
                 <SEOChecker html={result.html} />
               </Accordion>
 
-              {/* 再生成 */}
-              <Accordion title="再生成">
+              {/* 入力情報・再生成 */}
+              <Accordion title="📝 入力情報・再生成">
                 <div className="space-y-3">
-                  <p className="text-xs text-gray-500">入力内容を変更して再生成します。</p>
-                  <LPForm onSubmit={handleGenerate} loading={loading} importedValues={importedValues} />
+                  <p className="text-xs text-gray-500">入力内容を修正して再生成できます。カラー・画像設定は引き継がれます。</p>
+                  <LPForm
+                    key={`regen-${regenFormKey}`}
+                    onSubmit={handleRegenerate}
+                    loading={loading}
+                    importedValues={lastFormData ?? importedValues}
+                  />
                   {loading && (
                     <div className="flex items-center gap-2 py-2">
                       <div className="w-4 h-4 border-2 border-[#D8D8D2] border-t-[#00AFCC] rounded-full animate-spin" />
@@ -1141,16 +1228,10 @@ export default function Home() {
                   )}
                   <button
                     onClick={handleUndo}
-                    disabled={htmlHistory.length === 0}
-                    title="元に戻す"
+                    disabled={undoStack.length === 0}
+                    title={`元に戻す (Ctrl+Z)${undoStack.length > 0 ? ` — ${undoStack.length}件` : ""}`}
                     className="p-1.5 rounded text-sm text-gray-400 hover:text-[#00AFCC] hover:bg-[#E6F8FC] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
                   >↩</button>
-                  <button
-                    onClick={handleRedo}
-                    disabled={htmlFuture.length === 0}
-                    title="やり直し"
-                    className="p-1.5 rounded text-sm text-gray-400 hover:text-[#00AFCC] hover:bg-[#E6F8FC] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-                  >↪</button>
                   {activeTab === "netlify" && (
                     <>
                       <div className="w-px h-5 bg-gray-200 mx-1" />
@@ -1186,10 +1267,9 @@ export default function Home() {
                           )}
                         </span>
                       )}
-                      {(htmlHistory.length > 0 || htmlFuture.length > 0) && (
+                      {undoStack.length > 0 && (
                         <span className="text-[10px] text-gray-400 ml-auto">
-                          {htmlHistory.length > 0 && `↩${htmlHistory.length}`}
-                          {htmlFuture.length > 0 && ` ↪${htmlFuture.length}`}
+                          ↩{undoStack.length}
                         </span>
                       )}
                     </div>
