@@ -144,6 +144,7 @@ function parseSectionOrder(html: string): SortableSection[] {
         seen.add(id);
         // h2 → h3 → 代表テキスト → SECTION_META → ID の順で表示名を解決
         result.push({ id, label: extractSectionLabel(child, id) });
+        break; // 1要素につき最初の lp-* クラスだけを ID として採用（reorderHtmlSections と一致）
       }
     }
   }

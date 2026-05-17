@@ -38,7 +38,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       { key: "title", label: "セクション見出し", placeholder: "アクセス", defaultValue: "アクセス" },
     ],
     generateHtml: ({ address = "東京都渋谷区", title = "アクセス" }) => `
-<section class="lp-section lp-map">
+<section class="lp-map">
   <div class="lp-map-inner">
     <h2 class="lp-map-title">${title}</h2>
     <div class="lp-map-frame">
@@ -67,7 +67,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     icon: "📝",
     description: "名前・メール・電話・内容の入力フォーム",
     generateHtml: () => `
-<section class="lp-section lp-contact">
+<section class="lp-contact">
   <div class="lp-contact-inner">
     <h2 class="lp-contact-title">お問い合わせ</h2>
     <p class="lp-contact-lead">お気軽にお問い合わせください。2〜3営業日以内にご返信いたします。</p>
@@ -124,7 +124,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     icon: "❓",
     description: "よくある質問・回答のアコーディオン",
     generateHtml: () => `
-<section class="lp-section lp-faqblock">
+<section class="lp-faqblock">
   <div class="lp-faqb-inner">
     <h2 class="lp-faqb-title">よくある質問</h2>
     <div class="lp-faqb-list">
@@ -170,7 +170,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     icon: "🖼️",
     description: "施工事例・写真ギャラリー（6枚グリッド）",
     generateHtml: () => `
-<section class="lp-section lp-gallery">
+<section class="lp-gallery">
   <div class="lp-gallery-inner">
     <h2 class="lp-gallery-title">ギャラリー</h2>
     <p class="lp-gallery-sub">施工事例・サービスの様子をご覧ください</p>
@@ -207,7 +207,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     icon: "💬",
     description: "星評価付きのレビュー・体験談カード",
     generateHtml: () => `
-<section class="lp-section lp-voices">
+<section class="lp-voices">
   <div class="lp-voices-inner">
     <h2 class="lp-voices-title">お客様の声</h2>
     <div class="lp-voices-grid">
@@ -250,7 +250,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     icon: "🔄",
     description: "施術・サービス前後の比較を並べて表示",
     generateHtml: () => `
-<section class="lp-section lp-beforeafter">
+<section class="lp-beforeafter">
   <div class="lp-ba-inner">
     <h2 class="lp-ba-title">Before / After</h2>
     <p class="lp-ba-sub">サービスによる変化をご覧ください</p>
@@ -299,7 +299,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       { key: "sub", label: "サブテキスト", placeholder: "お気軽にメッセージください", defaultValue: "お気軽にメッセージください" },
     ],
     generateHtml: ({ lineUrl = "#", headline = "LINEで無料相談受付中！", sub = "お気軽にメッセージください" }) => `
-<section class="lp-section lp-linecta">
+<section class="lp-linecta">
   <div class="lp-lc-inner">
     <div class="lp-lc-icon">
       <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="36" height="36" rx="8" fill="#06C755"/><path d="M28 16.3c0-4.7-4.7-8.5-10.5-8.5S7 11.6 7 16.3c0 4.2 3.7 7.7 8.7 8.4.34.07.8.23.92.52.1.27.07.68.04.95l-.15.9c-.05.27-.22 1.06.93.58 1.15-.48 6.2-3.65 8.46-6.25C27.4 19.4 28 17.94 28 16.3z" fill="white"/></svg>
@@ -337,7 +337,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       { key: "title", label: "見出し", placeholder: "Instagram", defaultValue: "Instagram" },
     ],
     generateHtml: ({ postUrl = "https://www.instagram.com/", title = "Instagram" }) => `
-<section class="lp-section lp-instagram">
+<section class="lp-instagram">
   <div class="lp-ig-inner">
     <h2 class="lp-ig-title">${title}</h2>
     <p class="lp-ig-lead">最新の投稿はInstagramでチェック！</p>
