@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import LPForm from "@/components/LPForm";
-import LPPreview from "@/components/LPPreview";
+import LPPreview, { LPPreviewHandle } from "@/components/LPPreview";
 import CodeBlock from "@/components/CodeBlock";
 import RevisionForm from "@/components/RevisionForm";
 import SEOChecker from "@/components/SEOChecker";
@@ -333,6 +333,10 @@ export default function Home() {
   // ── Section order ──
   const [sectionOrder, setSectionOrder] = useState<SortableSection[]>([]);
 
+  // ── Section navigation（サイドバークリック → プレビュースクロール）──
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
+  const previewRef = useRef<LPPreviewHandle>(null);
+
   // refs：applyHtml の useCallback 内で最新値を参照するため（deps に加えない）
   const sectionOrderRef = useRef<SortableSection[]>([]);
   sectionOrderRef.current = sectionOrder;
@@ -522,6 +526,19 @@ export default function Home() {
       });
     }
   };
+
+  // ─── Section navigation（クリック → プレビュースクロール）──────────────────
+
+  const handleSectionClick = useCallback((id: string) => {
+    setActiveSectionId(id);
+    // プレビュータブが表示中でなければ切り替える
+    setActiveTab("preview");
+    // iframe への scroll 指示（タブ切り替えで iframe が再マウントされる前に
+    // 少し遅延させて確実にスクロール）
+    setTimeout(() => {
+      previewRef.current?.scrollToSection(id);
+    }, 50);
+  }, []);
 
   // ─── Section reorder ──────────────────────────────────────────────────────
 
@@ -1116,7 +1133,12 @@ export default function Home() {
                     <span className="text-lg leading-none">＋</span>
                     セクションを追加
                   </button>
-                  <SectionSorter sections={sectionOrder} onChange={handleSectionReorder} />
+                  <SectionSorter
+                    sections={sectionOrder}
+                    onChange={handleSectionReorder}
+                    onSectionClick={handleSectionClick}
+                    activeSectionId={activeSectionId}
+                  />
                 </div>
               </Accordion>
 
@@ -1298,6 +1320,7 @@ export default function Home() {
                     </div>
                     <div className="flex-1 min-h-0 overflow-y-auto bg-[#F5F5F2]">
                       <LPPreview
+                        ref={previewRef}
                         html={result.html}
                         css={effectiveCss}
                         mode={previewMode}

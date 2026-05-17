@@ -336,24 +336,25 @@ export default function SectionImageManager({
   return (
     <div className="space-y-3">
 
-      {/* セクション選択 */}
+      {/* セクション選択（プルダウン） */}
       <div>
-        <p className="text-[10px] font-semibold text-gray-500 mb-2">改善するセクション</p>
-        <div className="flex gap-1 flex-wrap">
+        <label className="text-[10px] font-semibold text-gray-500 block mb-1.5">
+          改善するセクション
+        </label>
+        <select
+          value={selectedId}
+          onChange={(e) => handleSectionChange(e.target.value)}
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs text-gray-900
+            focus:outline-none focus:ring-2 focus:ring-[#00AFCC] focus:border-transparent transition
+            appearance-none cursor-pointer"
+          style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center" }}
+        >
           {sections.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => handleSectionChange(s.id)}
-              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${
-                selectedId === s.id
-                  ? "bg-[#00AFCC] text-white shadow-sm"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
+            <option key={s.id} value={s.id}>
               {s.label}
-            </button>
+            </option>
           ))}
-        </div>
+        </select>
       </div>
 
       {/* セクション見出し */}

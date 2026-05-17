@@ -1,11 +1,37 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
 import { UploadedImage, PreviewMode, SelectedElement } from "@/types";
 
 function placementToSelector(placement: string): string {
   return placement === "other" ? ".lp-wrapper" : `.lp-${placement}`;
 }
+
+// ─── Section scroll script（常時注入：モード問わず有効）─────────────────────
+// 親ウィンドウから { type:'lp-scroll-to', sectionId:'hero' } を受け取り
+// .lp-{id} / [data-section-id="{id}"] / #{id} の順に要素を探してスクロール＋ハイライト
+
+const SCROLL_JS = `(function () {
+  window.addEventListener('message', function (e) {
+    if (!e.data || e.data.type !== 'lp-scroll-to') return;
+    var id = e.data.sectionId;
+    var el = document.querySelector('.lp-' + id)
+          || document.querySelector('[data-section-id="' + id + '"]')
+          || document.getElementById(id);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // 一時ハイライト（1.8秒）
+    var prev = { outline: el.style.outline, outlineOffset: el.style.outlineOffset, transition: el.style.transition };
+    el.style.transition = 'outline-color 0.25s';
+    el.style.outline = '3px solid #00AFCC';
+    el.style.outlineOffset = '4px';
+    setTimeout(function () {
+      el.style.outline = prev.outline;
+      el.style.outlineOffset = prev.outlineOffset;
+      el.style.transition = prev.transition;
+    }, 1800);
+  });
+})();`;
 
 // ─── Style-select injection script ───────────────────────────────────────────
 
@@ -226,7 +252,13 @@ interface Props {
   selectedSelector?: string | null;
 }
 
-export default function LPPreview({
+/** 親コンポーネントから呼び出せる命令型 API */
+export interface LPPreviewHandle {
+  /** プレビュー内の .lp-{sectionId} 要素へスムーズスクロール＋ハイライト */
+  scrollToSection: (sectionId: string) => void;
+}
+
+const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
   html,
   css,
   mode = "desktop",
@@ -236,8 +268,17 @@ export default function LPPreview({
   editMode = "text",
   onElementSelect,
   selectedSelector,
-}: Props) {
+}: Props, ref) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    scrollToSection: (sectionId: string) => {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "lp-scroll-to", sectionId },
+        "*"
+      );
+    },
+  }));
   const skipNextRef = useRef(false);
   const selectedSelectorRef = useRef<string | null>(selectedSelector ?? null);
   const editable = !!onHtmlChange;
@@ -261,6 +302,8 @@ export default function LPPreview({
     } else if (editable) {
       editBlock = `\n<script>\n${EDIT_JS}\n<` + `/script>`;
     }
+    // セクションスクロールは全モードで常時有効
+    const scrollBlock = `\n<script>\n${SCROLL_JS}\n<` + `/script>`;
 
     return `<!DOCTYPE html>
 <html lang="ja">
@@ -277,7 +320,7 @@ ${css}
 ${imageCss}
 </style>
 </head>
-<body>${html}${editBlock}
+<body>${html}${scrollBlock}${editBlock}
 </body>
 </html>`;
   }, [html, css, imageOverrides, editable, editMode]);
@@ -402,4 +445,6 @@ ${imageCss}
       </div>
     </div>
   );
-}
+});
+
+export default LPPreview;
