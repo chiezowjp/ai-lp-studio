@@ -14,9 +14,20 @@ interface Props {
   onSectionClick?: (id: string) => void;
   /** 現在アクティブ（スクロール先）のセクション ID */
   activeSectionId?: string | null;
+  /** 削除リクエストのコールバック */
+  onSectionDelete?: (id: string, label: string) => void;
+  /** 削除不可のセクション ID セット */
+  protectedIds?: Set<string>;
 }
 
-export default function SectionSorter({ sections, onChange, onSectionClick, activeSectionId }: Props) {
+export default function SectionSorter({
+  sections,
+  onChange,
+  onSectionClick,
+  activeSectionId,
+  onSectionDelete,
+  protectedIds,
+}: Props) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -70,6 +81,8 @@ export default function SectionSorter({ sections, onChange, onSectionClick, acti
           const isDragging = dragIndex === i;
           const isOver = overIndex === i && dragIndex !== i;
           const isActive = sec.id === activeSectionId;
+          const isProtected = protectedIds?.has(sec.id) ?? false;
+          const canDelete = !!onSectionDelete && !isProtected;
 
           return (
             <li
@@ -80,7 +93,7 @@ export default function SectionSorter({ sections, onChange, onSectionClick, acti
               onDrop={(e) => handleDrop(e, i)}
               onDragEnd={handleDragEnd}
               className={`
-                flex items-center gap-2 px-2 py-2 rounded-lg border text-xs
+                group flex items-center gap-2 px-2 py-2 rounded-lg border text-xs
                 transition-all select-none
                 ${isDragging ? "opacity-40 bg-indigo-50 border-indigo-300" : ""}
                 ${isActive && !isDragging ? "border-[#00AFCC] bg-[#E6F8FC]" : !isDragging ? "bg-white border-gray-100" : ""}
@@ -96,10 +109,10 @@ export default function SectionSorter({ sections, onChange, onSectionClick, acti
               <button
                 type="button"
                 onClick={() => {
-                  if (dragIndex !== null) return; // ドラッグ中は無視
+                  if (dragIndex !== null) return;
                   onSectionClick?.(sec.id);
                 }}
-                className={`flex-1 text-left font-medium truncate transition-colors ${
+                className={`flex-1 text-left font-medium truncate transition-colors min-w-0 ${
                   isActive
                     ? "text-[#00AFCC]"
                     : "text-gray-700 hover:text-[#00AFCC]"
@@ -111,6 +124,38 @@ export default function SectionSorter({ sections, onChange, onSectionClick, acti
                 )}
                 {sec.label}
               </button>
+
+              {/* 削除ボタン（hover 時のみ表示・保護セクションは非表示） */}
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSectionDelete(sec.id, sec.label);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded transition-all
+                    text-gray-300 hover:text-red-500 hover:bg-red-50 shrink-0"
+                  title={`「${sec.label}」を削除`}
+                >
+                  {/* ゴミ箱アイコン（SVG） */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="3 6 5 6 21 6" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6" />
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                  </svg>
+                </button>
+              )}
 
               {/* 並び替え矢印 */}
               <div className="flex gap-0.5 shrink-0">

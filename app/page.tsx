@@ -201,6 +201,24 @@ function reorderHtmlSections(html: string, newOrder: string[]): string {
   return doc.body.innerHTML;
 }
 
+/** 指定セクションを HTML から削除（DOM全スキャン） */
+function removeSectionFromHtml(html: string, sectionId: string): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const wrapper = doc.querySelector(".lp-wrapper") ?? doc.body;
+  const sectionClass = /^lp-([a-z][a-z0-9_]*)$/;
+  for (const child of Array.from(wrapper.children)) {
+    for (const cls of Array.from(child.classList)) {
+      const m = cls.match(sectionClass);
+      if (m && m[1] === sectionId) {
+        wrapper.removeChild(child);
+        break;
+      }
+    }
+  }
+  return doc.body.innerHTML;
+}
+
 /** 新セクションを既存 HTML に挿入（CTA 直前 or 末尾） */
 function insertSectionHtml(currentHtml: string, newHtml: string, insertAtEnd = false): string {
   if (typeof window === "undefined") return currentHtml;
@@ -346,6 +364,9 @@ export default function Home() {
   // ── Add section ──
   const [addSectionOpen, setAddSectionOpen] = useState(false);
 
+  // ── Delete section ──
+  const [deletingSection, setDeletingSection] = useState<{ id: string; label: string } | null>(null);
+
   // ── 入力情報フォームのリセットキー（再生成のたびにインクリメントして最新値を反映）──
   const [regenFormKey, setRegenFormKey] = useState(0);
 
@@ -381,6 +402,17 @@ export default function Home() {
   );
 
   const unsplashImages = images.filter((img) => img.attribution);
+
+  // ── 削除保護セクション（hero 常時・CTA は1つだけなら保護）──
+  const protectedSectionIds = useMemo(() => {
+    const ids = new Set<string>(["hero"]);
+    // CTA 系（id が "cta" を含む）が1つ以下なら保護
+    const ctaSections = sectionOrder.filter(
+      (s) => s.id === "cta" || s.id.startsWith("cta") || s.id.endsWith("cta")
+    );
+    if (ctaSections.length <= 1) ctaSections.forEach((s) => ids.add(s.id));
+    return ids;
+  }, [sectionOrder]);
 
   // ─── HTML change + Undo ───────────────────────────────────────────────────
 
@@ -526,6 +558,31 @@ export default function Home() {
       });
     }
   };
+
+  // ─── Section delete ───────────────────────────────────────────────────────
+
+  /** 削除確認モーダルを開く */
+  const handleDeleteRequest = useCallback((id: string, label: string) => {
+    setDeletingSection({ id, label });
+  }, []);
+
+  /** モーダル確認後の実削除（Undo スタック付き） */
+  const handleDeleteConfirm = useCallback(() => {
+    if (!deletingSection || !result) return;
+    const { id } = deletingSection;
+
+    // applyHtml が sectionOrderRef.current（削除前の状態）をスナップショットに取り込む
+    const newHtml = removeSectionFromHtml(result.html, id);
+    const newSectionOrder = sectionOrder.filter((s) => s.id !== id);
+    const newImages = images.filter((img) => img.placement !== id);
+
+    applyHtml(newHtml, true);            // ← undo スナップショット作成 + html 更新
+    setSectionOrder(newSectionOrder);   // ← 順序更新（スナップショット取得後）
+    setImages(newImages);               // ← 関連画像削除（undo では非復元・許容）
+    if (activeSectionId === id) setActiveSectionId(null);
+
+    setDeletingSection(null);
+  }, [deletingSection, result, sectionOrder, images, activeSectionId, applyHtml]);
 
   // ─── Section navigation（クリック → プレビュースクロール）──────────────────
 
@@ -1138,6 +1195,8 @@ export default function Home() {
                     onChange={handleSectionReorder}
                     onSectionClick={handleSectionClick}
                     activeSectionId={activeSectionId}
+                    onSectionDelete={handleDeleteRequest}
+                    protectedIds={protectedSectionIds}
                   />
                 </div>
               </Accordion>
@@ -1422,6 +1481,39 @@ export default function Home() {
           </aside>
         )}
       </div>
+
+      {/* ─── セクション削除 確認モーダル ─────────────────────────────────── */}
+      {deletingSection && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) setDeletingSection(null); }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-2xl">🗑️</span>
+              <h3 className="font-bold text-gray-900 text-base">セクションを削除</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-1">
+              <span className="font-semibold text-gray-900">「{deletingSection.label}」</span>を削除しますか？
+            </p>
+            <p className="text-xs text-gray-400 mb-6">削除後は Ctrl+Z / 元に戻すボタンで復元できます。</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeletingSection(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-sm font-semibold text-white transition-colors shadow-sm"
+              >
+                削除する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
