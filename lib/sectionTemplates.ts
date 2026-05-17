@@ -2,7 +2,7 @@ export interface SectionInput {
   key: string;
   label: string;
   placeholder: string;
-  type?: "text" | "tel" | "url";
+  type?: "text" | "tel" | "url" | "email";
   required?: boolean;
   defaultValue?: string;
 }
@@ -65,34 +65,80 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     id: "contact",
     label: "お問い合わせフォーム",
     icon: "📝",
-    description: "名前・メール・電話・内容の入力フォーム",
-    generateHtml: () => `
+    description: "名前・メール・電話・内容の入力フォーム（実際にメール送信）",
+    inputs: [
+      { key: "toEmail", label: "問い合わせ受信メールアドレス", placeholder: "info@example.com", type: "email", required: true },
+      { key: "title",   label: "セクション見出し", placeholder: "お問い合わせ", defaultValue: "お問い合わせ" },
+      { key: "lead",    label: "リード文", placeholder: "お気軽にお問い合わせください。", defaultValue: "お気軽にお問い合わせください。2〜3営業日以内にご返信いたします。" },
+    ],
+    generateHtml: ({ toEmail = "", title = "お問い合わせ", lead = "お気軽にお問い合わせください。2〜3営業日以内にご返信いたします。" }) => `
 <section class="lp-contact">
   <div class="lp-contact-inner">
-    <h2 class="lp-contact-title">お問い合わせ</h2>
-    <p class="lp-contact-lead">お気軽にお問い合わせください。2〜3営業日以内にご返信いたします。</p>
-    <form class="lp-contact-form" onsubmit="alert('送信ありがとうございます！'); return false;">
+    <h2 class="lp-contact-title">${title}</h2>
+    <p class="lp-contact-lead">${lead}</p>
+    <form class="lp-contact-form" id="lp-cf-form">
+      <input type="hidden" name="_to" value="${toEmail}">
       <div class="lp-cf-row">
         <label class="lp-cf-label">お名前 <span class="lp-cf-req">*</span></label>
-        <input class="lp-cf-input" type="text" placeholder="山田 太郎" required>
+        <input class="lp-cf-input" type="text" name="name" placeholder="山田 太郎" required>
       </div>
       <div class="lp-cf-row">
         <label class="lp-cf-label">メールアドレス <span class="lp-cf-req">*</span></label>
-        <input class="lp-cf-input" type="email" placeholder="example@email.com" required>
+        <input class="lp-cf-input" type="email" name="email" placeholder="example@email.com" required>
       </div>
       <div class="lp-cf-row">
         <label class="lp-cf-label">電話番号</label>
-        <input class="lp-cf-input" type="tel" placeholder="090-0000-0000">
+        <input class="lp-cf-input" type="tel" name="phone" placeholder="090-0000-0000">
       </div>
       <div class="lp-cf-row">
         <label class="lp-cf-label">お問い合わせ内容 <span class="lp-cf-req">*</span></label>
-        <textarea class="lp-cf-textarea" placeholder="ご質問・ご相談内容をご入力ください" required></textarea>
+        <textarea class="lp-cf-textarea" name="message" placeholder="ご質問・ご相談内容をご入力ください" required></textarea>
       </div>
       <div class="lp-cf-submit-wrap">
-        <button class="lp-cf-submit" type="submit">送信する →</button>
+        <button class="lp-cf-submit" type="submit" id="lp-cf-btn">送信する →</button>
       </div>
     </form>
+    <div id="lp-cf-success" class="lp-cf-result lp-cf-success" style="display:none">
+      <div class="lp-cf-result-icon">✅</div>
+      <p class="lp-cf-result-title">送信ありがとうございます！</p>
+      <p class="lp-cf-result-sub">担当者よりご連絡いたします。</p>
+    </div>
+    <div id="lp-cf-error" class="lp-cf-result lp-cf-error-msg" style="display:none">
+      <div class="lp-cf-result-icon">⚠️</div>
+      <p class="lp-cf-result-title">送信に失敗しました</p>
+      <p class="lp-cf-result-sub">しばらくしてからお試しください。</p>
+    </div>
   </div>
+  <script>
+(function(){
+  var form = document.getElementById('lp-cf-form');
+  var btn  = document.getElementById('lp-cf-btn');
+  if (!form || !btn) return;
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    btn.disabled = true;
+    btn.textContent = '送信中…';
+    var data = new FormData(form);
+    fetch('/api/contact', { method: 'POST', body: data })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if (j.ok) {
+          form.style.display = 'none';
+          document.getElementById('lp-cf-success').style.display = 'flex';
+        } else {
+          document.getElementById('lp-cf-error').style.display = 'flex';
+          btn.disabled = false;
+          btn.textContent = '送信する →';
+        }
+      })
+      .catch(function(){
+        document.getElementById('lp-cf-error').style.display = 'flex';
+        btn.disabled = false;
+        btn.textContent = '送信する →';
+      });
+  });
+})();
+  </script>
 </section>`.trim(),
     generateCss: () => `
 .lp-contact { padding: 64px 20px; background: #fff; }
@@ -114,7 +160,16 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   padding: .875rem 3rem; background: #6366f1; color: #fff; border: none;
   border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background .2s;
 }
-.lp-cf-submit:hover { background: #4f46e5; }`,
+.lp-cf-submit:hover { background: #4f46e5; }
+.lp-cf-submit:disabled { opacity: .6; cursor: not-allowed; }
+.lp-cf-result {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 3rem 1rem; text-align: center; gap: .5rem;
+}
+.lp-cf-result-icon { font-size: 2.5rem; }
+.lp-cf-result-title { font-size: 1.25rem; font-weight: 700; margin: 0; color: #111827; }
+.lp-cf-result-sub { font-size: .9rem; color: #6b7280; margin: 0; }
+.lp-cf-error-msg .lp-cf-result-title { color: #dc2626; }`,
   },
 
   /* ── FAQ ─────────────────────────────────────────────────────────────────── */
