@@ -355,11 +355,13 @@ export default function Home() {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const previewRef = useRef<LPPreviewHandle>(null);
 
-  // refs：applyHtml の useCallback 内で最新値を参照するため（deps に加えない）
+  // refs：useCallback 内で最新値を参照するため（deps に加えない）
   const sectionOrderRef = useRef<SortableSection[]>([]);
   sectionOrderRef.current = sectionOrder;
   const visualStylesRef = useRef<VisualStyles>({});
   visualStylesRef.current = visualStyles;
+  const resultRef = useRef(result);
+  resultRef.current = result;
 
   // ── Add section ──
   const [addSectionOpen, setAddSectionOpen] = useState(false);
@@ -598,22 +600,52 @@ export default function Home() {
   }, []);
 
   // ─── Section reorder ──────────────────────────────────────────────────────
-  // NOTE: result / sectionOrder を参照するため deps に含める。
-  // SectionSorter 側は sectionsRef + dataTransfer で最新値を保証しているが、
-  // 念のためこちらも useCallback でラップして stale closure リスクをゼロにする。
+  // SectionSorter から from/to インデックスを受け取り、page.tsx 側で全処理を行う。
+  // resultRef / sectionOrderRef 経由で常に最新値を取得するため deps は [applyHtml] のみ。
+  // ドラッグ操作・▲▼ボタン、どちらも必ずこの関数が呼ばれる。
 
-  const handleSectionReorder = useCallback((newOrder: string[]) => {
-    if (!result) return;
-    const reordered = reorderHtmlSections(result.html, newOrder);
-    // ラベルは現在の sectionOrder から引き継ぐ（SECTION_META 外のIDも正しく表示）
-    const labelMap = new Map(sectionOrder.map((s) => [s.id, s.label]));
-    const nextSections = newOrder
-      .filter((id) => labelMap.has(id))
-      .map((id) => ({ id, label: labelMap.get(id) ?? SECTION_META[id] ?? id }));
-    setSectionOrder(nextSections);
-    applyHtml(reordered, true);
+  const handleReorderByIndex = useCallback((fromIndex: number, toIndex: number) => {
+    const currentResult = resultRef.current;
+    const currentSections = sectionOrderRef.current;
+
+    console.log("[REORDER] called | from:", fromIndex, "to:", toIndex);
+    console.log("[REORDER] currentSections:", currentSections.map(s => s.id));
+
+    if (!currentResult) {
+      console.warn("[REORDER] result is null, skipping");
+      return;
+    }
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 || toIndex < 0 ||
+      fromIndex >= currentSections.length || toIndex >= currentSections.length
+    ) {
+      console.warn("[REORDER] invalid indices, skipping");
+      return;
+    }
+
+    // 新しいセクション順を計算
+    const next = [...currentSections];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    const newOrder = next.map(s => s.id);
+
+    console.log("[REORDER] newOrder:", newOrder);
+    console.log("[REORDER] result.html 先頭80:", currentResult.html.slice(0, 80));
+
+    // HTML を並び替え
+    const reorderedHtml = reorderHtmlSections(currentResult.html, newOrder);
+
+    console.log("[REORDER] reorderedHtml 先頭80:", reorderedHtml.slice(0, 80));
+    console.log("[REORDER] HTML changed:", reorderedHtml !== currentResult.html);
+
+    // sectionOrder を更新（ラベルは引き継ぐ）
+    setSectionOrder(next);
+    // HTML を更新 → LPPreview が再描画される
+    applyHtml(reorderedHtml, true);
+    console.log("[REORDER] applyHtml called ✓");
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, sectionOrder, applyHtml]);
+  }, [applyHtml]);
 
   // ─── Unsplash ─────────────────────────────────────────────────────────────
 
@@ -1196,7 +1228,7 @@ export default function Home() {
                   </button>
                   <SectionSorter
                     sections={sectionOrder}
-                    onChange={handleSectionReorder}
+                    onReorder={handleReorderByIndex}
                     onSectionClick={handleSectionClick}
                     activeSectionId={activeSectionId}
                     onSectionDelete={handleDeleteRequest}

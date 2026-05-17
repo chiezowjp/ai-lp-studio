@@ -9,7 +9,8 @@ export interface SortableSection {
 
 interface Props {
   sections: SortableSection[];
-  onChange: (newOrder: string[]) => void;
+  /** ドラッグ・▲▼ 共通：from/to インデックスで並び替えを親に委譲 */
+  onReorder: (fromIndex: number, toIndex: number) => void;
   /** セクション名クリック時のコールバック（プレビュースクロール用） */
   onSectionClick?: (id: string) => void;
   /** 現在アクティブ（スクロール先）のセクション ID */
@@ -25,54 +26,36 @@ const DT_KEY = "application/x-section-index";
 
 export default function SectionSorter({
   sections,
-  onChange,
+  onReorder,
   onSectionClick,
   activeSectionId,
   onSectionDelete,
   protectedIds,
 }: Props) {
-  // 視覚フィードバック用 state（ドラッグ中のインデックスは dataTransfer で管理）
+  // 視覚フィードバック用 state のみ（並び替えロジックは親に委譲）
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
   /**
-   * sections を常に最新版で参照するための ref。
-   * ドラッグ操作中に re-render が起きても applyReorder が古い配列を参照しない。
+   * onReorder を常に最新版で参照するための ref。
+   * ドラッグ中に React が re-render しても stale closure にならない。
    */
-  const sectionsRef = useRef<SortableSection[]>(sections);
-  sectionsRef.current = sections;
+  const onReorderRef = useRef(onReorder);
+  onReorderRef.current = onReorder;
 
   if (sections.length === 0) {
     return <p className="text-xs text-gray-400">セクションを検出中…</p>;
   }
 
-  // ────────────────────────────────────────────────────────────────────────
-  // 共通並び替え関数：ドラッグ完了時・▲▼ボタン、どちらもここを呼ぶ
-  // ────────────────────────────────────────────────────────────────────────
-  const applyReorder = (fromIndex: number, toIndex: number) => {
-    const current = sectionsRef.current; // 常に最新
-    if (
-      fromIndex === toIndex ||
-      fromIndex < 0 || toIndex < 0 ||
-      fromIndex >= current.length || toIndex >= current.length
-    ) return;
-    const next = [...current];
-    const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved);
-    onChange(next.map((s) => s.id)); // → page.tsx の handleSectionReorder を呼ぶ
-  };
-
   // ── Drag handlers ────────────────────────────────────────────────────────
 
   const handleDragStart = (e: React.DragEvent, i: number) => {
-    // インデックスをネイティブ API で保持（React state とは独立、re-render に影響されない）
     e.dataTransfer.effectAllowed = "move";
+    // インデックスを native API で保持（React state/re-render に影響されない）
     e.dataTransfer.setData(DT_KEY, String(i));
-
-    // 視覚フィードバック（opacity など）は requestAnimationFrame で遅延。
-    // ブラウザがドラッグ画像をキャプチャした AFTER に DOM を変更することで
-    // ドラッグ操作のキャンセルを防ぐ。
+    // 視覚更新は rAF で遅延してブラウザのドラッグ画像キャプチャ後に行う
     requestAnimationFrame(() => setDraggingIndex(i));
+    console.log("[DRAG] dragStart index:", i, "section:", sections[i]?.id);
   };
 
   const handleDragOver = (e: React.DragEvent, i: number) => {
@@ -83,20 +66,25 @@ export default function SectionSorter({
 
   const handleDrop = (e: React.DragEvent, toIndex: number) => {
     e.preventDefault();
-    // dataTransfer からドラッグ元インデックスを取得（React state に依存しない）
     const fromStr = e.dataTransfer.getData(DT_KEY);
     const fromIndex = parseInt(fromStr, 10);
 
-    if (!isNaN(fromIndex)) {
-      applyReorder(fromIndex, toIndex); // → HTML も sectionOrder も更新される
-    }
+    console.log("[DRAG] drop | fromStr:", fromStr, "fromIndex:", fromIndex, "toIndex:", toIndex);
 
     setDraggingIndex(null);
     setOverIndex(null);
+
+    if (!isNaN(fromIndex) && fromIndex !== toIndex) {
+      console.log("[DRAG] calling onReorder(", fromIndex, "→", toIndex, ")");
+      onReorderRef.current(fromIndex, toIndex); // 親の処理を呼ぶ（HTML も更新される）
+    } else {
+      console.log("[DRAG] skipped: fromIndex invalid or same as toIndex");
+    }
   };
 
   const handleDragEnd = () => {
-    // drop が発火しなかった場合（ドラッグキャンセル等）のクリーンアップ
+    // drop が発火しなかった場合（キャンセル等）のクリーンアップ
+    console.log("[DRAG] dragEnd (drop was not fired or already handled)");
     setDraggingIndex(null);
     setOverIndex(null);
   };
@@ -104,7 +92,9 @@ export default function SectionSorter({
   // ── ▲▼ ボタン ────────────────────────────────────────────────────────────
 
   const move = (from: number, to: number) => {
-    applyReorder(from, to); // 共通関数を使用
+    if (to < 0 || to >= sections.length) return;
+    console.log("[MOVE] ▲▼ button | from:", from, "to:", to);
+    onReorderRef.current(from, to); // ドラッグと完全に同じ関数を呼ぶ
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
