@@ -119,20 +119,34 @@ export default function AddSectionModal({ open, onClose, onAdd }: Props) {
                 </div>
               </div>
 
-              {selected.inputs?.map((inp) => (
+              {selected.inputs
+                ?.filter((inp) => !inp.dependsOn || values[inp.dependsOn.key] === inp.dependsOn.value)
+                .map((inp) => (
                 <div key={inp.key} className="space-y-1.5">
                   <label className="block text-sm font-semibold text-gray-700">
                     {inp.label}
                     {inp.required && <span className="text-red-500 ml-1">*</span>}
                   </label>
-                  <input
-                    type={inp.type ?? "text"}
-                    placeholder={inp.placeholder}
-                    value={values[inp.key] ?? ""}
-                    onChange={(e) => setValues((v) => ({ ...v, [inp.key]: e.target.value }))}
-                    required={inp.required}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-                  />
+                  {inp.type === "select" ? (
+                    <select
+                      value={values[inp.key] ?? inp.defaultValue ?? ""}
+                      onChange={(e) => setValues((v) => ({ ...v, [inp.key]: e.target.value }))}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 bg-white"
+                    >
+                      {inp.options?.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={inp.type ?? "text"}
+                      placeholder={inp.placeholder}
+                      value={values[inp.key] ?? ""}
+                      onChange={(e) => setValues((v) => ({ ...v, [inp.key]: e.target.value }))}
+                      required={inp.required}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                    />
+                  )}
                 </div>
               ))}
 

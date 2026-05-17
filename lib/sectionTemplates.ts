@@ -2,7 +2,9 @@ export interface SectionInput {
   key: string;
   label: string;
   placeholder: string;
-  type?: "text" | "tel" | "url" | "email";
+  type?: "text" | "tel" | "url" | "email" | "select";
+  options?: { value: string; label: string }[];
+  dependsOn?: { key: string; value: string };
   required?: boolean;
   defaultValue?: string;
 }
@@ -65,19 +67,65 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     id: "contact",
     label: "お問い合わせフォーム",
     icon: "📝",
-    description: "名前・メール・電話・内容の入力フォーム（実際にメール送信）",
+    description: "CF7・Formspree・mailtoから送信方式を選択",
     inputs: [
-      { key: "toEmail", label: "問い合わせ受信メールアドレス", placeholder: "info@example.com", type: "email", required: true },
-      { key: "title",   label: "セクション見出し", placeholder: "お問い合わせ", defaultValue: "お問い合わせ" },
-      { key: "lead",    label: "リード文", placeholder: "お気軽にお問い合わせください。", defaultValue: "お気軽にお問い合わせください。2〜3営業日以内にご返信いたします。" },
+      {
+        key: "method",
+        label: "フォーム送信方式",
+        placeholder: "",
+        type: "select",
+        defaultValue: "formspree",
+        options: [
+          { value: "formspree", label: "Formspree（HTML・Netlify対応）" },
+          { value: "cf7",       label: "WordPress / Contact Form 7" },
+          { value: "mailto",    label: "mailto（メーラー起動）" },
+        ],
+      },
+      {
+        key: "formspreeUrl",
+        label: "Formspree エンドポイントURL",
+        placeholder: "https://formspree.io/f/xxxxxxxx",
+        type: "url",
+        dependsOn: { key: "method", value: "formspree" },
+        required: true,
+      },
+      {
+        key: "cf7Shortcode",
+        label: "CF7 ショートコード",
+        placeholder: '[contact-form-7 id="123" title="Contact form 1"]',
+        dependsOn: { key: "method", value: "cf7" },
+        required: true,
+      },
+      {
+        key: "mailtoEmail",
+        label: "送信先メールアドレス",
+        placeholder: "info@example.com",
+        type: "email",
+        dependsOn: { key: "method", value: "mailto" },
+        required: true,
+      },
+      {
+        key: "title",
+        label: "セクション見出し",
+        placeholder: "お問い合わせ",
+        defaultValue: "お問い合わせ",
+      },
+      {
+        key: "lead",
+        label: "リード文",
+        placeholder: "お気軽にお問い合わせください。",
+        defaultValue: "お気軽にお問い合わせください。2〜3営業日以内にご返信いたします。",
+      },
     ],
-    generateHtml: ({ toEmail = "", title = "お問い合わせ", lead = "お気軽にお問い合わせください。2〜3営業日以内にご返信いたします。" }) => `
-<section class="lp-contact">
-  <div class="lp-contact-inner">
-    <h2 class="lp-contact-title">${title}</h2>
-    <p class="lp-contact-lead">${lead}</p>
-    <form class="lp-contact-form" id="lp-cf-form">
-      <input type="hidden" name="_to" value="${toEmail}">
+    generateHtml: (values) => {
+      const method       = values.method       || "formspree";
+      const title        = values.title        || "お問い合わせ";
+      const lead         = values.lead         || "お気軽にお問い合わせください。2〜3営業日以内にご返信いたします。";
+      const formspreeUrl = values.formspreeUrl || "https://formspree.io/f/xxxxxxxx";
+      const cf7Shortcode = values.cf7Shortcode || '[contact-form-7 id="1" title="Contact form 1"]';
+      const mailtoEmail  = values.mailtoEmail  || "info@example.com";
+
+      const commonFields = `
       <div class="lp-cf-row">
         <label class="lp-cf-label">お名前 <span class="lp-cf-req">*</span></label>
         <input class="lp-cf-input" type="text" name="name" placeholder="山田 太郎" required>
@@ -93,7 +141,54 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       <div class="lp-cf-row">
         <label class="lp-cf-label">お問い合わせ内容 <span class="lp-cf-req">*</span></label>
         <textarea class="lp-cf-textarea" name="message" placeholder="ご質問・ご相談内容をご入力ください" required></textarea>
+      </div>`;
+
+      /* ─ CF7 ─ */
+      if (method === "cf7") {
+        return `
+<section class="lp-contact">
+  <div class="lp-contact-inner">
+    <h2 class="lp-contact-title">${title}</h2>
+    <p class="lp-contact-lead">${lead}</p>
+    <div class="lp-cf7-wrap">
+      <div class="lp-cf7-placeholder">
+        <span class="lp-cf7-icon">📋</span>
+        <p class="lp-cf7-hint">Contact Form 7</p>
+        <code class="lp-cf7-code">${cf7Shortcode}</code>
+        <p class="lp-cf7-note">WordPressページではここにフォームが表示されます</p>
       </div>
+      <p class="lp-cf7-notwp">⚠️ このフォームは WordPress + Contact Form 7 環境でのみ動作します。通常のHTML・Netlifyでは機能しません。</p>
+    </div>
+  </div>
+</section>`.trim();
+      }
+
+      /* ─ mailto ─ */
+      if (method === "mailto") {
+        return `
+<section class="lp-contact">
+  <div class="lp-contact-inner">
+    <h2 class="lp-contact-title">${title}</h2>
+    <p class="lp-contact-lead">${lead}</p>
+    <form class="lp-contact-form" action="mailto:${mailtoEmail}" method="post" enctype="text/plain">
+      ${commonFields}
+      <div class="lp-cf-submit-wrap">
+        <button class="lp-cf-submit" type="submit">送信する →</button>
+      </div>
+    </form>
+    <p class="lp-mailto-note">※「送信する」を押すとメーラーが起動します</p>
+  </div>
+</section>`.trim();
+      }
+
+      /* ─ Formspree (default) ─ */
+      return `
+<section class="lp-contact">
+  <div class="lp-contact-inner">
+    <h2 class="lp-contact-title">${title}</h2>
+    <p class="lp-contact-lead">${lead}</p>
+    <form class="lp-contact-form" id="lp-cf-form" action="${formspreeUrl}" method="POST">
+      ${commonFields}
       <div class="lp-cf-submit-wrap">
         <button class="lp-cf-submit" type="submit" id="lp-cf-btn">送信する →</button>
       </div>
@@ -118,8 +213,11 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     e.preventDefault();
     btn.disabled = true;
     btn.textContent = '送信中…';
-    var data = new FormData(form);
-    fetch('/api/contact', { method: 'POST', body: data })
+    fetch(form.action, {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'Accept': 'application/json' }
+    })
       .then(function(r){ return r.json(); })
       .then(function(j){
         if (j.ok) {
@@ -139,7 +237,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   });
 })();
   </script>
-</section>`.trim(),
+</section>`.trim();
+    },
     generateCss: () => `
 .lp-contact { padding: 64px 20px; background: #fff; }
 .lp-contact-inner { max-width: 620px; margin: 0 auto; }
@@ -169,7 +268,25 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
 .lp-cf-result-icon { font-size: 2.5rem; }
 .lp-cf-result-title { font-size: 1.25rem; font-weight: 700; margin: 0; color: #111827; }
 .lp-cf-result-sub { font-size: .9rem; color: #6b7280; margin: 0; }
-.lp-cf-error-msg .lp-cf-result-title { color: #dc2626; }`,
+.lp-cf-error-msg .lp-cf-result-title { color: #dc2626; }
+.lp-cf7-wrap { display: flex; flex-direction: column; gap: 1rem; }
+.lp-cf7-placeholder {
+  display: flex; flex-direction: column; align-items: center; gap: .5rem;
+  padding: 2rem 1.5rem; border: 2px dashed #c7d2fe; border-radius: 12px; background: #eef2ff;
+  text-align: center;
+}
+.lp-cf7-icon { font-size: 2rem; }
+.lp-cf7-hint { font-size: .8rem; font-weight: 700; color: #6366f1; text-transform: uppercase; letter-spacing: .05em; margin: 0; }
+.lp-cf7-code {
+  display: block; padding: .5rem .875rem; background: #1e1b4b; color: #a5b4fc;
+  border-radius: 6px; font-size: .8rem; font-family: monospace; word-break: break-all;
+}
+.lp-cf7-note { font-size: .78rem; color: #6b7280; margin: 0; }
+.lp-cf7-notwp {
+  padding: .75rem 1rem; background: #fff7ed; border: 1px solid #fed7aa;
+  border-radius: 8px; font-size: .82rem; color: #92400e; margin: 0;
+}
+.lp-mailto-note { margin-top: 1rem; text-align: center; font-size: .82rem; color: #9ca3af; }`,
   },
 
   /* ── FAQ ─────────────────────────────────────────────────────────────────── */
