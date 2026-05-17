@@ -598,8 +598,11 @@ export default function Home() {
   }, []);
 
   // ─── Section reorder ──────────────────────────────────────────────────────
+  // NOTE: result / sectionOrder を参照するため deps に含める。
+  // SectionSorter 側は sectionsRef + dataTransfer で最新値を保証しているが、
+  // 念のためこちらも useCallback でラップして stale closure リスクをゼロにする。
 
-  const handleSectionReorder = (newOrder: string[]) => {
+  const handleSectionReorder = useCallback((newOrder: string[]) => {
     if (!result) return;
     const reordered = reorderHtmlSections(result.html, newOrder);
     // ラベルは現在の sectionOrder から引き継ぐ（SECTION_META 外のIDも正しく表示）
@@ -609,7 +612,8 @@ export default function Home() {
       .map((id) => ({ id, label: labelMap.get(id) ?? SECTION_META[id] ?? id }));
     setSectionOrder(nextSections);
     applyHtml(reordered, true);
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, sectionOrder, applyHtml]);
 
   // ─── Unsplash ─────────────────────────────────────────────────────────────
 

@@ -20,6 +20,9 @@ interface Props {
   protectedIds?: Set<string>;
 }
 
+/** ドラッグ data-transfer key */
+const DT_KEY = "application/x-section-index";
+
 export default function SectionSorter({
   sections,
   onChange,
@@ -28,58 +31,93 @@ export default function SectionSorter({
   onSectionDelete,
   protectedIds,
 }: Props) {
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  // 視覚フィードバック用 state（ドラッグ中のインデックスは dataTransfer で管理）
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+
+  /**
+   * sections を常に最新版で参照するための ref。
+   * ドラッグ操作中に re-render が起きても applyReorder が古い配列を参照しない。
+   */
+  const sectionsRef = useRef<SortableSection[]>(sections);
+  sectionsRef.current = sections;
 
   if (sections.length === 0) {
     return <p className="text-xs text-gray-400">セクションを検出中…</p>;
   }
 
-  const handleDragStart = (i: number) => setDragIndex(i);
+  // ────────────────────────────────────────────────────────────────────────
+  // 共通並び替え関数：ドラッグ完了時・▲▼ボタン、どちらもここを呼ぶ
+  // ────────────────────────────────────────────────────────────────────────
+  const applyReorder = (fromIndex: number, toIndex: number) => {
+    const current = sectionsRef.current; // 常に最新
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 || toIndex < 0 ||
+      fromIndex >= current.length || toIndex >= current.length
+    ) return;
+    const next = [...current];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    onChange(next.map((s) => s.id)); // → page.tsx の handleSectionReorder を呼ぶ
+  };
+
+  // ── Drag handlers ────────────────────────────────────────────────────────
+
+  const handleDragStart = (e: React.DragEvent, i: number) => {
+    // インデックスをネイティブ API で保持（React state とは独立、re-render に影響されない）
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData(DT_KEY, String(i));
+
+    // 視覚フィードバック（opacity など）は requestAnimationFrame で遅延。
+    // ブラウザがドラッグ画像をキャプチャした AFTER に DOM を変更することで
+    // ドラッグ操作のキャンセルを防ぐ。
+    requestAnimationFrame(() => setDraggingIndex(i));
+  };
 
   const handleDragOver = (e: React.DragEvent, i: number) => {
     e.preventDefault();
-    setOverIndex(i);
+    e.dataTransfer.dropEffect = "move";
+    if (overIndex !== i) setOverIndex(i);
   };
 
-  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+  const handleDrop = (e: React.DragEvent, toIndex: number) => {
     e.preventDefault();
-    if (dragIndex === null || dragIndex === dropIndex) {
-      setDragIndex(null);
-      setOverIndex(null);
-      return;
+    // dataTransfer からドラッグ元インデックスを取得（React state に依存しない）
+    const fromStr = e.dataTransfer.getData(DT_KEY);
+    const fromIndex = parseInt(fromStr, 10);
+
+    if (!isNaN(fromIndex)) {
+      applyReorder(fromIndex, toIndex); // → HTML も sectionOrder も更新される
     }
-    const next = [...sections];
-    const [moved] = next.splice(dragIndex, 1);
-    next.splice(dropIndex, 0, moved);
-    onChange(next.map((s) => s.id));
-    setDragIndex(null);
+
+    setDraggingIndex(null);
     setOverIndex(null);
   };
 
   const handleDragEnd = () => {
-    setDragIndex(null);
+    // drop が発火しなかった場合（ドラッグキャンセル等）のクリーンアップ
+    setDraggingIndex(null);
     setOverIndex(null);
   };
 
+  // ── ▲▼ ボタン ────────────────────────────────────────────────────────────
+
   const move = (from: number, to: number) => {
-    if (to < 0 || to >= sections.length) return;
-    const next = [...sections];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    onChange(next.map((s) => s.id));
+    applyReorder(from, to); // 共通関数を使用
   };
+
+  // ── Render ───────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-1">
       <p className="text-[11px] text-gray-400 mb-2">
         名前クリックでプレビューへ移動・ドラッグまたは矢印で並び替え
       </p>
-      <ul ref={listRef} className="space-y-1">
+      <ul className="space-y-1">
         {sections.map((sec, i) => {
-          const isDragging = dragIndex === i;
-          const isOver = overIndex === i && dragIndex !== i;
+          const isDragging = draggingIndex === i;
+          const isOver = overIndex === i && draggingIndex !== i;
           const isActive = sec.id === activeSectionId;
           const isProtected = protectedIds?.has(sec.id) ?? false;
           const canDelete = !!onSectionDelete && !isProtected;
@@ -88,17 +126,20 @@ export default function SectionSorter({
             <li
               key={sec.id}
               draggable
-              onDragStart={() => handleDragStart(i)}
+              onDragStart={(e) => handleDragStart(e, i)}
               onDragOver={(e) => handleDragOver(e, i)}
               onDrop={(e) => handleDrop(e, i)}
               onDragEnd={handleDragEnd}
-              className={`
-                group flex items-center gap-2 px-2 py-2 rounded-lg border text-xs
-                transition-all select-none
-                ${isDragging ? "opacity-40 bg-indigo-50 border-indigo-300" : ""}
-                ${isActive && !isDragging ? "border-[#00AFCC] bg-[#E6F8FC]" : !isDragging ? "bg-white border-gray-100" : ""}
-                ${isOver ? "border-indigo-400 bg-indigo-50 translate-y-0.5" : ""}
-              `}
+              className={[
+                "group flex items-center gap-2 px-2 py-2 rounded-lg border text-xs",
+                "transition-all select-none",
+                isDragging
+                  ? "opacity-40 bg-indigo-50 border-indigo-300"
+                  : isActive
+                  ? "border-[#00AFCC] bg-[#E6F8FC]"
+                  : "bg-white border-gray-100",
+                isOver ? "border-indigo-400 bg-indigo-50 translate-y-0.5" : "",
+              ].join(" ")}
             >
               {/* Drag handle */}
               <span className="text-gray-300 text-base leading-none cursor-grab active:cursor-grabbing shrink-0">
@@ -109,14 +150,14 @@ export default function SectionSorter({
               <button
                 type="button"
                 onClick={() => {
-                  if (dragIndex !== null) return;
+                  if (draggingIndex !== null) return;
                   onSectionClick?.(sec.id);
                 }}
-                className={`flex-1 text-left font-medium truncate transition-colors min-w-0 ${
-                  isActive
-                    ? "text-[#00AFCC]"
-                    : "text-gray-700 hover:text-[#00AFCC]"
-                } ${onSectionClick ? "cursor-pointer" : "cursor-default"}`}
+                className={[
+                  "flex-1 text-left font-medium truncate transition-colors min-w-0",
+                  isActive ? "text-[#00AFCC]" : "text-gray-700 hover:text-[#00AFCC]",
+                  onSectionClick ? "cursor-pointer" : "cursor-default",
+                ].join(" ")}
                 title={onSectionClick ? `「${sec.label}」へスクロール` : sec.label}
               >
                 {isActive && (
@@ -137,7 +178,6 @@ export default function SectionSorter({
                     text-gray-300 hover:text-red-500 hover:bg-red-50 shrink-0"
                   title={`「${sec.label}」を削除`}
                 >
-                  {/* ゴミ箱アイコン（SVG） */}
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="13"
