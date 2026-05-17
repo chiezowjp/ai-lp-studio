@@ -256,6 +256,12 @@ interface Props {
 export interface LPPreviewHandle {
   /** プレビュー内の .lp-{sectionId} 要素へスムーズスクロール＋ハイライト */
   scrollToSection: (sectionId: string) => void;
+  /**
+   * セクション並び替え・削除など「HTML だけ変わる」操作で
+   * skipNextRef をリセットしつつ即座に iframe を更新する。
+   * React の非同期チェーン（buildContent effect）を待たないため確実。
+   */
+  forceRefreshWithHtml: (newHtml: string) => void;
 }
 
 const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
@@ -271,14 +277,6 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
 }: Props, ref) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  useImperativeHandle(ref, () => ({
-    scrollToSection: (sectionId: string) => {
-      iframeRef.current?.contentWindow?.postMessage(
-        { type: "lp-scroll-to", sectionId },
-        "*"
-      );
-    },
-  }));
   const skipNextRef = useRef(false);
   const selectedSelectorRef = useRef<string | null>(selectedSelector ?? null);
   const editable = !!onHtmlChange;
@@ -287,7 +285,8 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
     selectedSelectorRef.current = selectedSelector ?? null;
   }, [selectedSelector]);
 
-  const buildContent = useCallback(() => {
+  const buildContent = useCallback((htmlOverride?: string) => {
+    const effectiveHtml = htmlOverride ?? html;
     const imageCss = imageOverrides
       .map((img) => {
         const sel = placementToSelector(img.placement);
@@ -320,10 +319,26 @@ ${css}
 ${imageCss}
 </style>
 </head>
-<body>${html}${scrollBlock}${editBlock}
+<body>${effectiveHtml}${scrollBlock}${editBlock}
 </body>
 </html>`;
   }, [html, css, imageOverrides, editable, editMode]);
+
+  useImperativeHandle(ref, () => ({
+    scrollToSection: (sectionId: string) => {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "lp-scroll-to", sectionId },
+        "*"
+      );
+    },
+    forceRefreshWithHtml: (newHtml: string) => {
+      const iframe = iframeRef.current;
+      if (!iframe) return;
+      // 直後の buildContent effect が二重更新するのを防ぐ
+      skipNextRef.current = true;
+      iframe.srcdoc = buildContent(newHtml);
+    },
+  }), [buildContent]); // buildContent が変わるたびに最新クロージャを反映
 
   // Sync iframe content — skip when triggered by our own edit
   useEffect(() => {

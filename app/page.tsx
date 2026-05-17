@@ -608,21 +608,12 @@ export default function Home() {
     const currentResult = resultRef.current;
     const currentSections = sectionOrderRef.current;
 
-    console.log("[REORDER] called | from:", fromIndex, "to:", toIndex);
-    console.log("[REORDER] currentSections:", currentSections.map(s => s.id));
-
-    if (!currentResult) {
-      console.warn("[REORDER] result is null, skipping");
-      return;
-    }
+    if (!currentResult) return;
     if (
       fromIndex === toIndex ||
       fromIndex < 0 || toIndex < 0 ||
       fromIndex >= currentSections.length || toIndex >= currentSections.length
-    ) {
-      console.warn("[REORDER] invalid indices, skipping");
-      return;
-    }
+    ) return;
 
     // 新しいセクション順を計算
     const next = [...currentSections];
@@ -630,20 +621,17 @@ export default function Home() {
     next.splice(toIndex, 0, moved);
     const newOrder = next.map(s => s.id);
 
-    console.log("[REORDER] newOrder:", newOrder);
-    console.log("[REORDER] result.html 先頭80:", currentResult.html.slice(0, 80));
-
     // HTML を並び替え
     const reorderedHtml = reorderHtmlSections(currentResult.html, newOrder);
 
-    console.log("[REORDER] reorderedHtml 先頭80:", reorderedHtml.slice(0, 80));
-    console.log("[REORDER] HTML changed:", reorderedHtml !== currentResult.html);
+    // ① 即座にプレビューを更新（React の非同期チェーンを待たない）
+    //    forceRefreshWithHtml が skipNextRef = true にセットするため
+    //    直後の buildContent effect は二重更新を防ぐためスキップされる
+    previewRef.current?.forceRefreshWithHtml(reorderedHtml);
 
-    // sectionOrder を更新（ラベルは引き継ぐ）
+    // ② 左パネルと React state を更新（Undo スタック含む）
     setSectionOrder(next);
-    // HTML を更新 → LPPreview が再描画される
     applyHtml(reorderedHtml, true);
-    console.log("[REORDER] applyHtml called ✓");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applyHtml]);
 
