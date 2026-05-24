@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { extractAndParseJSON } from "@/lib/parseAIJson";
+import { requirePlanGuard } from "@/lib/plan-guard";
+import { checkRateLimitBoth, getClientIp } from "@/lib/rate-limiter";
+import { checkInputSize, checkContentLength } from "@/lib/input-guard";
+import { logRateLimitExceeded } from "@/lib/audit-logger";
 
 const SYSTEM_PROMPT = `あなたはJSON APIです。
 ユーザーの指示に従い、必ず有効なJSONオブジェクトのみを返してください。
@@ -12,8 +16,33 @@ const SYSTEM_PROMPT = `あなたはJSON APIです。
 - 出力はJSONパーサーで直接パースできる形式のみとすること`;
 
 export async function POST(req: NextRequest) {
+  // ── Content-Length 早期チェック ──
+  const clCheck = checkContentLength(req);
+  if (clCheck) return clCheck;
+
+  // ── サーバーサイド プラン・課金ガード ──
+  const guard = await requirePlanGuard(req, { checkUsage: "ai_edit" });
+  if (guard instanceof NextResponse) return guard;
+  const { user, planType } = guard;
+
+  // ── レートリミット ──
+  const ip = getClientIp(req);
+  const rl = checkRateLimitBoth(ip, user.id, "ai_edit", planType);
+  if (!rl.allowed) {
+    logRateLimitExceeded({ userId: user.id, ip, action: "ai_edit", count: rl.count, limit: rl.limit });
+    return NextResponse.json(
+      { error: "リクエストが多すぎます。しばらく待ってから再試行してください。", retry_after: rl.retryAfter },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
+
   try {
-    const { html, css, instruction } = await req.json();
+    const body = await req.json();
+    const { html, css, instruction } = body as { html: string; css: string; instruction: string };
+
+    // ── 入力サイズ検証 ──
+    const sizeCheck = checkInputSize(body as Record<string, unknown>, { hasHtml: true });
+    if (sizeCheck) return sizeCheck;
 
     if (!html || !css || !instruction?.trim()) {
       return NextResponse.json({ error: "html, css, instruction は必須です" }, { status: 400 });

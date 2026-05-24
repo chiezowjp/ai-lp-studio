@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import LPForm from "@/components/LPForm";
-import LPPreview, { LPPreviewHandle } from "@/components/LPPreview";
+import LPPreview, { LPPreviewHandle, ButtonImageOverride } from "@/components/LPPreview";
 import CodeBlock from "@/components/CodeBlock";
 import RevisionForm from "@/components/RevisionForm";
 import SEOChecker from "@/components/SEOChecker";
@@ -14,28 +15,42 @@ import SiteImporter from "@/components/SiteImporter";
 import VisualStylePanel from "@/components/VisualStylePanel";
 import LPRefAnalyzer from "@/components/LPRefAnalyzer";
 import SectionImageManager from "@/components/SectionImageManager";
-import { LPFormData, GeneratedLP, UploadedImage, PreviewMode, UnsplashResult, SavedImagePrompt, SelectedElement, VisualStyles, StyleRule } from "@/types";
+import ImageInsertPanel from "@/components/ImageInsertPanel";
+import FreeBlockPanel from "@/components/FreeBlockPanel";
+import CustomHtmlPanel from "@/components/CustomHtmlPanel";
+import { LPFormData, GeneratedLP, UploadedImage, PreviewMode, UnsplashResult, SavedImagePrompt, SelectedElement, VisualStyles, StyleRule, LPAnalysis } from "@/types";
+import type { ProblemLayout } from "@/components/LPRefAnalyzer";
 import { SECTION_TEMPLATES } from "@/lib/sectionTemplates";
 import { buildVisualCss } from "@/lib/visualStyles";
 import { extractSectionLabel } from "@/lib/sectionLabel";
+import { FONT_OPTIONS, DEFAULT_FONT_ID, buildFontCss, getFontGoogleUrl, getFontOption } from "@/lib/fonts";
 import {
   LPProject, ProjectSnapshot,
   buildProject, saveToLocal, loadFromLocal, clearLocal,
   downloadProject, parseProjectFile, formatSavedAt,
   serializeImages, serializeImagesSync, deserializeImages,
 } from "@/lib/project";
+import { useAuth } from "@/lib/auth-context";
+import { usePlan } from "@/lib/plan-context";
+import { isLimitReached, PLAN_LIMITS } from "@/lib/plans";
+import PlanBadge from "@/components/PlanBadge";
+import UpgradeModal from "@/components/UpgradeModal";
+import LockScreen from "@/components/LockScreen";
+import PublishPanel from "@/components/PublishPanel";
+import FormConfigPanel from "@/components/FormConfigPanel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type ResultTab = "preview" | "html" | "css" | "netlify";
 type InputMethod = "form" | "url" | "text" | "ref";
-type EditMode = "text" | "style";
+type EditMode = "text" | "style" | "image";
 
-/** Undo スナップショット — HTML・セクション順・スタイルをまとめて保存 */
+/** Undo スナップショット — HTML・セクション順・スタイル・フォントをまとめて保存 */
 type UndoSnapshot = {
   html: string;
   sectionOrder: SortableSection[];
   visualStyles: VisualStyles;
+  globalFont: string;
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -87,13 +102,68 @@ async function generateWithRetry(
 }
 
 /**
+ * セレクター（例: ".lp-hero"）に対する背景色を CSS テキストから直接抽出する。
+ * iframe から受け取った computedStyles.backgroundColor が transparent/白の場合のフォールバックとして使用。
+ * background-color（solid）・background shorthand（gradient 含む）の両方に対応。
+ */
+function extractBgFromSelector(selector: string, css: string): string {
+  const lpClass = selector.replace(/^\./, ""); // ".lp-hero" → "lp-hero"
+  const re = new RegExp(`(?:^|[^\\w-])(\\.${lpClass})\\s*\\{([^}]+)\\}`, "gm");
+  const isClear = (v: string) =>
+    !v || v === "transparent" || /^rgba?\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(v.trim());
+  const firstColor = (v: string) => {
+    const m = v.match(/rgba?\([^)]+\)|#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}\b/);
+    return m ? m[0] : "";
+  };
+  let found = "";
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(css)) !== null) {
+    const block = match[2];
+    // background-color を先に確認
+    const m1 = block.match(/background-color\s*:\s*([^;!}\n]+)/);
+    if (m1) {
+      const v = m1[1].trim();
+      if (!isClear(v) && v !== "initial" && v !== "inherit") found = v;
+    }
+    // background shorthand（gradient 含む）— background-image: 等は除外
+    const m2 = block.match(/(?<![a-z-])background\s*:\s*([^;!}\n]+)/);
+    if (m2) {
+      const c = firstColor(m2[1].trim());
+      if (c && !isClear(c)) found = c;
+    }
+  }
+  return found;
+}
+
+/**
  * placement が "other" の場合は汎用ラッパー、それ以外は `.lp-{placement}` を使用。
  * sectionOrder がどう変わっても LP の lp-* クラスに確実にマッチする。
+ *
+ * data-bubble-layout="1" 付きセクションは背景画像を contain/center で表示
+ * （人物画像を大きく中央表示させるため）。
  */
-function buildImageCss(images: UploadedImage[]): string {
+function buildImageCss(images: UploadedImage[], html: string = ""): string {
+  // HTML から吹き出しセクション ID を検出
+  const bubbleIds = new Set<string>();
+  if (typeof window !== "undefined" && html) {
+    try {
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      doc.querySelectorAll("[data-bubble-layout]").forEach((el) => {
+        for (const cls of Array.from(el.classList)) {
+          const m = cls.match(/^lp-([a-z0-9-]+)$/);
+          if (m) { bubbleIds.add(m[1]); break; }
+        }
+      });
+    } catch { /* ignore */ }
+  }
+
   return images
     .map((img) => {
       const sel = img.placement === "other" ? ".lp-wrapper" : `.lp-${img.placement}`;
+      if (img.placement !== "other" && bubbleIds.has(img.placement)) {
+        // 吹き出しセクション：人物画像を背景に contain で表示
+        return `${sel} { background-image: url("${img.url}") !important; background-size: contain !important; background-position: center !important; background-repeat: no-repeat !important; }`;
+      }
       return `${sel} { background-image: url("${img.url}") !important; background-size: cover !important; background-position: center !important; }`;
     })
     .join("\n");
@@ -203,6 +273,18 @@ function reorderHtmlSections(html: string, newOrder: string[]): string {
 }
 
 /** 指定セクションを HTML から削除（DOM全スキャン） */
+/** elementId または selector で要素を HTML から削除する（セクション以外の個別要素用） */
+function deleteElementFromHtml(html: string, elementId?: string, selector?: string): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  let el: Element | null = null;
+  if (elementId) el = doc.querySelector(`[data-element-id="${elementId}"]`);
+  if (!el && selector) el = doc.querySelector(selector);
+  if (!el) return html;
+  el.remove();
+  return doc.body.innerHTML;
+}
+
 function removeSectionFromHtml(html: string, sectionId: string): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -218,6 +300,40 @@ function removeSectionFromHtml(html: string, sectionId: string): string {
     }
   }
   return doc.body.innerHTML;
+}
+
+/** 指定セクションの outerHTML を新しい HTML で丸ごと置換 */
+function replaceSectionInHtml(html: string, sectionId: string, newSectionHtml: string): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const wrapper = doc.querySelector(".lp-wrapper") ?? doc.body;
+  const sectionClass = /^lp-([a-z][a-z0-9_]*)$/;
+  for (const child of Array.from(wrapper.children)) {
+    for (const cls of Array.from(child.classList)) {
+      const m = cls.match(sectionClass);
+      if (m && m[1] === sectionId) {
+        const temp = doc.createElement("div");
+        temp.innerHTML = newSectionHtml.trim();
+        const newEl = temp.firstElementChild;
+        if (newEl) wrapper.replaceChild(newEl, child);
+        break;
+      }
+    }
+  }
+  return doc.body.innerHTML;
+}
+
+/** セクション一覧から「お悩み・問題提起」セクションの ID を推定する */
+function findProblemSectionId(sections: SortableSection[]): string | null {
+  const idKeywords = ["problem", "trouble", "worry", "nayami", "onaymi", "sadami"];
+  const labelKeywords = ["悩み", "問題", "お困り", "不安", "こんな", "trouble"];
+  return (
+    sections.find(
+      (s) =>
+        idKeywords.some((k) => s.id.includes(k)) ||
+        labelKeywords.some((k) => s.label.includes(k))
+    )?.id ?? null
+  );
 }
 
 /** 新セクションを既存 HTML に挿入（CTA 直前 or 末尾） */
@@ -243,22 +359,118 @@ function insertSectionHtml(currentHtml: string, newHtml: string, insertAtEnd = f
   return doc.body.innerHTML;
 }
 
-function buildNetlifyHtml(html: string, css: string, serviceName: string, unsplashImages: UploadedImage[]): string {
+/** ボタン要素を <img> タグに置換（HTML / Netlify 出力用） */
+function applyButtonImages(html: string, vs: VisualStyles): string {
+  if (typeof window === "undefined") return html;
+
+  const overrides = Object.entries(vs)
+    .filter(([, rule]) => rule.imageButton?.url)
+    .map(([selector, rule]) => ({ selector, ib: rule.imageButton! }));
+
+  if (overrides.length === 0) return html;
+
+  const doc = new DOMParser().parseFromString(html, "text/html");
+
+  /** ボタン要素のスタイルをリセット（白枠除去） */
+  function stripButtonStyle(el: Element) {
+    (el as HTMLElement).style.setProperty("background", "transparent", "important");
+    (el as HTMLElement).style.setProperty("background-color", "transparent", "important");
+    (el as HTMLElement).style.setProperty("background-image", "none", "important");
+    (el as HTMLElement).style.setProperty("border", "none", "important");
+    (el as HTMLElement).style.setProperty("box-shadow", "none", "important");
+    (el as HTMLElement).style.setProperty("padding", "0", "important");
+    (el as HTMLElement).style.setProperty("margin", "0", "important");
+    (el as HTMLElement).style.setProperty("display", "inline-block", "important");
+    (el as HTMLElement).style.setProperty("line-height", "0", "important");
+    (el as HTMLElement).style.setProperty("text-decoration", "none", "important");
+  }
+
+  /** 親ラッパー要素の背景・枠を除去 */
+  function stripWrapStyle(el: Element) {
+    (el as HTMLElement).style.setProperty("background", "transparent", "important");
+    (el as HTMLElement).style.setProperty("background-color", "transparent", "important");
+    (el as HTMLElement).style.setProperty("border", "none", "important");
+    (el as HTMLElement).style.setProperty("box-shadow", "none", "important");
+  }
+
+  for (const { selector, ib } of overrides) {
+    try {
+      const el = doc.querySelector(selector);
+      if (!el) continue;
+
+      const img = doc.createElement("img");
+      img.src = ib.url;
+      if (ib.alt) img.alt = ib.alt;
+
+      const fit = ib.fitMode ?? "cover";
+      const objectFit = fit === "stretch" ? "fill" : fit;
+      const styleProps: string[] = ["display:block", `object-fit:${objectFit}`];
+      if (ib.width !== "auto") styleProps.push(`width:${ib.width}`);
+      if (ib.maintainRatio) {
+        styleProps.push("height:auto");
+      } else if (ib.height !== "auto") {
+        styleProps.push(`height:${ib.height}`);
+      }
+      img.setAttribute("style", styleProps.join(";"));
+
+      const tag = el.tagName.toLowerCase();
+      if (tag === "a") {
+        el.innerHTML = "";
+        el.appendChild(img);
+        stripButtonStyle(el);
+        if (el.parentElement) stripWrapStyle(el.parentElement);
+      } else if (tag === "button") {
+        const parentEl = el.parentElement;
+        const parentTag = parentEl?.tagName.toLowerCase();
+        if (parentTag === "a") {
+          // <a><button>...</button></a> → <a><img /></a>
+          parentEl!.innerHTML = "";
+          parentEl!.appendChild(img);
+          stripButtonStyle(parentEl!);
+          if (parentEl!.parentElement) stripWrapStyle(parentEl!.parentElement);
+        } else {
+          const grandParent = parentEl;
+          el.replaceWith(img);
+          if (grandParent) stripWrapStyle(grandParent);
+        }
+      } else {
+        el.innerHTML = "";
+        el.appendChild(img);
+        stripButtonStyle(el);
+        if (el.parentElement) stripWrapStyle(el.parentElement);
+      }
+    } catch {
+      // 個別セレクタのエラーは無視
+    }
+  }
+
+  return doc.body.innerHTML;
+}
+
+function buildNetlifyHtml(
+  html: string,
+  css: string,
+  serviceName: string,
+  unsplashImages: UploadedImage[],
+  fontUrl?: string,
+): string {
   const attrComments = unsplashImages
     .filter((img) => img.attribution)
     .map((img) => `<!-- Photo by ${img.attribution!.photographerName} on Unsplash -->`)
     .join("\n");
+  const fontLink = fontUrl
+    ? `  <link rel="preconnect" href="https://fonts.googleapis.com">\n  <link href="${fontUrl}" rel="stylesheet">`
+    : `  <link rel="preconnect" href="https://fonts.googleapis.com">\n  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">`;
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="${serviceName}のランディングページ" />
   <title>${serviceName}</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+${fontLink}
   <style>
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; padding: 0; font-family: 'Noto Sans JP', sans-serif; }
+body { margin: 0; padding: 0; }
 img { max-width: 100%; height: auto; }
 ${css}
   </style>
@@ -320,6 +532,11 @@ export default function Home() {
   const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
   const [visualStyles, setVisualStyles] = useState<VisualStyles>({});
 
+  // ── Font ──
+  const [globalFont, setGlobalFont] = useState<string>(DEFAULT_FONT_ID);
+  const globalFontRef = useRef<string>(DEFAULT_FONT_ID);
+  globalFontRef.current = globalFont;
+
   // ── Input method ──
   const [inputMethod, setInputMethod] = useState<InputMethod>("form");
   const [importedValues, setImportedValues] = useState<Partial<LPFormData> | undefined>(undefined);
@@ -327,6 +544,25 @@ export default function Home() {
   const [hearingText, setHearingText] = useState("");
   const [hearingLoading, setHearingLoading] = useState(false);
   const [hearingError, setHearingError] = useState<string | null>(null);
+
+  // ── Auth ──
+  const { user, session, signInWithGoogle, signOut } = useAuth();
+  const router = useRouter();
+
+  // ── Plan ──
+  const { planType, usage, recordUsage } = usePlan();
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeReason, setUpgradeReason]       = useState<string | undefined>(undefined);
+
+  /** アップグレードモーダルを開くヘルパー */
+  const openUpgrade = (reason?: string) => {
+    setUpgradeReason(reason);
+    setShowUpgradeModal(true);
+  };
+
+  // ── Publish ──
+  const [showPublishPanel, setShowPublishPanel] = useState(false);
+  const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
 
   // ── Project save / load ──
   const [savedProject, setSavedProject] = useState<LPProject | null>(null);
@@ -336,6 +572,12 @@ export default function Home() {
   const [saveMenuOpen, setSaveMenuOpen] = useState(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadFileRef = useRef<HTMLInputElement>(null);
+
+  // ── Cloud save ──
+  /** 現在編集中プロジェクトの Supabase UUID（null = 未保存） */
+  const [remoteProjectId, setRemoteProjectId] = useState<string | null>(null);
+  type CloudStatus = "idle" | "saving" | "saved" | "error";
+  const [cloudStatus, setCloudStatus] = useState<CloudStatus>("idle");
 
   // ── Undo（スナップショット方式、最大20件）──
   const [undoStack, setUndoStack] = useState<UndoSnapshot[]>([]);
@@ -351,6 +593,8 @@ export default function Home() {
 
   // ── Section order ──
   const [sectionOrder, setSectionOrder] = useState<SortableSection[]>([]);
+  /** insertAtEnd セクション（固定CTAバーなど）— セクション一覧とは別に管理 */
+  const [fixedSections, setFixedSections] = useState<SortableSection[]>([]);
 
   // ── Section navigation（サイドバークリック → プレビュースクロール）──
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
@@ -363,6 +607,12 @@ export default function Home() {
   visualStylesRef.current = visualStyles;
   const resultRef = useRef(result);
   resultRef.current = result;
+
+  // ── 参考LP 吹き出し切り替え ──
+  const [refAnalysis, setRefAnalysis] = useState<LPAnalysis | null>(null);
+  const [refProblemLayout, setRefProblemLayout] = useState<ProblemLayout>("normal");
+  const [sectionSwapLoading, setSectionSwapLoading] = useState(false);
+  const [sectionSwapError, setSectionSwapError] = useState<string | null>(null);
 
   // ── Add section ──
   const [addSectionOpen, setAddSectionOpen] = useState(false);
@@ -385,14 +635,41 @@ export default function Home() {
 
   const effectiveCss = useMemo(() => {
     if (!result) return "";
-    let css = replaceColors(result.css, colorReplacements);
+
+    // 追加セクションの見出しを AI 生成 LP の見出し重みに自動で揃える。
+    // result.css 内のタイトル系クラス（lp-*-title / lp-*-heading / lp-*-headline）
+    // または h1〜h3 で最初に見つかった font-weight 値を CSS 変数として提供し、
+    // テンプレートの var(--lp-heading-weight, 700) が参照する。
+    const hwMatch = /(?:\.lp-[a-z0-9-]*(?:title|heading|headline|catch|ttl)[a-z0-9-]*|h[1-3])\b[\s\S]*?\{[\s\S]*?font-weight\s*:\s*(\d+)/.exec(result.css);
+    const headingWeight = hwMatch ? hwMatch[1] : "700";
+    const headingWeightCss = `:root{--lp-heading-weight:${headingWeight}}\n`;
+
+    let css = headingWeightCss + replaceColors(result.css, colorReplacements);
     if (additionalCss) css += "\n/* 追加セクション */\n" + additionalCss;
-    const imgCss = buildImageCss(images);
+    const imgCss = buildImageCss(images, result.html);
     if (imgCss) css += "\n/* 画像オーバーライド */\n" + imgCss;
     const visualCss = buildVisualCss(visualStyles);
     if (visualCss) css += "\n" + visualCss;
+    const fontCss = buildFontCss(globalFont);
+    css += "\n" + fontCss;
     return css;
-  }, [result, colorReplacements, additionalCss, images, visualStyles]);
+  }, [result, colorReplacements, additionalCss, images, visualStyles, globalFont]);
+
+  /** HTML/Netlify出力用：ボタン画像差し替えを適用したHTML */
+  const buttonProcessedHtml = useMemo(() => {
+    if (!result?.html) return "";
+    return applyButtonImages(result.html, visualStyles);
+  }, [result?.html, visualStyles]);
+
+  /** プレビュー用：ボタン画像オーバーライド一覧 */
+  const buttonImageOverrides = useMemo<ButtonImageOverride[]>(() => {
+    return Object.entries(visualStyles)
+      .filter(([, rule]) => rule.imageButton?.url)
+      .map(([selector, rule]) => ({ selector, config: rule.imageButton! }));
+  }, [visualStyles]);
+
+  const fontGoogleUrl = useMemo(() => getFontGoogleUrl(globalFont), [globalFont]);
+  const fontFamily    = useMemo(() => getFontOption(globalFont).cssFamily, [globalFont]);
 
   const extractedColors = useMemo(() => {
     if (!result?.css) return [];
@@ -428,6 +705,7 @@ export default function Home() {
           html: prev.html,
           sectionOrder: [...sectionOrderRef.current],
           visualStyles: { ...visualStylesRef.current },
+          globalFont: globalFontRef.current,
         };
         setUndoStack((h) => [...h.slice(-19), snapshot]);
       }
@@ -444,6 +722,7 @@ export default function Home() {
       html: result.html,
       sectionOrder: [...sectionOrderRef.current],
       visualStyles: { ...visualStylesRef.current },
+      globalFont: globalFontRef.current,
     };
     setUndoStack((h) => [...h.slice(-19), snapshot]);
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -455,11 +734,23 @@ export default function Home() {
     setResult((r) => (r ? { ...r, html: snapshot.html } : r));
     setSectionOrder(snapshot.sectionOrder);
     setVisualStyles(snapshot.visualStyles);
+    setGlobalFont(snapshot.globalFont ?? DEFAULT_FONT_ID);
   }, [undoStack]);
 
   // ─── Generate ─────────────────────────────────────────────────────────────
 
   const handleGenerate = async (data: LPFormData) => {
+    // プランチェック
+    if (planType === "expired") {
+      openUpgrade("トライアル期間が終了しました。Proプランにアップグレードしてください。");
+      return;
+    }
+    if (planType && isLimitReached("generate", usage, planType)) {
+      const lim = PLAN_LIMITS[planType].maxGenerate;
+      openUpgrade(`LP生成の月間上限（${lim}回）に達しました。Proプランで回数を増やせます。`);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
@@ -470,6 +761,7 @@ export default function Home() {
     setVisualStyles({});
     setSelectedElement(null);
     setEditMode("text");
+    setGlobalFont(DEFAULT_FONT_ID);
     setServiceName(data.serviceName);
     setLastFormData(data);
     setUnsplashResult(null);
@@ -478,6 +770,7 @@ export default function Home() {
       setResult(generated);
       setSectionOrder(parseSectionOrder(generated.html));
       setActiveTab("preview");
+      recordUsage("generate");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "不明なエラーが発生しました");
     } finally {
@@ -506,6 +799,7 @@ export default function Home() {
       setSectionOrder(parseSectionOrder(generated.html));
       setActiveTab("preview");
       setRegenFormKey((k) => k + 1); // フォームを最新データで再初期化
+      recordUsage("generate");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "不明なエラーが発生しました");
     } finally {
@@ -518,6 +812,16 @@ export default function Home() {
 
   const handleRevise = async (instruction: string) => {
     if (!result) return;
+    // プランチェック
+    if (planType === "expired") {
+      openUpgrade("トライアル期間が終了しました。Proプランにアップグレードしてください。");
+      return;
+    }
+    if (planType && isLimitReached("ai_edit", usage, planType)) {
+      const lim = PLAN_LIMITS[planType].maxAiEdit;
+      openUpgrade(`AI編集の月間上限（${lim}回）に達しました。Proプランで回数を増やせます。`);
+      return;
+    }
     setRevisionLoading(true);
     setRevisionError(null);
     setUndoStack([]);
@@ -532,6 +836,7 @@ export default function Home() {
       setResult(json as GeneratedLP);
       setSectionOrder(parseSectionOrder((json as GeneratedLP).html));
       setActiveTab("preview");
+      recordUsage("ai_edit");
     } catch (err: unknown) {
       setRevisionError(err instanceof Error ? err.message : "不明なエラーが発生しました");
     } finally {
@@ -546,17 +851,36 @@ export default function Home() {
     const template = SECTION_TEMPLATES.find((t) => t.id === templateId);
     const newHtml = insertSectionHtml(result.html, html, template?.insertAtEnd);
     applyHtml(newHtml, true);
-    // CSS は型ごとに1度だけ
+    // CSS は型ごとに1度だけ（複数インスタンスでも共通CSSは1回のみ）
     setAdditionalCssByType((prev) => ({ ...prev, [templateId]: css }));
-    // SectionSorter に追加（fixedcta は並び替え対象外）
-    if (!template?.insertAtEnd) {
-      setSectionOrder((prev) => {
+    // SectionSorter に追加（insertAtEnd は固定要素として別管理）
+    if (template?.insertAtEnd) {
+      setFixedSections((prev) => {
         if (prev.some((s) => s.id === templateId)) return prev;
         const meta = SECTION_META[templateId] ?? templateId;
+        return [...prev, { id: templateId, label: meta }];
+      });
+    } else {
+      setSectionOrder((prev) => {
+        // multipleAllowed テンプレート：HTML から一意クラスを取り出してインスタンス ID にする
+        let sectionId = templateId;
+        if (template?.multipleAllowed && typeof window !== "undefined") {
+          const doc = new DOMParser().parseFromString(html, "text/html");
+          const sec = doc.querySelector(`.lp-${templateId}`);
+          if (sec) {
+            const uniqueCls = Array.from(sec.classList).find(
+              (c) => c !== `lp-${templateId}` && c.startsWith(`lp-${templateId}_`)
+            );
+            if (uniqueCls) sectionId = uniqueCls.replace(/^lp-/, "");
+          }
+        }
+        // 通常テンプレートは重複追加を防ぐ
+        if (!template?.multipleAllowed && prev.some((s) => s.id === sectionId)) return prev;
+        const label = SECTION_META[templateId] ?? template?.label ?? templateId;
         // CTA の前に挿入
         const ctaIdx = prev.findIndex((s) => s.id === "cta");
         const next = [...prev];
-        next.splice(ctaIdx >= 0 ? ctaIdx : next.length, 0, { id: templateId, label: meta });
+        next.splice(ctaIdx >= 0 ? ctaIdx : next.length, 0, { id: sectionId, label });
         return next;
       });
     }
@@ -581,6 +905,7 @@ export default function Home() {
 
     applyHtml(newHtml, true);            // ← undo スナップショット作成 + html 更新
     setSectionOrder(newSectionOrder);   // ← 順序更新（スナップショット取得後）
+    setFixedSections((prev) => prev.filter((s) => s.id !== id)); // ← 固定要素も削除
     setImages(newImages);               // ← 関連画像削除（undo では非復元・許容）
     if (activeSectionId === id) setActiveSectionId(null);
 
@@ -681,6 +1006,32 @@ export default function Home() {
   };
 
   const handleElementSelect = (el: SelectedElement | null) => {
+    // セクション要素かつ背景色が transparent / 白 (= gradient fallback) の場合、
+    // CSS テキストから直接パースして正しい背景色を補完する。
+    // ※ visualStyles オーバーライドを含む effectiveCss ではなく result.css（元 CSS）を使う。
+    //   そうしないと「誤って白を保存した場合」に visual override 側の白が返ってしまう。
+    if (el && el.type === "section") {
+      const bg = el.computedStyles.backgroundColor ?? "";
+      const bgAlpha = (() => {
+        const m = bg.match(/^rgba\s*\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\s*\)/);
+        return m ? parseFloat(m[1]) : null;
+      })();
+      const isBgUnclear =
+        !bg ||
+        bg === "transparent" ||
+        bg === "rgb(255, 255, 255)" ||
+        /^rgba?\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(bg.trim()) ||
+        // alpha < 0.15 の rgba は事実上透明（lp-vs-a の rgba(99,102,241,.05) 等）
+        (bgAlpha !== null && bgAlpha < 0.15);
+      if (isBgUnclear) {
+        // result.css に colorReplacements を適用したものを使う（visual/image override は除外）
+        const baseCss = result?.css ? replaceColors(result.css, colorReplacements) : "";
+        const fromCss = extractBgFromSelector(el.selector, baseCss);
+        if (fromCss) {
+          el = { ...el, computedStyles: { ...el.computedStyles, backgroundColor: fromCss } };
+        }
+      }
+    }
     setSelectedElement(el);
   };
 
@@ -711,6 +1062,64 @@ export default function Home() {
     setSavedProject(project);
     setShowRestoreBanner(false);
   }, []);
+
+  // ─── Project: スナップショットを API ペイロードに変換 ─────────────────────────
+
+  const buildCloudPayload = useCallback(async (opts: { fullBlob?: boolean } = {}) => {
+    if (!result || !lastFormData) return null;
+    const imgs = opts.fullBlob ? await serializeImages(images) : serializeImagesSync(images);
+    const snap: ProjectSnapshot = {
+      formData: lastFormData, html: result.html, css: result.css,
+      colorReplacements, visualStyles, sectionOrder, additionalCssByType,
+      images: imgs,
+    };
+    const project = buildProject(snap);
+    return {
+      title: project.name,
+      html: project.html,
+      css: project.css,
+      project_json: project as unknown as Record<string, unknown>,
+    };
+  }, [result, lastFormData, images, colorReplacements, visualStyles, sectionOrder, additionalCssByType]);
+
+  // ─── Project: クラウド保存（新規作成 or 更新）────────────────────────────────
+
+  const handleSaveRemote = useCallback(async () => {
+    if (!session) return;
+    const payload = await buildCloudPayload({ fullBlob: true });
+    if (!payload) return;
+    setCloudStatus("saving");
+    setIsSaving(true);
+    setSaveMenuOpen(false);
+    try {
+      let res: Response;
+      if (remoteProjectId) {
+        res = await fetch(`/api/projects/${remoteProjectId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch("/api/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify(payload),
+        });
+      }
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "保存失敗");
+      if (!remoteProjectId) setRemoteProjectId(json.id);
+      setCloudStatus("saved");
+      setSaveToast("クラウドに保存しました ☁");
+      setTimeout(() => { setSaveToast(null); setCloudStatus("idle"); }, 3000);
+    } catch (e) {
+      setCloudStatus("error");
+      setSaveToast(e instanceof Error ? e.message : "クラウド保存に失敗しました");
+      setTimeout(() => { setSaveToast(null); setCloudStatus("idle"); }, 3000);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [session, remoteProjectId, buildCloudPayload]);
 
   // ─── Project: ローカル保存（同期・高速）──────────────────────────────────────
 
@@ -789,7 +1198,12 @@ export default function Home() {
 
   // ─── Ref LP complete ──────────────────────────────────────────────────────
 
-  const handleRefComplete = (generated: GeneratedLP, formData: LPFormData) => {
+  const handleRefComplete = (
+    generated: GeneratedLP,
+    formData: LPFormData,
+    lpAnalysis: LPAnalysis,
+    currentLayout: ProblemLayout,
+  ) => {
     setResult(generated);
     setLastFormData(formData);
     setServiceName(formData.serviceName);
@@ -803,7 +1217,55 @@ export default function Home() {
     setActiveTab("preview");
     setUnsplashResult(null);
     setInputMethod("form");
+    // 参考LP吹き出し切り替え用に保存
+    setRefAnalysis(lpAnalysis ?? null);
+    setRefProblemLayout(currentLayout ?? "normal");
+    setSectionSwapError(null);
   };
+
+  // ─── 問題セクション レイアウト切り替え ─────────────────────────────────────
+
+  const handleSwapProblemLayout = useCallback(async () => {
+    if (!result || !lastFormData) return;
+    const newLayout: ProblemLayout = refProblemLayout === "normal" ? "bubble" : "normal";
+    const problemSectionId = findProblemSectionId(sectionOrderRef.current);
+    if (!problemSectionId) {
+      setSectionSwapError("お悩みセクションが見つかりませんでした");
+      return;
+    }
+    const sec = sectionOrderRef.current.find((s) => s.id === problemSectionId);
+
+    setSectionSwapLoading(true);
+    setSectionSwapError(null);
+    try {
+      const res = await fetch("/api/regenerate-section", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sectionId: problemSectionId,
+          sectionName: sec?.label ?? problemSectionId,
+          sectionRole: refAnalysis?.sections?.find((s) => s.id === problemSectionId)?.role ?? "ターゲットのお悩みを提起し共感を得るセクション",
+          analysis: refAnalysis ?? null,
+          serviceInfo: lastFormData,
+          problemLayout: newLayout,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "切り替えに失敗しました");
+
+      const newHtml = replaceSectionInHtml(resultRef.current!.html, problemSectionId, json.html);
+      applyHtml(newHtml, true);
+      if (json.css?.trim()) {
+        setAdditionalCssByType((prev) => ({ ...prev, [`problem-swap-${newLayout}`]: json.css }));
+      }
+      setRefProblemLayout(newLayout);
+    } catch (err) {
+      setSectionSwapError(err instanceof Error ? err.message : "切り替えに失敗しました");
+    } finally {
+      setSectionSwapLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, lastFormData, refAnalysis, refProblemLayout, applyHtml]);
 
   // ─── Site importer ────────────────────────────────────────────────────────
 
@@ -816,6 +1278,16 @@ export default function Home() {
 
   const handleHearingAnalyze = async () => {
     if (!hearingText.trim()) return;
+    // プランチェック
+    if (planType === "expired") {
+      openUpgrade("トライアル期間が終了しました。Proプランにアップグレードしてください。");
+      return;
+    }
+    if (planType && isLimitReached("analyze", usage, planType)) {
+      const lim = PLAN_LIMITS[planType].maxAnalyze;
+      openUpgrade(`解析の月間上限（${lim}回）に達しました。Proプランで回数を増やせます。`);
+      return;
+    }
     setHearingLoading(true);
     setHearingError(null);
     try {
@@ -830,6 +1302,7 @@ export default function Home() {
       const ct = (["line", "phone", "contact"].includes(ctaType) ? ctaType : "contact") as "line" | "phone" | "contact";
       setImportedValues({ serviceName, industry, target, area, serviceDetail, price, strengths, designMood, ctaType: ct, ctaLink });
       setInputMethod("form");
+      recordUsage("analyze");
     } catch (err) {
       setHearingError(err instanceof Error ? err.message : "解析に失敗しました");
     } finally {
@@ -876,27 +1349,93 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Project: auto-save（2秒デバウンス、LP 生成後のみ）────────────────────
+  // ─── Project: URL ?p=<id> でクラウドからロード ───────────────────────────
+  // useSearchParams は Suspense 必須のため window.location.search で代替する
+
+  useEffect(() => {
+    if (!session) return;
+    const pid = new URLSearchParams(window.location.search).get("p");
+    if (!pid) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/projects/${pid}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!res.ok) return;
+        const row = await res.json();
+        const project = row.project_json as LPProject;
+        if (!project?.html) return;
+        applyProject(project);
+        setRemoteProjectId(pid);
+        // URL パラメータを消す
+        router.replace("/");
+      } catch { /* ignore */ }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
+  // ─── Project: auto-save ─────────────────────────────────────────────────────
+  // ・常時: 2秒デバウンスで localStorage に保存
+  // ・ログイン中: 30秒インターバルでクラウドに保存（変更検知付き）
+
+  const cloudAutoSaveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isDirtyRef = useRef(false);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  const remoteProjectIdRef = useRef(remoteProjectId);
+  remoteProjectIdRef.current = remoteProjectId;
+  const buildCloudPayloadRef = useRef(buildCloudPayload);
+  buildCloudPayloadRef.current = buildCloudPayload;
 
   useEffect(() => {
     if (!result || !lastFormData) return;
+    // localStorage 2秒デバウンス
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = setTimeout(() => {
       const snap: ProjectSnapshot = {
         formData: lastFormData,
-        html: result.html,
-        css: result.css,
-        colorReplacements,
-        visualStyles,
-        sectionOrder,
-        additionalCssByType,
+        html: result.html, css: result.css,
+        colorReplacements, visualStyles, sectionOrder, additionalCssByType,
         images: serializeImagesSync(images),
       };
       saveToLocal(buildProject(snap));
     }, 2000);
+    // 変更フラグを立てる（クラウド自動保存用）
+    isDirtyRef.current = true;
     return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, lastFormData, colorReplacements, visualStyles, sectionOrder, additionalCssByType, images]);
+
+  // ログイン中のみ 30秒ごとにクラウド自動保存
+  useEffect(() => {
+    if (cloudAutoSaveTimerRef.current) clearInterval(cloudAutoSaveTimerRef.current);
+    if (!session) return;
+    cloudAutoSaveTimerRef.current = setInterval(async () => {
+      if (!isDirtyRef.current) return;
+      const currentSession = sessionRef.current;
+      if (!currentSession) return;
+      const payload = await buildCloudPayloadRef.current();
+      if (!payload) return;
+      isDirtyRef.current = false;
+      setCloudStatus("saving");
+      try {
+        const pid = remoteProjectIdRef.current;
+        const res = pid
+          ? await fetch(`/api/projects/${pid}`, { method: "PUT", headers: { "Content-Type": "application/json", Authorization: `Bearer ${currentSession.access_token}` }, body: JSON.stringify(payload) })
+          : await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${currentSession.access_token}` }, body: JSON.stringify(payload) });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error);
+        if (!pid) setRemoteProjectId(json.id);
+        setCloudStatus("saved");
+        setTimeout(() => setCloudStatus("idle"), 3000);
+      } catch {
+        setCloudStatus("error");
+        setTimeout(() => setCloudStatus("idle"), 3000);
+      }
+    }, 30000);
+    return () => { if (cloudAutoSaveTimerRef.current) clearInterval(cloudAutoSaveTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   // ─── Tab definitions ──────────────────────────────────────────────────────
 
@@ -911,6 +1450,21 @@ export default function Home() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#F5F5F2]">
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        reason={upgradeReason}
+      />
+      <PublishPanel
+        open={showPublishPanel}
+        onClose={() => setShowPublishPanel(false)}
+        projectId={remoteProjectId}
+        projectTitle={serviceName || "無題LP"}
+        session={session}
+        onPublishChange={(published, slug) => {
+          setPublishedSlug(published ? slug : null);
+        }}
+      />
       <AddSectionModal
         open={addSectionOpen}
         onClose={() => setAddSectionOpen(false)}
@@ -931,8 +1485,9 @@ export default function Home() {
           <div className="w-9 h-9 rounded-xl bg-[#00AFCC] flex items-center justify-center text-white font-black text-[11px] tracking-tight shrink-0">
             AI
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <h1 className="text-[15px] font-black text-gray-900 leading-tight tracking-[0.15em]">AI LP STUDIO</h1>
+            {user && <PlanBadge />}
           </div>
 
           {/* ── 保存・読み込みボタン ── */}
@@ -966,9 +1521,27 @@ export default function Home() {
                 </button>
                 {saveMenuOpen && (
                   <>
-                    {/* オーバーレイ（メニュー外クリックで閉じる） */}
                     <div className="fixed inset-0 z-40" onClick={() => setSaveMenuOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-50 min-w-[180px]">
+                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-50 min-w-[200px]">
+                      {/* クラウド保存（ログイン時のみ） */}
+                      {user && (
+                        <>
+                          <button
+                            onClick={handleSaveRemote}
+                            disabled={isSaving}
+                            className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#E6F8FC] transition-colors flex items-center gap-2 disabled:opacity-50"
+                          >
+                            <span>☁️</span>
+                            <div>
+                              <p className="font-semibold text-gray-800">クラウドに保存</p>
+                              <p className="text-[10px] text-gray-400">
+                                {remoteProjectId ? "上書き保存" : "新規保存"}
+                              </p>
+                            </div>
+                          </button>
+                          <div className="border-t border-gray-100 my-1" />
+                        </>
+                      )}
                       <button
                         onClick={handleSaveLocal}
                         className="w-full text-left px-3 py-2.5 text-xs hover:bg-[#E6F8FC] transition-colors flex items-center gap-2"
@@ -997,11 +1570,90 @@ export default function Home() {
               </div>
             )}
 
-            {result && (
+            {/* 自動保存ステータス（ログイン中） */}
+            {user && result && cloudStatus !== "idle" && (
+              <div className="hidden sm:flex items-center gap-1 text-[10px]">
+                {cloudStatus === "saving" && <><div className="w-2.5 h-2.5 border border-gray-400 border-t-transparent rounded-full animate-spin" /><span className="text-gray-400">保存中</span></>}
+                {cloudStatus === "saved"  && <><span className="text-green-500">✓</span><span className="text-gray-400">保存済み</span></>}
+                {cloudStatus === "error"  && <><span className="text-red-400">✗</span><span className="text-red-400">保存失敗</span></>}
+              </div>
+            )}
+
+            {result && cloudStatus === "idle" && (
               <div className="hidden sm:flex items-center gap-1.5">
                 <span className="text-xs text-gray-400">AI生成完了</span>
                 <span className="w-2 h-2 rounded-full bg-green-400" />
               </div>
+            )}
+
+            {/* 公開ボタン（LP生成後かつログイン中） */}
+            {result && user && (
+              <button
+                onClick={() => setShowPublishPanel(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold bg-[#00AFCC] hover:bg-[#0099B3] text-white rounded-lg transition-colors"
+                title={publishedSlug ? "公開設定を変更" : "LPを公開する"}
+              >
+                🚀 <span className="hidden sm:inline">{publishedSlug ? "公開中" : "公開"}</span>
+              </button>
+            )}
+
+            {/* マイLP */}
+            {user && (
+              <button
+                onClick={() => router.push("/my-lps")}
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                📁 マイLP
+              </button>
+            )}
+
+            {/* ユーザー表示 / ログインボタン */}
+            {user ? (
+              <div className="relative group">
+                <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors">
+                  <div className="w-6 h-6 rounded-full bg-[#00AFCC] flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                    {(user.email?.[0] ?? "U").toUpperCase()}
+                  </div>
+                  <span className="hidden sm:block text-[11px] text-gray-600 max-w-[100px] truncate">
+                    {user.email}
+                  </span>
+                </div>
+                {/* ドロップダウン */}
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-50 min-w-[160px] hidden group-hover:block">
+                  <button
+                    onClick={() => router.push("/my-lps")}
+                    className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+                  >
+                    📁 マイLP
+                  </button>
+                  <button
+                    onClick={() => router.push("/leads")}
+                    className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+                  >
+                    📬 リード管理
+                  </button>
+                  <div className="border-t border-gray-100 my-1" />
+                  <button
+                    onClick={signOut}
+                    className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors text-red-500 font-semibold"
+                  >
+                    ログアウト
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={signInWithGoogle}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                ログイン
+              </button>
             )}
           </div>
         </div>
@@ -1012,6 +1664,28 @@ export default function Home() {
         <div className="fixed bottom-5 right-5 z-50 bg-gray-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-in">
           <span className="text-green-400">✓</span>
           {saveToast}
+        </div>
+      )}
+
+      {/* ── Expired plan banner ── */}
+      {planType === "expired" && (
+        <div className="flex-shrink-0 bg-red-50 border-b border-red-200 px-4 py-2.5 flex items-center gap-3">
+          <span className="text-red-500 text-sm">⚠️</span>
+          <p className="text-xs font-semibold text-red-700 flex-1">
+            トライアル期間が終了しました。プレビュー・マイLP閲覧のみ可能です。
+          </p>
+          <button
+            onClick={() => openUpgrade()}
+            className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-[11px] font-bold rounded-lg transition-colors shrink-0"
+          >
+            アップグレード
+          </button>
+          <a
+            href="/pricing"
+            className="px-3 py-1.5 border border-red-300 text-red-600 text-[11px] font-bold rounded-lg hover:bg-red-100 transition-colors shrink-0"
+          >
+            料金を見る
+          </a>
         </div>
       )}
 
@@ -1205,6 +1879,38 @@ export default function Home() {
                 />
               </Accordion>
 
+              {/* フォント */}
+              <Accordion title="🔤 フォント">
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1">LP全体のフォント</label>
+                    <select
+                      value={globalFont}
+                      onChange={(e) => {
+                        pushUndo();
+                        setGlobalFont(e.target.value);
+                      }}
+                      className="w-full rounded-lg border border-gray-300 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#00AFCC] transition bg-white"
+                    >
+                      {FONT_OPTIONS.map((f) => (
+                        <option key={f.id} value={f.id}>{f.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* プレビューテキスト */}
+                  <div
+                    className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-xs text-gray-700 leading-relaxed"
+                    style={{ fontFamily: FONT_OPTIONS.find(f => f.id === globalFont)?.cssFamily }}
+                  >
+                    <span className="text-base font-bold">見出しのサンプル</span><br />
+                    <span>本文テキストのサンプルです。ABCDabcd 1234</span>
+                  </div>
+                  {FONT_OPTIONS.find(f => f.id === globalFont)?.googleFontsUrl && (
+                    <p className="text-[10px] text-gray-400">Google Fonts から読み込みます（出力HTMLに自動追記）</p>
+                  )}
+                </div>
+              </Accordion>
+
               {/* セクション追加 & 並び替え */}
               <Accordion title="セクション" defaultOpen>
                 <div className="space-y-3">
@@ -1215,6 +1921,49 @@ export default function Home() {
                     <span className="text-lg leading-none">＋</span>
                     セクションを追加
                   </button>
+
+                  {/* 吹き出し切り替え（お悩みセクションがある場合は常に表示） */}
+                  {findProblemSectionId(sectionOrder) && (
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 space-y-2">
+                      <p className="text-[11px] font-bold text-indigo-700">💬 お悩みセクション レイアウト</p>
+                      <div className="flex gap-1.5">
+                        {(
+                          [
+                            { id: "normal" as const,  label: "📝 通常",   desc: "テキスト型" },
+                            { id: "bubble" as const,  label: "💬 吹き出し", desc: "カード型"  },
+                          ]
+                        ).map((opt) => (
+                          <button
+                            key={opt.id}
+                            onClick={() => refProblemLayout !== opt.id && handleSwapProblemLayout()}
+                            disabled={sectionSwapLoading || refProblemLayout === opt.id}
+                            className={`flex-1 py-2 text-[11px] font-semibold rounded-lg border-2 transition-all disabled:cursor-not-allowed ${
+                              refProblemLayout === opt.id
+                                ? "bg-indigo-600 text-white border-indigo-600"
+                                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600"
+                            } ${sectionSwapLoading && refProblemLayout !== opt.id ? "opacity-50" : ""}`}
+                          >
+                            {sectionSwapLoading && refProblemLayout !== opt.id ? (
+                              <span className="flex items-center justify-center gap-1">
+                                <span className="w-3 h-3 border-2 border-current/40 border-t-current rounded-full animate-spin inline-block" />
+                                生成中…
+                              </span>
+                            ) : (
+                              <>
+                                <div>{opt.label}</div>
+                                <div className={`text-[9px] font-normal mt-0.5 ${refProblemLayout === opt.id ? "text-indigo-200" : "text-gray-400"}`}>{opt.desc}</div>
+                              </>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      {sectionSwapError && (
+                        <p className="text-[10px] text-red-600">{sectionSwapError}</p>
+                      )}
+                      <p className="text-[10px] text-indigo-500">切り替え後はUndoで元に戻せます</p>
+                    </div>
+                  )}
+
                   <SectionSorter
                     sections={sectionOrder}
                     onReorder={handleReorderByIndex}
@@ -1223,6 +1972,37 @@ export default function Home() {
                     onSectionDelete={handleDeleteRequest}
                     protectedIds={protectedSectionIds}
                   />
+
+                  {/* 固定要素（insertAtEnd / position:fixed など） */}
+                  {fixedSections.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-[10px] text-gray-400 mb-1.5">固定要素</p>
+                      <ul className="space-y-1">
+                        {fixedSections.map((sec) => (
+                          <li
+                            key={sec.id}
+                            className="group flex items-center gap-2 px-2 py-2 rounded-lg border border-gray-100 bg-white text-xs"
+                          >
+                            <span className="text-gray-400">📌</span>
+                            <span className="flex-1 font-medium text-gray-700 truncate">{sec.label}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRequest(sec.id, sec.label)}
+                              className="opacity-0 group-hover:opacity-100 p-1 rounded transition-all text-gray-300 hover:text-red-500 hover:bg-red-50 shrink-0"
+                              title={`「${sec.label}」を削除`}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14H6L5 6" />
+                                <path d="M10 11v6M14 11v6" />
+                                <path d="M9 6V4h6v2" />
+                              </svg>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </Accordion>
 
@@ -1259,6 +2039,15 @@ export default function Home() {
               {/* SEO */}
               <Accordion title="SEOチェック">
                 <SEOChecker html={result.html} />
+              </Accordion>
+
+              {/* フォーム設定（Phase 6） */}
+              <Accordion title="📋 フォーム・リード取得">
+                <FormConfigPanel
+                  projectId={remoteProjectId}
+                  projectSlug={publishedSlug}
+                  isPublished={!!publishedSlug}
+                />
               </Accordion>
 
               {/* 入力情報・再生成 */}
@@ -1340,6 +2129,11 @@ export default function Home() {
                           title="スタイル編集モード"
                           className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "style" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
                         >🎨 スタイル</button>
+                        <button
+                          onClick={() => handleEditModeToggle("image")}
+                          title="画像挿入モード"
+                          className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "image" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
+                        >📷 画像</button>
                       </div>
                       <div className="w-px h-5 bg-gray-200 mx-1" />
                       <button
@@ -1366,7 +2160,7 @@ export default function Home() {
                       <div className="w-px h-5 bg-gray-200 mx-1" />
                       <button
                         onClick={() => downloadFile(
-                          buildNetlifyHtml(result.html, effectiveCss, serviceName, unsplashImages),
+                          buildNetlifyHtml(buttonProcessedHtml, effectiveCss, serviceName, unsplashImages, fontGoogleUrl),
                           `${serviceName || "lp"}.html`,
                           "text/html"
                         )}
@@ -1386,6 +2180,15 @@ export default function Home() {
                     <div className="px-3 py-1.5 flex items-center gap-1.5 bg-white border-b border-gray-100 flex-shrink-0">
                       {editMode === "text" ? (
                         <span className="text-[11px] text-[#00AFCC] font-medium">✏ テキストをクリックして直接編集</span>
+                      ) : editMode === "image" ? (
+                        <span className="text-[11px] text-[#00AFCC] font-medium">
+                          📷 要素をクリックして画像を挿入
+                          {selectedElement && (
+                            <span className="ml-2 text-[#00AFCC]">
+                              — {selectedElement.label || selectedElement.selector}
+                            </span>
+                          )}
+                        </span>
                       ) : (
                         <span className="text-[11px] text-[#00AFCC] font-medium">
                           🎨 要素をクリックしてスタイルを編集
@@ -1410,25 +2213,41 @@ export default function Home() {
                         mode={previewMode}
                         imageOverrides={images}
                         onHtmlChange={handleHtmlChange}
+                        onHtmlSilentUpdate={(html) => applyHtml(html, false)}
                         iframeHeight={750}
-                        editMode={editMode}
+                        editMode={editMode === "image" ? "style" : editMode}
                         onElementSelect={handleElementSelect}
                         selectedSelector={selectedElement?.selector ?? null}
+                        buttonImageOverrides={buttonImageOverrides}
+                        fontGoogleUrl={fontGoogleUrl}
+                        fontFamily={fontFamily}
                       />
                     </div>
                   </div>
                 )}
                 {activeTab === "html" && (
-                  <div className="p-4">
+                  <div className="relative p-4">
+                    {planType && planType !== "pro" && (
+                      <LockScreen
+                        featureTitle="HTMLエクスポート"
+                        onUpgrade={() => openUpgrade("HTMLエクスポートはProプランの機能です。")}
+                      />
+                    )}
                     <CodeBlock
                       label="WordPressカスタムHTMLブロックに貼り付け"
-                      code={result.html}
+                      code={buttonProcessedHtml}
                       language="html"
                     />
                   </div>
                 )}
                 {activeTab === "css" && (
-                  <div className="p-4">
+                  <div className="relative p-4">
+                    {planType && planType !== "pro" && (
+                      <LockScreen
+                        featureTitle="CSSエクスポート"
+                        onUpgrade={() => openUpgrade("CSSエクスポートはProプランの機能です。")}
+                      />
+                    )}
                     <CodeBlock
                       label={`WordPress「追加CSS」に貼り付け${images.length > 0 || Object.keys(colorReplacements).length > 0 ? "（カスタマイズ反映済み）" : ""}`}
                       code={effectiveCss}
@@ -1437,13 +2256,19 @@ export default function Home() {
                   </div>
                 )}
                 {activeTab === "netlify" && (
-                  <div className="p-4">
+                  <div className="relative p-4">
+                    {planType && planType !== "pro" && (
+                      <LockScreen
+                        featureTitle="Netlifyデプロイ用HTML"
+                        onUpgrade={() => openUpgrade("Netlifyデプロイ用HTMLはProプランの機能です。")}
+                      />
+                    )}
                     <p className="text-sm text-gray-600 mb-3">
                       HTML・CSSを1ファイルに統合。Netlify / GitHub Pages などに直接デプロイできます。
                     </p>
                     <CodeBlock
                       label="完全なHTMLファイル（Netlify / GitHub Pages 用）"
-                      code={buildNetlifyHtml(result.html, effectiveCss, serviceName, unsplashImages)}
+                      code={buildNetlifyHtml(buttonProcessedHtml, effectiveCss, serviceName, unsplashImages, fontGoogleUrl)}
                       language="html"
                     />
                   </div>
@@ -1453,13 +2278,67 @@ export default function Home() {
           )}
         </main>
 
+        {/* ═══ RIGHT PANEL — Image Insert ═══ */}
+        {result && editMode === "image" && (
+          <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+            <ImageInsertPanel
+              selectedElement={selectedElement}
+              html={result.html}
+              onUpdate={(newHtml) => applyHtml(newHtml, true)}
+              onDeselect={() => setSelectedElement(null)}
+            />
+          </aside>
+        )}
+
         {/* ═══ RIGHT PANEL — Visual Style Editor ═══ */}
-        {result && editMode === "style" && selectedElement && (
+        {result && editMode === "style" && selectedElement &&
+          !selectedElement.selector.endsWith(".lp-freeblock") &&
+          !selectedElement.selector.includes(".lp-customhtml") && (
           <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
             <VisualStylePanel
               element={selectedElement}
               currentRule={visualStyles[selectedElement.selector] ?? { styles: {} }}
               onUpdate={handleStyleUpdate}
+              onDeselect={() => setSelectedElement(null)}
+              onDelete={() => {
+                pushUndo();
+                const newHtml = deleteElementFromHtml(
+                  result.html,
+                  selectedElement.elementId,
+                  selectedElement.selector,
+                );
+                applyHtml(newHtml, false);
+                setSelectedElement(null);
+              }}
+              effectiveCss={effectiveCss}
+            />
+          </aside>
+        )}
+
+        {/* ═══ RIGHT PANEL — Free Block Editor ═══ */}
+        {result && editMode === "style" && selectedElement?.selector.endsWith(".lp-freeblock") && (
+          <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+            <FreeBlockPanel
+              selector={selectedElement.selector}
+              html={result.html}
+              onUpdate={(newHtml) => {
+                pushUndo();
+                applyHtml(newHtml, false);
+              }}
+            />
+          </aside>
+        )}
+
+        {/* ═══ RIGHT PANEL — Custom HTML Editor ═══ */}
+        {result && editMode === "style" && selectedElement?.selector.includes(".lp-customhtml") && (
+          <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+            <CustomHtmlPanel
+              selector={selectedElement.selector}
+              html={result.html}
+              onUpdate={(newHtml) => {
+                pushUndo();
+                applyHtml(newHtml, false);
+              }}
               onDeselect={() => setSelectedElement(null)}
             />
           </aside>
@@ -1483,6 +2362,7 @@ export default function Home() {
                   { icon: "H", text: "見出し — フォント・色・影" },
                   { icon: "¶", text: "本文 — サイズ・行間・色" },
                   { icon: "▶", text: "ボタン — 4タブで詳細編集" },
+                  { icon: "▥", text: "カード — 背景・枠線・影・余白" },
                   { icon: "▣", text: "セクション — 背景・余白" },
                   { icon: "⬜", text: "画像 — 幅・角丸・枠線" },
                 ].map((item) => (

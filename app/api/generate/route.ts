@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { LPFormData } from "@/types";
 import { extractAndParseJSON } from "@/lib/parseAIJson";
+import { requirePlanGuard } from "@/lib/plan-guard";
+import { checkRateLimitBoth, getClientIp } from "@/lib/rate-limiter";
+import { checkInputSize, checkContentLength } from "@/lib/input-guard";
+import { logRateLimitExceeded } from "@/lib/audit-logger";
 
 const CTA_LABELS: Record<string, string> = {
   line: "LINEで予約する",
@@ -63,8 +67,32 @@ function buildPrompt(data: LPFormData): string {
 }
 
 export async function POST(req: NextRequest) {
+  // ── Content-Length 早期チェック ──
+  const clCheck = checkContentLength(req);
+  if (clCheck) return clCheck;
+
+  // ── サーバーサイド プラン・課金ガード ──
+  const guard = await requirePlanGuard(req, { checkUsage: "generate" });
+  if (guard instanceof NextResponse) return guard;
+  const { user, planType } = guard;
+
+  // ── レートリミット（per-minute） ──
+  const ip = getClientIp(req);
+  const rl = checkRateLimitBoth(ip, user.id, "generate", planType);
+  if (!rl.allowed) {
+    logRateLimitExceeded({ userId: user.id, ip, action: "generate", count: rl.count, limit: rl.limit });
+    return NextResponse.json(
+      { error: "リクエストが多すぎます。しばらく待ってから再試行してください。", retry_after: rl.retryAfter },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
+
   try {
     const data: LPFormData = await req.json();
+
+    // ── 入力サイズ検証 ──
+    const sizeCheck = checkInputSize(data as unknown as Record<string, unknown>, { maxBodyBytes: 20 * 1024 });
+    if (sizeCheck) return sizeCheck;
 
     const required = ["industry", "target", "serviceName", "serviceDetail", "ctaType", "ctaLink"] as const;
     for (const key of required) {

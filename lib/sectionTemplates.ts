@@ -17,6 +17,8 @@ export interface SectionTemplate {
   inputs?: SectionInput[];
   /** body 末尾に挿入（Fixed CTA など） */
   insertAtEnd?: boolean;
+  /** 同一テンプレートを複数追加できる（各インスタンスに一意サフィックスを付与） */
+  multipleAllowed?: boolean;
   generateHtml: (values: Record<string, string>) => string;
   generateCss: () => string;
 }
@@ -55,7 +57,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     generateCss: () => `
 .lp-map { padding: 64px 20px; background: #f9fafb; }
 .lp-map-inner { max-width: 900px; margin: 0 auto; text-align: center; }
-.lp-map-title { font-size: 1.75rem; font-weight: 700; margin: 0 0 2rem; }
+.lp-map-title { font-size: 1.75rem; font-weight: var(--lp-heading-weight, 700); margin: 0 0 2rem; }
 .lp-map-frame { position: relative; padding-bottom: 50%; height: 0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.1); }
 .lp-map-frame iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
 .lp-map-addr { margin-top: 1rem; color: #6b7280; font-size: .9rem; }
@@ -242,7 +244,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     generateCss: () => `
 .lp-contact { padding: 64px 20px; background: #fff; }
 .lp-contact-inner { max-width: 620px; margin: 0 auto; }
-.lp-contact-title { font-size: 1.75rem; font-weight: 700; text-align: center; margin: 0 0 .5rem; }
+.lp-contact-title { font-size: 1.75rem; font-weight: var(--lp-heading-weight, 700); text-align: center; margin: 0 0 .5rem; }
 .lp-contact-lead { text-align: center; color: #6b7280; font-size: .9rem; margin: 0 0 2.5rem; }
 .lp-contact-form { display: flex; flex-direction: column; gap: 1.25rem; }
 .lp-cf-row { display: flex; flex-direction: column; gap: .4rem; }
@@ -322,7 +324,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     generateCss: () => `
 .lp-faqblock { padding: 64px 20px; background: #f9fafb; }
 .lp-faqb-inner { max-width: 760px; margin: 0 auto; }
-.lp-faqb-title { font-size: 1.75rem; font-weight: 700; text-align: center; margin: 0 0 2.5rem; }
+.lp-faqb-title { font-size: 1.75rem; font-weight: var(--lp-heading-weight, 700); text-align: center; margin: 0 0 2.5rem; }
 .lp-faqb-list { display: flex; flex-direction: column; gap: .75rem; }
 .lp-faqb-item { background: #fff; border-radius: 10px; border: 1px solid #e5e7eb; overflow: hidden; }
 .lp-faqb-q {
@@ -347,27 +349,23 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     <h2 class="lp-gallery-title">ギャラリー</h2>
     <p class="lp-gallery-sub">施工事例・サービスの様子をご覧ください</p>
     <div class="lp-gallery-grid">
-      <div class="lp-gallery-item"><span>写真 1</span></div>
-      <div class="lp-gallery-item"><span>写真 2</span></div>
-      <div class="lp-gallery-item"><span>写真 3</span></div>
-      <div class="lp-gallery-item"><span>写真 4</span></div>
-      <div class="lp-gallery-item"><span>写真 5</span></div>
-      <div class="lp-gallery-item"><span>写真 6</span></div>
+      <div class="lp-gallery-item"><img class="lp-gallery-img" src="https://placehold.co/400x300?text=1" alt=""></div>
+      <div class="lp-gallery-item"><img class="lp-gallery-img" src="https://placehold.co/400x300?text=2" alt=""></div>
+      <div class="lp-gallery-item"><img class="lp-gallery-img" src="https://placehold.co/400x300?text=3" alt=""></div>
+      <div class="lp-gallery-item"><img class="lp-gallery-img" src="https://placehold.co/400x300?text=4" alt=""></div>
+      <div class="lp-gallery-item"><img class="lp-gallery-img" src="https://placehold.co/400x300?text=5" alt=""></div>
+      <div class="lp-gallery-item"><img class="lp-gallery-img" src="https://placehold.co/400x300?text=6" alt=""></div>
     </div>
   </div>
 </section>`.trim(),
     generateCss: () => `
 .lp-gallery { padding: 64px 20px; background: #fff; }
 .lp-gallery-inner { max-width: 960px; margin: 0 auto; text-align: center; }
-.lp-gallery-title { font-size: 1.75rem; font-weight: 700; margin: 0 0 .5rem; }
+.lp-gallery-title { font-size: 1.75rem; font-weight: var(--lp-heading-weight, 700); margin: 0 0 .5rem; }
 .lp-gallery-sub { color: #6b7280; font-size: .9rem; margin: 0 0 2rem; }
 .lp-gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
-.lp-gallery-item {
-  aspect-ratio: 4/3; background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
-  border-radius: 10px; display: flex; align-items: center; justify-content: center;
-  color: #6366f1; font-size: .8rem; font-weight: 600; cursor: pointer;
-  transition: transform .2s; overflow: hidden;
-}
+.lp-gallery-item { aspect-ratio: 4/3; border-radius: 10px; overflow: hidden; cursor: pointer; transition: transform .2s; }
+.lp-gallery-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .lp-gallery-item:hover { transform: scale(1.02); }
 @media (max-width: 640px) { .lp-gallery-grid { grid-template-columns: repeat(2, 1fr); } }`,
   },
@@ -405,7 +403,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     generateCss: () => `
 .lp-voices { padding: 64px 20px; background: #f9fafb; }
 .lp-voices-inner { max-width: 960px; margin: 0 auto; text-align: center; }
-.lp-voices-title { font-size: 1.75rem; font-weight: 700; margin: 0 0 2rem; }
+.lp-voices-title { font-size: 1.75rem; font-weight: var(--lp-heading-weight, 700); margin: 0 0 2rem; }
 .lp-voices-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; text-align: left; }
 .lp-voice-card { background: #fff; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,.06); }
 .lp-voice-star { color: #f59e0b; font-size: 1rem; margin-bottom: .75rem; }
@@ -443,7 +441,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     generateCss: () => `
 .lp-beforeafter { padding: 64px 20px; background: #fff; }
 .lp-ba-inner { max-width: 820px; margin: 0 auto; text-align: center; }
-.lp-ba-title { font-size: 1.75rem; font-weight: 700; margin: 0 0 .5rem; }
+.lp-ba-title { font-size: 1.75rem; font-weight: var(--lp-heading-weight, 700); margin: 0 0 .5rem; }
 .lp-ba-sub { color: #6b7280; font-size: .9rem; margin: 0 0 2.5rem; }
 .lp-ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; text-align: left; }
 .lp-ba-card { border-radius: 14px; overflow: hidden; border: 2px solid #e5e7eb; }
@@ -457,6 +455,115 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
 }
 .lp-ba-desc { padding: 1rem; font-size: .875rem; color: #4b5563; line-height: 1.65; margin: 0; }
 @media (max-width: 640px) { .lp-ba-grid { grid-template-columns: 1fr; } }`,
+  },
+
+  /* ── Image Block ────────────────────────────────────────────────────────── */
+  {
+    id: "imgblock",
+    label: "画像",
+    icon: "🖼️",
+    description: "画像を1枚追加して、LP内に表示",
+    inputs: [
+      {
+        key: "imageUrl",
+        label: "画像URL",
+        placeholder: "https://example.com/image.jpg",
+        type: "url",
+        required: true,
+      },
+      {
+        key: "alt",
+        label: "代替テキスト（alt）",
+        placeholder: "サービスイメージ写真",
+        defaultValue: "",
+      },
+      {
+        key: "alignment",
+        label: "配置",
+        placeholder: "",
+        type: "select",
+        defaultValue: "center",
+        options: [
+          { value: "center", label: "中央" },
+          { value: "left",   label: "左" },
+          { value: "right",  label: "右" },
+        ],
+      },
+      {
+        key: "width",
+        label: "横幅",
+        placeholder: "100%",
+        defaultValue: "100%",
+      },
+      {
+        key: "height",
+        label: "高さ（省略可）",
+        placeholder: "auto または 300px",
+        defaultValue: "auto",
+      },
+      {
+        key: "borderRadius",
+        label: "角丸",
+        placeholder: "0",
+        defaultValue: "0",
+      },
+      {
+        key: "paddingTop",
+        label: "上余白",
+        placeholder: "0",
+        defaultValue: "0",
+      },
+      {
+        key: "paddingBottom",
+        label: "下余白",
+        placeholder: "0",
+        defaultValue: "0",
+      },
+      {
+        key: "paddingH",
+        label: "左右余白",
+        placeholder: "0",
+        defaultValue: "0",
+      },
+    ],
+    generateHtml: ({
+      imageUrl = "",
+      alt = "",
+      alignment = "center",
+      width = "100%",
+      height = "auto",
+      borderRadius = "0",
+      paddingTop = "0",
+      paddingBottom = "0",
+      paddingH = "0",
+    }) => {
+      const alignMod =
+        alignment === "left" ? "left" : alignment === "right" ? "right" : "center";
+      const src = imageUrl || "https://placehold.co/800x450?text=Image";
+      const imgStyle = [
+        `width:${width}`,
+        height && height !== "auto" ? `height:${height}` : "",
+        borderRadius && borderRadius !== "0" ? `border-radius:${borderRadius}` : "",
+      ]
+        .filter(Boolean)
+        .join(";");
+      const sectionStyle =
+        `padding-top:${paddingTop};padding-bottom:${paddingBottom};` +
+        `padding-left:${paddingH};padding-right:${paddingH}`;
+      return `<section class="lp-imgblock" style="${sectionStyle}">
+  <div class="lp-imgblock-inner lp-imgblock-inner--${alignMod}">
+    <img class="lp-imgblock-img" src="${src}" alt="${alt}"${imgStyle ? ` style="${imgStyle}"` : ""}>
+  </div>
+</section>`.trim();
+    },
+    generateCss: () => `
+.lp-imgblock { box-sizing: border-box; }
+.lp-imgblock-inner { width: 100%; display: flex; }
+.lp-imgblock-inner--center { justify-content: center; }
+.lp-imgblock-inner--left   { justify-content: flex-start; }
+.lp-imgblock-inner--right  { justify-content: flex-end; }
+.lp-imgblock-img { max-width: 100%; display: block; height: auto; vertical-align: bottom; }
+@media (max-width: 640px) { .lp-imgblock-img { width: 100% !important; height: auto !important; } }`,
   },
 
   /* ── LINE CTA ────────────────────────────────────────────────────────────── */
@@ -488,7 +595,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
 .lp-lc-inner { max-width: 560px; margin: 0 auto; text-align: center; }
 .lp-lc-icon { width: 56px; height: 56px; margin: 0 auto 1.25rem; }
 .lp-lc-icon svg { width: 100%; height: 100%; }
-.lp-lc-headline { font-size: 1.75rem; font-weight: 800; color: #fff; margin: 0 0 .5rem; }
+.lp-lc-headline { font-size: 1.75rem; font-weight: var(--lp-heading-weight, 700); color: #fff; margin: 0 0 .5rem; }
 .lp-lc-sub { color: rgba(255,255,255,.85); margin: 0 0 1.75rem; font-size: .95rem; }
 .lp-lc-btn {
   display: inline-block; padding: .9rem 2.5rem; background: #fff; color: #06C755;
@@ -498,45 +605,48 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
 .lp-lc-btn:hover { transform: translateY(-2px); }`,
   },
 
-  /* ── Instagram ───────────────────────────────────────────────────────────── */
+  /* ── Custom HTML ────────────────────────────────────────────────────────── */
   {
-    id: "instagram",
-    label: "Instagram埋め込み",
-    icon: "📸",
-    description: "Instagram投稿のURLを入力して埋め込み表示",
-    inputs: [
-      { key: "postUrl", label: "Instagram投稿URL", placeholder: "https://www.instagram.com/p/XXXXXXX/", type: "url", required: true },
-      { key: "title", label: "見出し", placeholder: "Instagram", defaultValue: "Instagram" },
-    ],
-    generateHtml: ({ postUrl = "https://www.instagram.com/", title = "Instagram" }) => `
-<section class="lp-instagram">
-  <div class="lp-ig-inner">
-    <h2 class="lp-ig-title">${title}</h2>
-    <p class="lp-ig-lead">最新の投稿はInstagramでチェック！</p>
-    <div class="lp-ig-embed">
-      <blockquote class="instagram-media"
-        data-instgrm-captioned
-        data-instgrm-permalink="${postUrl}"
-        data-instgrm-version="14"
-        style="background:#fff;border:0;border-radius:12px;box-shadow:0 0 0 1px #d1d5db,0 0 0 3px #fff;margin:0 auto;max-width:540px;min-width:326px;padding:0;width:calc(100% - 2px);">
-        <a href="${postUrl}" target="_blank" rel="noopener" class="lp-ig-fallback">
-          📸 Instagramで見る →
-        </a>
-      </blockquote>
-    </div>
-    <script async src="//www.instagram.com/embed.js"></script>
-  </div>
-</section>`.trim(),
+    id: "customhtml",
+    label: "カスタムHTML",
+    icon: "</>",
+    description: "HTML・iframe・埋め込みコードを追加",
+    multipleAllowed: true,
+    generateHtml: () => {
+      const uid = Math.random().toString(36).slice(2, 9);
+      return `<section class="lp-customhtml_${uid} lp-customhtml" style="padding:48px 20px;background:#fff;">
+  <div class="lp-ch-inner" style="max-width:900px;margin:0 auto;"></div>
+</section>`.trim();
+    },
     generateCss: () => `
-.lp-instagram { padding: 64px 20px; background: #fafafa; }
-.lp-ig-inner { max-width: 620px; margin: 0 auto; text-align: center; }
-.lp-ig-title { font-size: 1.75rem; font-weight: 700; margin: 0 0 .5rem; }
-.lp-ig-lead { color: #6b7280; font-size: .9rem; margin: 0 0 2rem; }
-.lp-ig-embed { display: flex; justify-content: center; }
-.lp-ig-fallback {
-  display: block; padding: 1.5rem; color: #6366f1; text-decoration: none;
-  font-weight: 700; font-size: 1rem;
-}`,
+.lp-customhtml { padding: 48px 20px; background: #fff; }
+.lp-ch-inner { max-width: 900px; margin: 0 auto; }`,
+  },
+
+  /* ── Free Block (空セクション) ──────────────────────────────────────────── */
+  {
+    id: "freeblock",
+    label: "空セクション",
+    icon: "⬜",
+    description: "自由に要素を追加できる空のセクション",
+    insertAtEnd: false,
+    multipleAllowed: true,
+    generateHtml: () => {
+      const uid = Math.random().toString(36).slice(2, 9);
+      return `<section class="lp-freeblock_${uid} lp-freeblock">
+  <div class="lp-fb-inner"></div>
+</section>`.trim();
+    },
+    generateCss: () => `
+.lp-freeblock { padding: 64px 20px; }
+.lp-fb-inner { max-width: 900px; margin: 0 auto; }
+.lp-fb-heading { font-size: 1.75rem; font-weight: var(--lp-heading-weight, 700); margin: 0 0 1rem; color: var(--lp-heading-color, #111); }
+.lp-fb-text { font-size: 1rem; line-height: 1.8; margin: 0 0 1rem; color: var(--lp-text-color, #374151); }
+.lp-fb-btn { display: inline-block; padding: 14px 36px; border-radius: 50px; font-weight: 700; font-size: 1rem;
+  text-decoration: none; background: var(--lp-primary, #6366f1); color: #fff; transition: opacity .2s; margin: 0 0 1rem; }
+.lp-fb-btn:hover { opacity: .85; }
+.lp-fb-img-wrap { margin: 0 0 1rem; }
+.lp-fb-img-wrap img { max-width: 100%; height: auto; border-radius: 8px; display: block; }`,
   },
 
   /* ── Fixed CTA Bar ───────────────────────────────────────────────────────── */

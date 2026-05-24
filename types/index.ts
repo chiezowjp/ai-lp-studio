@@ -169,16 +169,37 @@ export interface LPAnalysis {
   hasPricing: boolean;
   conversionStrategy: string; // 学ぶべき訴求ポイント
   notes: string;              // 注意点
+  /** お悩み訴求セクションが吹き出し/チェックリスト/カード型の場合 true */
+  bubbleProblem?: boolean;
 }
 
 // ── Visual Style Editor ───────────────────────────────────────────────────────
 
 export interface SelectedElement {
-  type: "heading" | "text" | "button" | "section" | "image";
+  type: "heading" | "text" | "button" | "section" | "image" | "card" | "img-placeholder";
   selector: string;
+  /** クリック時に付与された data-element-id（画像挿入で正確な要素特定に使用） */
+  elementId?: string;
   tagName: string;
   label: string;
   computedStyles: Record<string, string>;
+}
+
+export interface ButtonImageConfig {
+  url: string;         // data URL (base64)
+  alt: string;         // alt text
+  width: string;       // "auto" | "160px" | "200px" | "240px" | "300px" | "100%"
+  height: string;      // "auto" | "44px" | "52px" | "60px" | "80px" | "100px"
+  maintainRatio: boolean; // true → HTML出力時はwidthのみ指定しheight:auto
+  fitMode: "cover" | "contain" | "stretch"; // background-size の挙動
+}
+
+/** セクション背景画像に重ねるオーバーレイ設定 */
+export interface OverlayConfig {
+  enabled: boolean;
+  color: string;    // hex "#rrggbb"
+  opacity: number;  // 0-100
+  blur: number;     // 0-20px (backdrop-filter blur)
 }
 
 export interface StyleRule {
@@ -186,6 +207,8 @@ export interface StyleRule {
   hoverStyles?: Record<string, string>;
   animation?: "none" | "lift" | "scale" | "pulse";
   mobileFullWidth?: boolean;
+  imageButton?: ButtonImageConfig | null;
+  overlay?: OverlayConfig | null;
 }
 
 export type VisualStyles = Record<string, StyleRule>;

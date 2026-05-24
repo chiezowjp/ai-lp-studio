@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import { LPAnalysis, AnalyzedSection, LPFormData } from "@/types";
 import { extractAndParseJSON } from "@/lib/parseAIJson";
+import { requirePlanGuard } from "@/lib/plan-guard";
 
 const CTA_LABELS: Record<string, string> = {
   line: "LINEで予約する",
@@ -21,7 +22,8 @@ const SYSTEM_PROMPT = `あなたはJSON APIです。
 function buildPrompt(
   analysis: LPAnalysis,
   selectedSections: AnalyzedSection[],
-  serviceInfo: LPFormData
+  serviceInfo: LPFormData,
+  problemLayout: "normal" | "bubble" = "normal"
 ): string {
   const ctaLabel = CTA_LABELS[serviceInfo.ctaType] ?? "お問い合わせはこちら";
 
@@ -83,7 +85,135 @@ ${sectionList}
 ・CTA種別：${serviceInfo.ctaType}（ボタンラベル：「${ctaLabel}」）
 ・CTAリンク：${serviceInfo.ctaLink}
 
+${problemLayout === "bubble" ? `━━━━━━━━━━━━━━━━━━━━
+【お悩みセクション 吹き出しレイアウト指示（必須・厳守）】
 ━━━━━━━━━━━━━━━━━━━━
+【方針】人物画像はHTMLに含めない。セクションの背景画像（CSS background-image）として後から設定する。
+【必須】吹き出しを position:absolute で背景画像の上に重ねること。
+【禁止】人物画像用の<img>タグ・<div>スロットをHTMLに含めないこと。
+
+━━━ HTML構造（お悩みセクションのclass名に合わせて使うこと）━━━
+<section class="lp-problem" data-bubble-layout="1">
+  <div class="lp-problem__inner">
+    <h2 class="lp-problem__heading">（見出し）</h2>
+    <p class="lp-problem__sub">（サブ見出し）</p>
+    <div class="lp-problem__board">
+      <!-- 吹き出し（背景画像の上に絶対配置）-->
+      <!-- 人物画像はセクション背景で設定するためHTMLには不要 -->
+      <div class="lp-problem__bubble lp-problem__bubble--lt">😔 （お悩み文1）</div>
+      <div class="lp-problem__bubble lp-problem__bubble--rt">💭 （お悩み文2）</div>
+      <div class="lp-problem__bubble lp-problem__bubble--lm">😥 （お悩み文3）</div>
+      <div class="lp-problem__bubble lp-problem__bubble--rm">😞 （お悩み文4）</div>
+      <div class="lp-problem__bubble lp-problem__bubble--lb">🥲 （お悩み文5）</div>
+      <div class="lp-problem__bubble lp-problem__bubble--rb">😩 （お悩み文6）</div>
+    </div>
+  </div>
+</section>
+
+━━━ CSS（<ACCENT>を${analysis.colorTone}に合うメインカラーに変更すること）━━━
+
+/* セクション：人物背景画像を contain で中央表示 */
+.lp-problem {
+  padding: 5rem 1.5rem 6rem;
+  background-color: #faf8f5;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.lp-problem__inner { max-width: 960px; margin: 0 auto; text-align: center; }
+.lp-problem__heading { font-size: clamp(1.4rem,3vw,2.2rem); margin-bottom: 0.5rem; }
+.lp-problem__sub { color: #888; font-size: 0.95rem; margin-bottom: 2.5rem; }
+
+/* ─── PC：吹き出しを背景画像の上に絶対配置 ─── */
+.lp-problem__board {
+  position: relative;
+  min-height: 580px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+/* 吹き出し共通 */
+.lp-problem__bubble {
+  position: absolute;
+  z-index: 2;
+  width: clamp(200px, 26vw, 320px);
+  white-space: normal;
+  word-break: normal;
+  line-height: 1.7;
+  background: #fff;
+  border: 2px solid <ACCENT>;
+  border-radius: 1.25rem;
+  padding: 0.9rem 1.1rem;
+  font-size: clamp(0.82rem, 1.2vw, 0.95rem);
+  color: #3d2e20;
+  text-align: left;
+  box-shadow: 0 4px 16px rgba(0,0,0,.07);
+}
+/* 各吹き出しの位置 */
+.lp-problem__bubble--lt { left:  2%; top:  6%; }
+.lp-problem__bubble--rt { right: 2%; top:  9%; }
+.lp-problem__bubble--lm { left:  0%; top: 37%; }
+.lp-problem__bubble--rm { right: 0%; top: 40%; }
+.lp-problem__bubble--lb { left:  5%; bottom: 7%; }
+.lp-problem__bubble--rb { right: 5%; bottom: 7%; }
+/* 左側テール：右向き */
+.lp-problem__bubble--lt::after,
+.lp-problem__bubble--lm::after,
+.lp-problem__bubble--lb::after {
+  content: ""; position: absolute;
+  right: -17px; top: 50%; transform: translateY(-50%);
+  border: 9px solid transparent; border-left-color: <ACCENT>;
+}
+.lp-problem__bubble--lt::before,
+.lp-problem__bubble--lm::before,
+.lp-problem__bubble--lb::before {
+  content: ""; position: absolute;
+  right: -11px; top: 50%; transform: translateY(-50%);
+  border: 7px solid transparent; border-left-color: #fff; z-index: 1;
+}
+/* 右側テール：左向き */
+.lp-problem__bubble--rt::after,
+.lp-problem__bubble--rm::after,
+.lp-problem__bubble--rb::after {
+  content: ""; position: absolute;
+  left: -17px; top: 50%; transform: translateY(-50%);
+  border: 9px solid transparent; border-right-color: <ACCENT>;
+}
+.lp-problem__bubble--rt::before,
+.lp-problem__bubble--rm::before,
+.lp-problem__bubble--rb::before {
+  content: ""; position: absolute;
+  left: -11px; top: 50%; transform: translateY(-50%);
+  border: 7px solid transparent; border-right-color: #fff; z-index: 1;
+}
+/* ─── スマホ：背景画像を上部、吹き出しを縦並びで下に ─── */
+@media (max-width: 767px) {
+  .lp-problem {
+    background-position: center top;
+    background-size: 75vw auto;
+    padding-top: 75vw;
+    padding-bottom: 3rem;
+  }
+  .lp-problem__board {
+    position: static; min-height: auto;
+    display: flex; flex-direction: column;
+    align-items: flex-start; gap: 0.75rem; padding: 0 0.5rem;
+  }
+  .lp-problem__bubble { position: static; width: 80%; }
+  .lp-problem__bubble--lt,.lp-problem__bubble--lm,.lp-problem__bubble--lb { margin-right: auto; }
+  .lp-problem__bubble--rt,.lp-problem__bubble--rm,.lp-problem__bubble--rb { margin-left: auto; }
+  .lp-problem__bubble--lt::after,.lp-problem__bubble--lm::after,.lp-problem__bubble--lb::after,
+  .lp-problem__bubble--rt::after,.lp-problem__bubble--rm::after,.lp-problem__bubble--rb::after {
+    right:auto;left:1.4rem;top:auto;bottom:-17px;transform:none;
+    border-left-color:transparent;border-right-color:transparent;border-top-color:<ACCENT>;
+  }
+  .lp-problem__bubble--lt::before,.lp-problem__bubble--lm::before,.lp-problem__bubble--lb::before,
+  .lp-problem__bubble--rt::before,.lp-problem__bubble--rm::before,.lp-problem__bubble--rb::before {
+    right:auto;left:1.5rem;top:auto;bottom:-12px;transform:none;
+    border-left-color:transparent;border-right-color:transparent;border-top-color:#fff;
+  }
+}
+
+` : ""}━━━━━━━━━━━━━━━━━━━━
 【HTML/CSS生成ルール】
 ━━━━━━━━━━━━━━━━━━━━
 1. WordPressのカスタムHTMLブロックに直接貼り付けられるHTMLを生成
@@ -105,15 +235,21 @@ ${sectionList}
 }
 
 export async function POST(req: NextRequest) {
+  // ── サーバーサイド プラン・課金ガード ──
+  const guard = await requirePlanGuard(req, { checkUsage: "generate" });
+  if (guard instanceof NextResponse) return guard;
+
   try {
     const {
       analysis,
       selectedSections,
       serviceInfo,
+      problemLayout = "normal",
     }: {
       analysis: LPAnalysis;
       selectedSections: AnalyzedSection[];
       serviceInfo: LPFormData;
+      problemLayout?: "normal" | "bubble";
     } = await req.json();
 
     if (!analysis || !selectedSections?.length || !serviceInfo) {
@@ -137,7 +273,7 @@ export async function POST(req: NextRequest) {
       messages: [
         {
           role: "user",
-          content: buildPrompt(analysis, selectedSections, serviceInfo),
+          content: buildPrompt(analysis, selectedSections, serviceInfo, problemLayout),
         },
       ],
     });
