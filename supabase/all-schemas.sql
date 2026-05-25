@@ -221,7 +221,8 @@ CREATE INDEX IF NOT EXISTS ae_event_type_idx  ON public.analytics_events (event_
 CREATE INDEX IF NOT EXISTS ae_created_at_idx  ON public.analytics_events (created_at DESC);
 CREATE INDEX IF NOT EXISTS ae_visitor_id_idx  ON public.analytics_events (visitor_id);
 CREATE INDEX IF NOT EXISTS ae_session_id_idx  ON public.analytics_events (session_id);
-CREATE INDEX IF NOT EXISTS ae_project_day_idx ON public.analytics_events (project_id, date_trunc('day', created_at));
+-- ae_project_day_idx: date_trunc('day', timestamptz) は STABLE のためインデックス式に使用不可。
+-- ae_created_at_idx (created_at DESC) で日別範囲クエリをカバー。
 
 -- ─── heatmap_events ──────────────────────────────────────────
 
