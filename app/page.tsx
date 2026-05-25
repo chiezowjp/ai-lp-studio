@@ -2294,6 +2294,16 @@ export default function Home() {
         {/* ═══ RIGHT PANEL — Image Insert ═══ */}
         {result && editMode === "image" && (
           <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+            <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-end shrink-0">
+              <a
+                href="/assets"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[#00AFCC] hover:underline font-semibold"
+              >
+                📁 アセットライブラリ →
+              </a>
+            </div>
             <ImageInsertPanel
               selectedElement={selectedElement}
               html={result.html}
