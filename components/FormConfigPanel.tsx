@@ -286,13 +286,13 @@ export default function FormConfigPanel({ projectId, projectSlug, isPublished }:
         </div>
         <button
           onClick={() => setConfig((c) => ({ ...c, enabled: !c.enabled }))}
-          className={`w-11 h-6 rounded-full transition-colors relative ${
+          className={`w-11 h-6 rounded-full transition-colors relative overflow-hidden ${
             config.enabled ? "bg-[#00AFCC]" : "bg-gray-300"
           }`}
         >
           <span
-            className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-              config.enabled ? "translate-x-5" : "translate-x-0.5"
+            className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+              config.enabled ? "translate-x-5" : "translate-x-0"
             }`}
           />
         </button>
@@ -407,13 +407,13 @@ export default function FormConfigPanel({ projectId, projectSlug, isPublished }:
                         },
                       }))
                     }
-                    className={`w-9 h-5 rounded-full transition-colors relative ${
+                    className={`w-9 h-5 rounded-full transition-colors relative overflow-hidden ${
                       config.emailNotification.enabled ? "bg-[#00AFCC]" : "bg-gray-300"
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                        config.emailNotification.enabled ? "translate-x-4" : "translate-x-0.5"
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        config.emailNotification.enabled ? "translate-x-4" : "translate-x-0"
                       }`}
                     />
                   </button>
@@ -457,13 +457,13 @@ export default function FormConfigPanel({ projectId, projectSlug, isPublished }:
                         googleSheets: { ...c.googleSheets, enabled: !c.googleSheets.enabled },
                       }))
                     }
-                    className={`w-9 h-5 rounded-full transition-colors relative ${
+                    className={`w-9 h-5 rounded-full transition-colors relative overflow-hidden ${
                       config.googleSheets.enabled ? "bg-[#00AFCC]" : "bg-gray-300"
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                        config.googleSheets.enabled ? "translate-x-4" : "translate-x-0.5"
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        config.googleSheets.enabled ? "translate-x-4" : "translate-x-0"
                       }`}
                     />
                   </button>
@@ -522,13 +522,13 @@ export default function FormConfigPanel({ projectId, projectSlug, isPublished }:
                         webhook: { ...c.webhook, enabled: !c.webhook.enabled },
                       }))
                     }
-                    className={`w-9 h-5 rounded-full transition-colors relative ${
+                    className={`w-9 h-5 rounded-full transition-colors relative overflow-hidden ${
                       config.webhook.enabled ? "bg-[#00AFCC]" : "bg-gray-300"
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                        config.webhook.enabled ? "translate-x-4" : "translate-x-0.5"
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        config.webhook.enabled ? "translate-x-4" : "translate-x-0"
                       }`}
                     />
                   </button>
