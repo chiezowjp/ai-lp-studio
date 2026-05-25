@@ -4,6 +4,26 @@ import { logAudit } from "@/lib/audit-logger";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
+// ─── GET /api/projects/[id]  ── 取得 ──────────────────────────────────────────
+
+export async function GET(req: NextRequest, ctx: RouteCtx) {
+  const user = await getUserFromRequest(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await ctx.params;
+  const admin = createAdminClient();
+
+  const { data, error } = await admin
+    .from("projects")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (error || !data) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(data);
+}
+
 // ─── PUT /api/projects/[id]  ── 更新 ──────────────────────────────────────────
 
 export async function PUT(req: NextRequest, ctx: RouteCtx) {
