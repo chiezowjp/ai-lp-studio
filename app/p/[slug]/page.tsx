@@ -6,6 +6,10 @@ import FormWidget from "@/components/FormWidget";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import type { FormConfig } from "@/lib/form-schema";
 
+// ─── キャッシュ設定（5分 ISR）────────────────────────────────────────────────
+
+export const revalidate = 300;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Props = { params: Promise<{ slug: string }> };
