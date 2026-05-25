@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { UploadedImage, LPFormData, UnsplashResult } from "@/types";
+import { useAuth } from "@/lib/auth-context";
 import UnsplashPicker from "./UnsplashPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ function DirectionPanel({
   sectionLabel: string;
   serviceInfo?: Partial<LPFormData>;
 }) {
+  const { session } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
@@ -94,7 +96,10 @@ function DirectionPanel({
     try {
       const res = await fetch("/api/generate-image-direction", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           imageBase64, mimeType, section: sectionId,
           whatToReference, whatToChange, elementsToAdd, elementsToAvoid,
@@ -322,6 +327,7 @@ export default function SectionImageManager({
   onImageDeselect,
   serviceInfo,
 }: Props) {
+  const { session } = useAuth();
   const sections = sectionOrder.length > 0 ? sectionOrder : FALLBACK_SECTIONS;
   const [selectedId, setSelectedId] = useState(sections[0]?.id ?? "hero");
   const [activeTab, setActiveTab] = useState<SectionTab>("direction");

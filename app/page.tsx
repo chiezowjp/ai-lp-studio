@@ -75,12 +75,16 @@ const SECTION_META: Record<string, string> = {
 
 async function generateWithRetry(
   data: LPFormData,
-  onRetry: (message: string) => void
+  onRetry: (message: string) => void,
+  accessToken?: string,
 ): Promise<GeneratedLP> {
   for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
     const res = await fetch("/api/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
       body: JSON.stringify(data),
     });
     const json = await res.json();
@@ -766,7 +770,7 @@ export default function Home() {
     setLastFormData(data);
     setUnsplashResult(null);
     try {
-      const generated = await generateWithRetry(data, (msg) => setRetryMessage(msg));
+      const generated = await generateWithRetry(data, (msg) => setRetryMessage(msg), session?.access_token);
       setResult(generated);
       setSectionOrder(parseSectionOrder(generated.html));
       setActiveTab("preview");
@@ -794,7 +798,7 @@ export default function Home() {
     setLastFormData(data);
     setUnsplashResult(null);
     try {
-      const generated = await generateWithRetry(data, (msg) => setRetryMessage(msg));
+      const generated = await generateWithRetry(data, (msg) => setRetryMessage(msg), session?.access_token);
       setResult(generated);
       setSectionOrder(parseSectionOrder(generated.html));
       setActiveTab("preview");
@@ -828,7 +832,10 @@ export default function Home() {
     try {
       const res = await fetch("/api/revise", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ html: result.html, css: result.css, instruction }),
       });
       const json = await res.json();
@@ -1240,7 +1247,10 @@ export default function Home() {
     try {
       const res = await fetch("/api/regenerate-section", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           sectionId: problemSectionId,
           sectionName: sec?.label ?? problemSectionId,

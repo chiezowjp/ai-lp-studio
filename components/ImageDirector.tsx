@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { LPFormData } from "@/types";
+import { useAuth } from "@/lib/auth-context";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -131,6 +132,7 @@ function ResultCard({ entry }: { entry: GeneratedEntry }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ImageDirector({ serviceInfo }: Props) {
+  const { session } = useAuth();
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Upload state
@@ -203,7 +205,10 @@ export default function ImageDirector({ serviceInfo }: Props) {
     try {
       const res = await fetch("/api/generate-image-direction", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           imageBase64,
           mimeType,

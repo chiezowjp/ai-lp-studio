@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { LPFormData, GeneratedLP, LPAnalysis, AnalyzedSection, CTAType, ImageToneAnalysis } from "@/types";
+import { useAuth } from "@/lib/auth-context";
 
 export type ProblemLayout = "normal" | "bubble";
 
@@ -171,6 +172,7 @@ function ImageCard({ img, index }: { img: ImageToneAnalysis; index: number }) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props) {
+  const { session } = useAuth();
   const [phase, setPhase] = useState<Phase>("input");
   const [refUrl, setRefUrl] = useState("");
   const [fallbackText, setFallbackText] = useState("");
@@ -203,7 +205,10 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
     setLoadingMsg("AIがLP構成を分析しています…");
     const res = await fetch("/api/analyze-lp", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
       body: JSON.stringify({ text, title, url }),
     });
     const json = await res.json();
@@ -270,7 +275,10 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
     try {
       const res = await fetch("/api/analyze-images", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           imageUrls,
           industry: form.industry,
@@ -323,7 +331,10 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
       setLoadingMsg(retryMsg ?? "LP生成中…（30〜60秒）");
       const res = await fetch("/api/generate-from-ref", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ analysis, selectedSections: selected, serviceInfo: form, problemLayout }),
       });
       const json = await res.json();

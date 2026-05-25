@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
 import {
   ImagePromptConfig, ImagePromptResult, SavedImagePrompt,
   ImageAITool, ImagePlacementLP, ImageMood, ImageSizeType, ImageBrightnessType,
@@ -116,6 +117,7 @@ function PromptCard({ label, text, accent = false }: { label: string; text: stri
 type ConfigDraft = Partial<ImagePromptConfig>;
 
 export default function ImagePromptAssistant({ open, onClose, lpContext, savedPrompts, onSave }: Props) {
+  const { session } = useAuth();
   const [step, setStep] = useState(1);
   const [cfg, setCfg] = useState<ConfigDraft>({ moods: [], hasPeople: false, needsTextSpace: true });
   const [result, setResult] = useState<ImagePromptResult | null>(null);
@@ -155,7 +157,10 @@ export default function ImagePromptAssistant({ open, onClose, lpContext, savedPr
     try {
       const res = await fetch("/api/image-prompt", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           config: cfg as ImagePromptConfig,
           lpContext: lpContext
