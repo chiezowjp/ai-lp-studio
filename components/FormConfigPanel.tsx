@@ -14,6 +14,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { FormConfig, FormField, FieldType } from "@/lib/form-schema";
 import { DEFAULT_FORM_CONFIG } from "@/lib/form-schema";
+import { useAuth } from "@/lib/auth-context";
 
 interface Props {
   projectId: string | null;
@@ -166,6 +167,7 @@ function FieldEditor({
 // ─── メインコンポーネント ─────────────────────────────────────────────────────
 
 export default function FormConfigPanel({ projectId, projectSlug, isPublished }: Props) {
+  const { session } = useAuth();
   const [config, setConfig] = useState<FormConfig>(DEFAULT_FORM_CONFIG);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -175,24 +177,32 @@ export default function FormConfigPanel({ projectId, projectSlug, isPublished }:
 
   // ── フォーム設定を取得 ──
   useEffect(() => {
-    if (!projectId) return;
+    if (!projectId || !session) return;
     setLoading(true);
-    fetch(`/api/projects/${projectId}/form-config`)
-      .then((r) => r.json())
-      .then((data: FormConfig) => setConfig(data))
+    fetch(`/api/projects/${projectId}/form-config`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`${r.status}`);
+        return r.json() as Promise<FormConfig>;
+      })
+      .then((data) => setConfig(data))
       .catch((e) => console.error("form-config fetch error:", e))
       .finally(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, session]);
 
   // ── 保存 ──
   const save = useCallback(async (cfg: FormConfig) => {
-    if (!projectId) return;
+    if (!projectId || !session) return;
     setSaving(true);
     setError(null);
     try {
       const res = await fetch(`/api/projects/${projectId}/form-config`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify(cfg),
       });
       if (!res.ok) {
