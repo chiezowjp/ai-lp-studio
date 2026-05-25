@@ -3,13 +3,15 @@
 import { useState, useCallback } from "react";
 import { LPFormData, GeneratedLP, LPAnalysis, AnalyzedSection, CTAType, ImageToneAnalysis } from "@/types";
 
+export type ProblemLayout = "normal" | "bubble";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Phase = "input" | "fetching" | "analyzing" | "review" | "generating";
 
 interface Props {
   initialServiceData?: Partial<LPFormData>;
-  onComplete: (result: GeneratedLP, formData: LPFormData) => void;
+  onComplete: (result: GeneratedLP, formData: LPFormData, lpAnalysis: LPAnalysis, currentLayout: ProblemLayout) => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -176,6 +178,7 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
 
   const [analysis, setAnalysis] = useState<LPAnalysis | null>(null);
   const [sections, setSections] = useState<AnalyzedSection[]>([]);
+  const [problemLayout, setProblemLayout] = useState<"normal" | "bubble">("normal");
 
   // Image tone analysis state
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -212,6 +215,8 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
     if (lpAnalysis.designMood) {
       setForm((p) => ({ ...p, designMood: lpAnalysis.designMood }));
     }
+    // 吹き出しレイアウトが検出された場合、デフォルトを "bubble" に
+    setProblemLayout(lpAnalysis.bubbleProblem ? "bubble" : "normal");
     setImageUrls(imgs);
     setImageAnalyzed(false);
     setImageAnalyses([]);
@@ -319,10 +324,10 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
       const res = await fetch("/api/generate-from-ref", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ analysis, selectedSections: selected, serviceInfo: form }),
+        body: JSON.stringify({ analysis, selectedSections: selected, serviceInfo: form, problemLayout }),
       });
       const json = await res.json();
-      if (res.ok) { onComplete(json as GeneratedLP, form); return; }
+      if (res.ok) { onComplete(json as GeneratedLP, form, analysis!, problemLayout); return; }
       if (json.type === "overloaded" && attempt < RETRY_DELAYS.length) {
         const sec = RETRY_DELAYS[attempt] / 1000;
         setRetryMsg(`AIが混み合っています。${sec}秒後に再試行… (${attempt + 1}/${RETRY_DELAYS.length})`);
@@ -517,6 +522,53 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
             </div>
           </div>
 
+          {/* ── 吹き出しレイアウト切り替え（お悩み系セクションがある場合に表示） */}
+          {sections.some(s =>
+            ["problem","trouble","worry","nayami"].some(k => s.id.includes(k)) ||
+            ["悩み","問題","お困り","不安","こんな"].some(k => s.name.includes(k))
+          ) && (
+            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <span className="text-lg shrink-0">💬</span>
+                <div>
+                  <p className="text-xs font-bold text-indigo-800">お悩みセクションのレイアウト</p>
+                  <p className="text-[11px] text-indigo-600 mt-0.5">
+                    参考LPに吹き出し・チェックリスト型の悩み訴求が検出されました。生成レイアウトを選んでください。
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {(
+                  [
+                    { id: "normal" as const,  label: "通常レイアウト",   desc: "テキスト段落・リスト形式", icon: "📝" },
+                    { id: "bubble" as const,  label: "吹き出しレイアウト", desc: "CSS吹き出し・カード型",    icon: "💬" },
+                  ]
+                ).map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => setProblemLayout(opt.id)}
+                    className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-xs font-semibold transition-all ${
+                      problemLayout === opt.id
+                        ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600"
+                    }`}
+                  >
+                    <span className="text-xl">{opt.icon}</span>
+                    <span>{opt.label}</span>
+                    <span className={`text-[10px] font-normal ${problemLayout === opt.id ? "text-indigo-200" : "text-gray-400"}`}>
+                      {opt.desc}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {problemLayout === "bubble" && (
+                <p className="text-[10px] text-indigo-600 bg-white rounded-lg px-3 py-2 border border-indigo-100">
+                  ✓ 吹き出し型レイアウトで生成します。生成後、ビジュアル編集でスタイルを調整できます。
+                </p>
+              )}
+            </div>
+          )}
+
           {/* ── Image direction CTA ── */}
           <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 p-4">
             <p className="text-xs font-bold text-indigo-800 mb-1">📸 画像ディレクション（メイン）</p>
@@ -624,7 +676,7 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
               ✨ この構成でLPを生成する
             </button>
             <button
-              onClick={() => { setPhase("input"); setAnalysis(null); setSections([]); setImageUrls([]); setImageAnalyses([]); setImageAnalyzed(false); setError(null); }}
+              onClick={() => { setPhase("input"); setAnalysis(null); setSections([]); setProblemLayout("normal"); setImageUrls([]); setImageAnalyses([]); setImageAnalyzed(false); setError(null); }}
               className="w-full py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
             >
               URLを変更してやり直す

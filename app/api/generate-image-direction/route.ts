@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { requirePlanGuard } from "@/lib/plan-guard";
+import { checkRateLimitBoth, getClientIp } from "@/lib/rate-limiter";
+import { checkInputSize } from "@/lib/input-guard";
+import { logRateLimitExceeded } from "@/lib/audit-logger";
 
 const SECTION_LABELS: Record<string, string> = {
   hero: "ファーストビュー（メインビジュアル）",
@@ -13,7 +17,29 @@ const VALID_MIME_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"] 
 type ValidMimeType = (typeof VALID_MIME_TYPES)[number];
 
 export async function POST(req: NextRequest) {
+  // ── サーバーサイド プラン・課金ガード（認証 + expired チェック） ──
+  const guard = await requirePlanGuard(req);
+  if (guard instanceof NextResponse) return guard;
+  const { user, planType } = guard;
+
+  // ── レートリミット（analyze と同じ上限） ──
+  const ip = getClientIp(req);
+  const rl = checkRateLimitBoth(ip, user.id, "analyze", planType);
+  if (!rl.allowed) {
+    logRateLimitExceeded({ userId: user.id, ip, action: "generate-image-direction", count: rl.count, limit: rl.limit });
+    return NextResponse.json(
+      { error: "リクエストが多すぎます。しばらく待ってから再試行してください。", retry_after: rl.retryAfter },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
+
   try {
+    const body = await req.json();
+
+    // ── 入力サイズ検証（画像 base64 含む） ──
+    const sizeCheck = checkInputSize(body as Record<string, unknown>, { hasImages: true });
+    if (sizeCheck) return sizeCheck;
+
     const {
       imageBase64,
       mimeType,
@@ -26,7 +52,7 @@ export async function POST(req: NextRequest) {
       industry,
       serviceDetail,
       target,
-    } = await req.json();
+    } = body as Record<string, string | undefined>;
 
     if (!imageBase64) {
       return NextResponse.json({ error: "画像データが必要です" }, { status: 400 });

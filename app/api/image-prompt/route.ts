@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { extractAndParseJSON } from "@/lib/parseAIJson";
 import { ImagePromptConfig, ImagePromptResult, LPFormData } from "@/types";
+import { requirePlanGuard } from "@/lib/plan-guard";
+import { checkRateLimitBoth, getClientIp } from "@/lib/rate-limiter";
+import { checkInputSize } from "@/lib/input-guard";
+import { logRateLimitExceeded } from "@/lib/audit-logger";
 
 // ─── AI ごとのプロンプト記法ガイド ──────────────────────────────────────────
 
@@ -57,6 +61,22 @@ const BRIGHTNESS_LABEL: Record<string, string> = {
 // ─── Route handler ───────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  // ── サーバーサイド プラン・課金ガード（認証 + expired チェック） ──
+  const guard = await requirePlanGuard(req);
+  if (guard instanceof NextResponse) return guard;
+  const { user, planType } = guard;
+
+  // ── レートリミット ──
+  const ip = getClientIp(req);
+  const rl = checkRateLimitBoth(ip, user.id, "analyze", planType);
+  if (!rl.allowed) {
+    logRateLimitExceeded({ userId: user.id, ip, action: "image-prompt", count: rl.count, limit: rl.limit });
+    return NextResponse.json(
+      { error: "リクエストが多すぎます。しばらく待ってから再試行してください。", retry_after: rl.retryAfter },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
+
   try {
     const { config, lpContext }: {
       config: ImagePromptConfig;

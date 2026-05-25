@@ -4,6 +4,15 @@ function camelToKebab(str: string): string {
   return str.replace(/([A-Z])/g, (m) => "-" + m.toLowerCase());
 }
 
+/** hex "#rrggbb" → "r,g,b" */
+function hexToRgb(hex: string): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16) || 0;
+  const g = parseInt(h.slice(2, 4), 16) || 0;
+  const b = parseInt(h.slice(4, 6), 16) || 0;
+  return `${r},${g},${b}`;
+}
+
 export function buildVisualCss(vs: VisualStyles): string {
   if (!vs || Object.keys(vs).length === 0) return "";
 
@@ -54,6 +63,39 @@ export function buildVisualCss(vs: VisualStyles): string {
       );
       lines.push("}");
     }
+
+    // ── 背景オーバーレイ ────────────────────────────────────────────────────
+    // ::after 疑似要素でオーバーレイ色・透明度・backdrop-filter blur を実現。
+    // コンテンツは position:relative / z-index:1 で前面に保持する。
+    const ov = rule.overlay;
+    if (ov?.enabled && (ov.opacity > 0 || ov.blur > 0)) {
+      const rgb   = hexToRgb(ov.color || "#000000");
+      const alpha = (Math.min(ov.opacity, 100) / 100).toFixed(2);
+
+      // セクション自体に position:relative / overflow:hidden を付与
+      lines.push(`${selector} { position: relative !important; overflow: hidden !important; }`);
+
+      // 直下の子要素を前面に（オーバーレイの上に）
+      lines.push(`${selector} > * { position: relative !important; z-index: 1 !important; }`);
+
+      // オーバーレイ本体（::after）
+      lines.push(`${selector}::after {`);
+      lines.push(`  content: "" !important;`);
+      lines.push(`  position: absolute !important;`);
+      lines.push(`  inset: 0 !important;`);
+      lines.push(`  background: rgba(${rgb},${alpha}) !important;`);
+      lines.push(`  z-index: 0 !important;`);
+      lines.push(`  pointer-events: none !important;`);
+      if (ov.blur > 0) {
+        const b = Math.min(ov.blur, 20);
+        lines.push(`  backdrop-filter: blur(${b}px) !important;`);
+        lines.push(`  -webkit-backdrop-filter: blur(${b}px) !important;`);
+      }
+      lines.push(`}`);
+    }
+
+    // imageButton は CSS ではなく LPPreview の JS 注入 + applyButtonImages で処理するため
+    // visualStyles には残さない（CSS tab には出力しない）
   }
 
   if (hasPulse) {

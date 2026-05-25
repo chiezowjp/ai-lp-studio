@@ -1,0 +1,62 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient, getUserFromRequest } from "@/lib/supabase-admin";
+
+type RouteCtx = { params: Promise<{ id: string }> };
+
+/**
+ * PATCH /api/projects/[id]/seo
+ * SEO / OGP / favicon / custom_head_html などの公開設定を保存する。
+ * プランチェックなし（読み取り専用の設定保存は Trial でも可）。
+ * ただし公開自体は publish エンドポイントで Pro チェックを行う。
+ */
+export async function PATCH(req: NextRequest, ctx: RouteCtx) {
+  const user = await getUserFromRequest(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await ctx.params;
+  const admin = createAdminClient();
+
+  // 所有者確認
+  const { data: existing } = await admin
+    .from("projects")
+    .select("user_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!existing || existing.user_id !== user.id) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const body = await req.json() as {
+    seo_title?: string | null;
+    seo_description?: string | null;
+    og_image?: string | null;
+    favicon_url?: string | null;
+    custom_css?: string | null;
+    custom_head_html?: string | null;
+    noindex?: boolean;
+  };
+
+  // 許可フィールドのみを更新（他のフィールドは無視）
+  const patch: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if ("seo_title"        in body) patch.seo_title        = body.seo_title        ?? null;
+  if ("seo_description"  in body) patch.seo_description  = body.seo_description  ?? null;
+  if ("og_image"         in body) patch.og_image         = body.og_image         ?? null;
+  if ("favicon_url"      in body) patch.favicon_url      = body.favicon_url      ?? null;
+  if ("custom_css"       in body) patch.custom_css       = body.custom_css       ?? null;
+  if ("custom_head_html" in body) patch.custom_head_html = body.custom_head_html ?? null;
+  if ("noindex"          in body) patch.noindex          = body.noindex          ?? false;
+
+  const { data, error } = await admin
+    .from("projects")
+    .update(patch)
+    .eq("id", id)
+    .select("id, seo_title, seo_description, og_image, favicon_url, custom_css, custom_head_html, noindex")
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}

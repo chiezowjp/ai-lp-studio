@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { extractAndParseJSON } from "@/lib/parseAIJson";
 import { ExtractedSiteData } from "@/types";
+import { requirePlanGuard } from "@/lib/plan-guard";
+import { checkRateLimitBoth, getClientIp } from "@/lib/rate-limiter";
+import { checkInputSize } from "@/lib/input-guard";
+import { logRateLimitExceeded } from "@/lib/audit-logger";
 
 const DESIGN_MOODS = [
   "ナチュラル・温かみ",
@@ -13,12 +17,33 @@ const DESIGN_MOODS = [
 ];
 
 export async function POST(req: NextRequest) {
+  // ── サーバーサイド プラン・課金ガード ──
+  const guard = await requirePlanGuard(req, { checkUsage: "analyze" });
+  if (guard instanceof NextResponse) return guard;
+  const { user, planType } = guard;
+
+  // ── レートリミット ──
+  const ip = getClientIp(req);
+  const rl = checkRateLimitBoth(ip, user.id, "analyze", planType);
+  if (!rl.allowed) {
+    logRateLimitExceeded({ userId: user.id, ip, action: "analyze", count: rl.count, limit: rl.limit });
+    return NextResponse.json(
+      { error: "リクエストが多すぎます。しばらく待ってから再試行してください。", retry_after: rl.retryAfter },
+      { status: 429, headers: { "Retry-After": String(rl.retryAfter) } },
+    );
+  }
+
   try {
+    const body = await req.json();
     const {
       text,
       title,
       url,
-    }: { text: string; title?: string; url?: string } = await req.json();
+    } = body as { text: string; title?: string; url?: string };
+
+    // ── 入力サイズ検証 ──
+    const sizeCheck = checkInputSize(body as Record<string, unknown>, { hasHtml: true });
+    if (sizeCheck) return sizeCheck;
 
     if (!text?.trim()) {
       return NextResponse.json(
