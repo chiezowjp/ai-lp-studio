@@ -19,5 +19,7 @@ export async function GET(req: NextRequest) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  return NextResponse.redirect(`${origin}${next}`);
+  // Railway では origin が localhost になるため NEXT_PUBLIC_APP_URL を優先する
+  const base = process.env.NEXT_PUBLIC_APP_URL ?? origin;
+  return NextResponse.redirect(`${base}${next}`);
 }
