@@ -103,6 +103,12 @@ export default function PublishPanel({
   const [toast, setToast]           = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // スラッグ編集用
+  const [slugInput, setSlugInput]   = useState("");
+  const [slugDirty, setSlugDirty]   = useState(false);
+  const [slugSaving, setSlugSaving] = useState(false);
+  const [slugError, setSlugError]   = useState<string | null>(null);
+
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? (typeof window !== "undefined" ? window.location.origin : "");
 
   // ── 設定取得 ────────────────────────────────────────────────────────────────
@@ -115,7 +121,13 @@ export default function PublishPanel({
       const res = await fetch(`/api/projects/${projectId}/publish`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (res.ok) setSettings(await res.json() as PublishSettings);
+      if (res.ok) {
+        const data = await res.json() as PublishSettings;
+        setSettings(data);
+        setSlugInput(data.slug ?? "");
+        setSlugDirty(false);
+        setSlugError(null);
+      }
     } catch {
       setError("設定の読み込みに失敗しました");
     } finally {
@@ -126,6 +138,44 @@ export default function PublishPanel({
   useEffect(() => {
     if (open && projectId) void fetchSettings();
   }, [open, projectId, fetchSettings]);
+
+  // ── スラッグ保存 ────────────────────────────────────────────────────────────
+
+  const handleSaveSlug = async () => {
+    if (!session || !projectId) return;
+    const trimmed = slugInput.trim();
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(trimmed)) {
+      setSlugError("小文字英数字とハイフンのみ（先頭・末尾はハイフン不可）");
+      return;
+    }
+    setSlugSaving(true);
+    setSlugError(null);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/seo`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ slug: trimmed }),
+      });
+      const json = await res.json() as { slug?: string; error?: string };
+      if (!res.ok) {
+        setSlugError(json.error ?? "変更に失敗しました");
+        return;
+      }
+      const newSlug = json.slug ?? null;
+      setSettings((prev) => prev ? { ...prev, slug: newSlug } : prev);
+      setSlugInput(newSlug ?? "");
+      setSlugDirty(false);
+      onPublishChange?.(settings?.is_published ?? false, newSlug);
+      showToast("URLを変更しました ✓");
+    } catch {
+      setSlugError("通信エラーが発生しました");
+    } finally {
+      setSlugSaving(false);
+    }
+  };
 
   // ── SEO 保存 ────────────────────────────────────────────────────────────────
 
@@ -340,6 +390,51 @@ export default function PublishPanel({
                       コピー
                     </button>
                   </div>
+                )}
+              </div>
+
+              {/* ── 公開URL スラッグ編集 ── */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-gray-600 uppercase tracking-wide">
+                  公開URL
+                </label>
+                <div className={`flex items-center gap-0 rounded-xl border px-3 py-2 transition-colors ${slugError ? "border-red-300 bg-red-50" : "border-gray-200 bg-gray-50 focus-within:border-[#00AFCC] focus-within:bg-white"}`}>
+                  <span className="text-[11px] text-gray-400 shrink-0 whitespace-nowrap select-none">
+                    {appUrl}/p/
+                  </span>
+                  <input
+                    type="text"
+                    value={slugInput}
+                    onChange={(e) => {
+                      setSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                      setSlugDirty(true);
+                      setSlugError(null);
+                    }}
+                    placeholder="my-landing-page"
+                    className="flex-1 text-[11px] text-gray-800 bg-transparent focus:outline-none min-w-0 font-mono"
+                  />
+                  {slugDirty && (
+                    <button
+                      onClick={() => { void handleSaveSlug(); }}
+                      disabled={slugSaving || !slugInput.trim()}
+                      className="shrink-0 ml-2 text-[10px] font-bold text-white bg-[#00AFCC] hover:bg-[#0099b3] px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {slugSaving ? "保存中" : "変更"}
+                    </button>
+                  )}
+                </div>
+                {settings.is_published && slugDirty && !slugError && (
+                  <p className="text-[10px] text-amber-600 flex items-center gap-1">
+                    <span>⚠</span> URLが変わると既存のリンクは無効になります
+                  </p>
+                )}
+                {slugError && (
+                  <p className="text-[10px] text-red-500">{slugError}</p>
+                )}
+                {!slugDirty && settings.slug && (
+                  <p className="text-[10px] text-gray-400">
+                    小文字英数字とハイフンのみ使用できます
+                  </p>
                 )}
               </div>
 

@@ -28,6 +28,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
   }
 
   const body = await req.json() as {
+    slug?: string | null;
     seo_title?: string | null;
     seo_description?: string | null;
     og_image?: string | null;
@@ -42,6 +43,32 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
     updated_at: new Date().toISOString(),
   };
 
+  // slug: フォーマット検証 + 重複チェック
+  if ("slug" in body) {
+    const slug = body.slug;
+    if (slug !== null && slug !== undefined && slug !== "") {
+      if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(slug)) {
+        return NextResponse.json(
+          { error: "スラッグは小文字英数字とハイフンのみ使用できます（先頭・末尾はハイフン不可）" },
+          { status: 400 },
+        );
+      }
+      const { data: dup } = await admin
+        .from("projects")
+        .select("id")
+        .eq("slug", slug)
+        .neq("id", id)
+        .maybeSingle();
+      if (dup) {
+        return NextResponse.json(
+          { error: "このURLはすでに使用されています" },
+          { status: 409 },
+        );
+      }
+    }
+    patch.slug = slug || null;
+  }
+
   if ("seo_title"        in body) patch.seo_title        = body.seo_title        ?? null;
   if ("seo_description"  in body) patch.seo_description  = body.seo_description  ?? null;
   if ("og_image"         in body) patch.og_image         = body.og_image         ?? null;
@@ -54,7 +81,7 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
     .from("projects")
     .update(patch)
     .eq("id", id)
-    .select("id, seo_title, seo_description, og_image, favicon_url, custom_css, custom_head_html, noindex")
+    .select("id, slug, seo_title, seo_description, og_image, favicon_url, custom_css, custom_head_html, noindex")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
