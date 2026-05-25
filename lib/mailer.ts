@@ -1,15 +1,13 @@
 /**
  * lib/mailer.ts — メール送信ユーティリティ
  *
- * 送信方法: Gmail SMTP（nodemailer）
+ * 送信方法: Resend API（fetch ベース — HTTPなのでRailwayのSMTPブロックに影響されない）
  *
  * 環境変数:
- *   GMAIL_USER      — 送信元 Gmail アドレス（例: noreply.ailpstudio@gmail.com）
- *   GMAIL_APP_PASS  — Gmail アプリパスワード（16桁）
- *   FROM_EMAIL      — 送信元表示名付きアドレス（省略時は GMAIL_USER を使用）
+ *   RESEND_API_KEY  — Resend の API キー（必須）
+ *   FROM_EMAIL      — 送信元アドレス（独自ドメイン認証済みの場合に設定）
+ *                     未設定時は onboarding@resend.dev を使用
  */
-
-import nodemailer from "nodemailer";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,45 +18,40 @@ export interface MailOptions {
   text?: string;
 }
 
-// ─── Transporter ─────────────────────────────────────────────────────────────
-
-function createTransporter() {
-  const user = process.env.GMAIL_USER;
-  const pass = process.env.GMAIL_APP_PASS;
-
-  if (!user || !pass) {
-    return null;
-  }
-
-  return nodemailer.createTransport({
-    service: "gmail",
-    auth: { user, pass },
-  });
-}
-
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * Gmail SMTP でメールを送信する。
- * GMAIL_USER / GMAIL_APP_PASS が未設定の場合はスキップする。
+ * Resend API でメールを送信する。
+ * RESEND_API_KEY が未設定の場合は警告をログに出力してスキップする。
  */
 export async function sendMail(options: MailOptions): Promise<void> {
-  const transporter = createTransporter();
-  if (!transporter) {
-    console.warn("[mailer] GMAIL_USER / GMAIL_APP_PASS not set. Skipping email.");
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.warn("[mailer] RESEND_API_KEY not set. Skipping email.");
     return;
   }
 
-  const from = process.env.FROM_EMAIL
-    ?? `AI LP STUDIO <${process.env.GMAIL_USER}>`;
+  const from = process.env.FROM_EMAIL ?? "onboarding@resend.dev";
 
-  await transporter.sendMail({
-    from,
-    to: options.to,
-    subject: options.subject,
-    html: options.html,
-    text: options.text,
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [options.to],
+      subject: options.subject,
+      html: options.html,
+      text: options.text,
+    }),
   });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Resend API error ${res.status}: ${body}`);
+  }
 }
 
 // ─── テンプレート ─────────────────────────────────────────────────────────────
