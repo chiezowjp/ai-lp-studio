@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ExtractedSiteData, LPFormData } from "@/types";
+import { useAuth } from "@/lib/auth-context";
 
 interface Props {
   onApply: (data: Partial<LPFormData>) => void;
@@ -31,6 +32,7 @@ const EXTRA_FIELDS: { key: keyof ExtractedSiteData; icon: string; label: string 
 ];
 
 export default function SiteImporter({ onApply }: Props) {
+  const { session } = useAuth();
   const [url, setUrl] = useState("");
   const [phase, setPhase] = useState<Phase>("input");
   const [loadingMsg, setLoadingMsg] = useState("");
@@ -45,7 +47,10 @@ export default function SiteImporter({ onApply }: Props) {
     setLoadingMsg("AIがサイト情報を解析しています…");
     const res = await fetch("/api/analyze-site", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
       body: JSON.stringify({ text, title, url: siteUrl }),
     });
     const json = await res.json();

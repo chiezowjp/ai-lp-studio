@@ -1293,7 +1293,10 @@ export default function Home() {
     try {
       const res = await fetch("/api/analyze-site", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ text: hearingText.trim() }),
       });
       const json = await res.json();
