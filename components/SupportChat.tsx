@@ -114,8 +114,8 @@ export default function SupportChat() {
         >
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 bg-[#00AFCC] text-white shrink-0">
-            <div className="w-9 h-9 rounded-full bg-white overflow-hidden shrink-0">
-              <img src="/support-avatar.png" alt="サポート" className="w-full h-full object-cover" />
+            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-sm font-black shrink-0">
+              AI
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold leading-tight">サポートBot</p>
