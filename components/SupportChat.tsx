@@ -191,6 +191,17 @@ export default function SupportChat() {
             <div ref={bottomRef} />
           </div>
 
+          {/* Mail footer */}
+          <div className="shrink-0 border-t border-gray-100 px-4 py-2 bg-gray-50 text-center">
+            <p className="text-[10px] text-gray-400">
+              解決しない場合は{" "}
+              <a href="mailto:info@ailpstudio.com" className="text-[#00AFCC] hover:underline font-medium">
+                info@ailpstudio.com
+              </a>
+              {" "}へ
+            </p>
+          </div>
+
           {/* Input */}
           <div className="shrink-0 border-t border-gray-100 p-3 bg-white">
             <div className="flex gap-2 items-end">
