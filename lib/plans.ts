@@ -205,7 +205,6 @@ export const PLAN_FEATURES: PlanFeature[] = [
   // ── Analytics・改善（Phase 8）
   { category: "Analytics・改善", label: "Analytics閲覧",    trial: false, pro: true, highlight: true },
   {                               label: "Heatmap基盤",      trial: false, pro: true  },
-  {                               label: "Version履歴・Rollback", trial: false, pro: true  },
   {                               label: "Asset Library",    trial: "10件", pro: "無制限", highlight: true },
   // ── 保存・管理
   { category: "保存・管理",  label: "クラウド保存",   trial: "1件", pro: "10件", highlight: true },
