@@ -296,6 +296,14 @@ export default function MyLPsPage() {
                   >
                     編集
                   </button>
+                  {p.is_published && (
+                    <Link
+                      href={`/analytics/${p.id}`}
+                      className="px-3 py-1.5 text-[11px] font-semibold border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      📊 分析
+                    </Link>
+                  )}
                   <button
                     onClick={() => handleDuplicate(p)}
                     disabled={duplicating === p.id}
