@@ -245,34 +245,84 @@ const accordionItems: AccordionItem[] = [
     title: "LPを編集する",
     content: (
       <div>
-        <p className="text-gray-600 mb-4 text-sm">生成されたLPは右側のエディターパネルで細かく編集できます。上部のタブで「テキスト」「スタイル」「画像」を切り替えて使います。</p>
+        <p className="text-gray-600 mb-4 text-sm">
+          生成されたLPはビジュアルエディターで自由に編集できます。大きく「左サイドバー」と「右パネル」の2つのエリアを使います。
+        </p>
 
-        <SectionTitle>📝 テキスト編集</SectionTitle>
-        <Step number={1} text="上部タブの「テキスト」を選択した状態で、プレビュー上のテキスト部分をクリックします。" />
-        <Step number={2} text="右パネルに編集フィールドが表示されるので、内容を書き換えます。" />
-        <Step number={3} text="変更はリアルタイムでプレビューに反映されます。" />
-        <Tip>見出し・本文・ボタンのテキストなど、LP内のほぼすべてのテキストを直接編集できます。</Tip>
+        {/* エディター構成の説明 */}
+        <div className="bg-gray-50 rounded-xl p-4 mb-5 text-sm text-gray-700">
+          <p className="font-bold text-gray-800 mb-2">📐 エディターの構成</p>
+          <ul className="space-y-1.5">
+            <li><span className="font-semibold text-[#00AFCC]">左サイドバー</span> ── カラーテーマ・フォント・セクション管理・お悩みレイアウト</li>
+            <li><span className="font-semibold text-[#00AFCC]">中央プレビュー</span> ── クリックして要素を選択・テキスト直接編集</li>
+            <li><span className="font-semibold text-[#00AFCC]">右パネル（タブ切り替え）</span> ── テキスト編集 / スタイル / 画像 / フォーム / Analytics</li>
+          </ul>
+        </div>
 
-        <SectionTitle>🎨 カラーテーマ変更</SectionTitle>
-        <Step number={1} text="左サイドバーの「カラーテーマ」セクションに6色のカラーパレットが表示されています。" />
-        <Step number={2} text="変更したい色をクリックするとカラーピッカーが開き、好みの色に変更できます。" />
-        <Step number={3} text="変更はリアルタイムでプレビューに反映されます。気に入らない場合はUndoボタン（↩）で戻せます。" />
+        <SectionTitle>📝 テキスト・要素の編集</SectionTitle>
+        <Step number={1} text="右パネル上部のタブで「テキスト」を選択します。" />
+        <Step number={2} text="中央プレビューで編集したいテキスト（見出し・本文・ボタンなど）をクリックします。" />
+        <Step number={3} text="右パネルに選択した要素の編集フィールドが表示されます。テキストを書き換えてください。" />
+        <Step number={4} text="変更はリアルタイムでプレビューに反映されます。" />
+        <Tip>見出し・本文・ボタンのテキスト・リスト項目など、LP内のほぼすべてのテキストをクリックして編集できます。</Tip>
 
-        <SectionTitle>🔤 フォント変更</SectionTitle>
-        <Step number={1} text="上部タブの「スタイル」を選択します。" />
-        <Step number={2} text="「フォント」ドロップダウンから好みのフォントを選択します（日本語・英語フォント対応）。" />
-        <Step number={3} text="フォントはLP全体に一括適用されます。" />
+        <SectionTitle>🎨 カラーテーマの編集</SectionTitle>
+        <Step number={1} text="左サイドバーの「カラーテーマ」セクションを確認します。カラー1〜カラー6の6つのカラーパレットが表示されています。" />
+        <Step number={2} text="変更したい色のカラーボックスをクリックするとカラーピッカーが開きます。" />
+        <Step number={3} text="カラーピッカーで好みの色を選ぶか、HEXコード（例：#FF5733）を直接入力します。" />
+        <Step number={4} text="変更はリアルタイムでプレビューに反映されます。" />
+        <Step number={5} text="気に入らない場合はプレビュー右上のUndoボタン（↩）で1つ前の状態に戻せます。" />
+        <Tip>カラー1がメインカラー（ボタン・見出しなど）、カラー4が背景色になることが多いです。ブランドカラーに合わせて調整してください。</Tip>
 
-        <SectionTitle>➕ セクション追加・並び替え</SectionTitle>
+        <SectionTitle>🔤 フォントの変更</SectionTitle>
+        <Step number={1} text="左サイドバーの「フォント」セクションを開きます。" />
+        <Step number={2} text="ドロップダウンから好みのフォントを選択します。" />
+        <Step number={3} text="フォントはLP全体に一括で適用されます。" />
+        <Tip>「Noto Sans JP」は読みやすい定番フォント、「Zen Kaku Gothic」はスタイリッシュな印象になります。業種に合わせて選びましょう。</Tip>
+
+        <SectionTitle>➕ セクションの追加</SectionTitle>
         <Step number={1} text="左サイドバー下部の「＋ セクションを追加」ボタンをクリックします。" />
-        <Step number={2} text="追加したいセクションの種類（料金表・FAQ・タイムライン・お客様の声など）を選択します。" />
-        <Step number={3} text="「セクション並び替え」パネルでドラッグ&ドロップしてセクションの順序を変更できます。" />
-        <Step number={4} text="Undoボタン（↩）でセクションの追加・並び替えを元に戻せます。" />
+        <Step number={2} text="追加できるセクションの一覧が表示されます（料金表・FAQ・タイムライン・お客様の声・比較表など）。" />
+        <Step number={3} text="追加したいセクションをクリックするとLPに追加されます。" />
+        <Step number={4} text="追加後は左サイドバーの並び替えパネルでセクションの位置を調整できます。" />
 
-        <SectionTitle>✏️ AI編集（修正依頼）</SectionTitle>
-        <Step number={1} text="エディター下部の「AIに修正を依頼」フォームに修正内容を入力します。" />
-        <Step number={2} text="例：「ヒーローセクションのキャッチコピーをより力強い表現に変えてください」" />
-        <Step number={3} text="AIが指示に従ってLPを修正します。気に入らない場合はUndoで戻せます。" />
+        <SectionTitle>↕️ セクションの並び替え</SectionTitle>
+        <Step number={1} text="左サイドバーの「セクション」パネルに現在のセクション一覧が表示されています。" />
+        <Step number={2} text="各セクション名の左側の「⠿」ハンドルをドラッグ&ドロップして順序を入れ替えます。" />
+        <Step number={3} text="変更後はプレビューに即座に反映されます。" />
+        <Tip>一般的なLPの順番：ファーストビュー → お悩み → 選ばれる理由 → サービス内容 → 料金 → お客様の声 → FAQ → CTA</Tip>
+
+        <SectionTitle>💬 お悩みセクション レイアウト切り替え</SectionTitle>
+        <Step number={1} text="左サイドバー下部の「💬 お悩みセクション レイアウト」パネルを確認します（お悩みセクションがある場合のみ表示）。" />
+        <Step number={2} text="「📝 通常（テキスト型）」と「💬 吹き出し（カード型）」の2種類から選べます。" />
+        <Step number={3} text="切り替えボタンをクリックするとAIが新しいレイアウトでお悩みセクションを再生成します。" />
+        <Step number={4} text="気に入らない場合はUndoボタン（↩）で元に戻せます。" />
+        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <p className="font-bold text-gray-700 mb-1">📝 通常（テキスト型）</p>
+            <p className="text-gray-500 text-xs">お悩みをリスト形式やテキストで表示。シンプルで読みやすい。</p>
+          </div>
+          <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-200">
+            <p className="font-bold text-indigo-700 mb-1">💬 吹き出し（カード型）</p>
+            <p className="text-indigo-500 text-xs">お悩みをカードや吹き出し形式で表示。視覚的でインパクトがある。</p>
+          </div>
+        </div>
+
+        <SectionTitle>🤖 AI編集（修正依頼）</SectionTitle>
+        <Step number={1} text="エディター右下の「AIに修正を依頼」フォームに修正内容を日本語で入力します。" />
+        <Step number={2} text="具体的に指示するほど精度が上がります。例：「ヒーローセクションのキャッチコピーを美容サロン向けの柔らかい表現に変えてください」" />
+        <Step number={3} text="「修正する」ボタンを押すとAIがLP全体を修正します（約30秒）。" />
+        <Step number={4} text="気に入らない場合はUndoボタン（↩）で修正前の状態に戻せます。" />
+        <Tip>セクション単位での修正も可能です。「FAQセクションに3つ質問を追加してください」のように指定できます。</Tip>
+
+        <SectionTitle>↩️ Undo（元に戻す）</SectionTitle>
+        <Step number={1} text="プレビュー右上のUndoボタン（↩）をクリックすると1つ前の状態に戻ります。" />
+        <Step number={2} text="最大20回分の操作履歴が保存されています。" />
+
+        <SectionTitle>📱 プレビューモードの切り替え</SectionTitle>
+        <Step number={1} text="右パネルの右上にあるPC/スマホアイコンをクリックしてプレビューを切り替えます。" />
+        <Step number={2} text="「💻 PC表示」と「📱 スマホ表示」を切り替えて両方のレイアウトを確認できます。" />
+        <Tip>スマホでの閲覧が多い場合はスマホ表示でもきれいに見えるか必ず確認しましょう。</Tip>
       </div>
     ),
   },
