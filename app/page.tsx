@@ -1505,6 +1505,20 @@ export default function Home() {
           {/* ── 保存・読み込みボタン ── */}
           <div className="flex items-center gap-1.5 shrink-0">
 
+            {/* 新規作成（LP生成後のみ） */}
+            {result && (
+              <button
+                onClick={() => {
+                  if (confirm("現在の編集内容を破棄して新規作成しますか？\n（保存していない変更は失われます）")) {
+                    window.location.href = "/";
+                  }
+                }}
+                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                ＋ <span className="hidden sm:inline">新規</span>
+              </button>
+            )}
+
             {/* 読み込む（常時表示） */}
             <label className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 cursor-pointer transition-colors">
               📂
