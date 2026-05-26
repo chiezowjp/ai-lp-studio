@@ -1640,6 +1640,14 @@ export default function Home() {
               </button>
             )}
 
+            {/* 使い方 */}
+            <button
+              onClick={() => router.push("/how-to-use")}
+              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              ❓ 使い方
+            </button>
+
             {/* マイLP */}
             {user && (
               <button
