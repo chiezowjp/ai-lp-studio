@@ -41,7 +41,7 @@ import FormConfigPanel from "@/components/FormConfigPanel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type ResultTab = "preview" | "html" | "css" | "netlify";
+type ResultTab = "preview" | "html" | "css";
 type InputMethod = "form" | "url" | "text" | "ref";
 type EditMode = "text" | "style" | "image";
 
@@ -1456,7 +1456,6 @@ export default function Home() {
     { id: "preview", label: "プレビュー" },
     { id: "html", label: "HTML" },
     { id: "css", label: "CSS" },
-    { id: "netlify", label: "Netlify" },
   ];
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -2168,21 +2167,6 @@ export default function Home() {
                     title={`元に戻す (Ctrl+Z)${undoStack.length > 0 ? ` — ${undoStack.length}件` : ""}`}
                     className="p-1.5 rounded text-sm text-gray-400 hover:text-[#00AFCC] hover:bg-[#E6F8FC] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
                   >↩</button>
-                  {activeTab === "netlify" && (
-                    <>
-                      <div className="w-px h-5 bg-gray-200 mx-1" />
-                      <button
-                        onClick={() => downloadFile(
-                          buildNetlifyHtml(buttonProcessedHtml, effectiveCss, serviceName, unsplashImages, fontGoogleUrl),
-                          `${serviceName || "lp"}.html`,
-                          "text/html"
-                        )}
-                        className="text-xs px-3 py-1.5 bg-[#00AFCC] hover:bg-[#0099B3] text-white rounded-lg font-semibold transition-colors"
-                      >
-                        DL
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
 
@@ -2265,24 +2249,6 @@ export default function Home() {
                       label={`WordPress「追加CSS」に貼り付け${images.length > 0 || Object.keys(colorReplacements).length > 0 ? "（カスタマイズ反映済み）" : ""}`}
                       code={effectiveCss}
                       language="css"
-                    />
-                  </div>
-                )}
-                {activeTab === "netlify" && (
-                  <div className="relative p-4">
-                    {planType && planType !== "pro" && (
-                      <LockScreen
-                        featureTitle="Netlifyデプロイ用HTML"
-                        onUpgrade={() => openUpgrade("Netlifyデプロイ用HTMLはProプランの機能です。")}
-                      />
-                    )}
-                    <p className="text-sm text-gray-600 mb-3">
-                      HTML・CSSを1ファイルに統合。Netlify / GitHub Pages などに直接デプロイできます。
-                    </p>
-                    <CodeBlock
-                      label="完全なHTMLファイル（Netlify / GitHub Pages 用）"
-                      code={buildNetlifyHtml(buttonProcessedHtml, effectiveCss, serviceName, unsplashImages, fontGoogleUrl)}
-                      language="html"
                     />
                   </div>
                 )}
