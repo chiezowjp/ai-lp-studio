@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { PlanProvider } from "@/lib/plan-context";
 import { GlobalBanners } from "@/components/GlobalBanners";
+import SupportChat from "@/components/SupportChat";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +36,7 @@ export default function RootLayout({
           <PlanProvider>
             <GlobalBanners />
             {children}
+            <SupportChat />
           </PlanProvider>
         </AuthProvider>
       </body>
