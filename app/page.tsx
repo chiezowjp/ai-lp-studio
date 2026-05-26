@@ -38,6 +38,7 @@ import UpgradeModal from "@/components/UpgradeModal";
 import LockScreen from "@/components/LockScreen";
 import PublishPanel from "@/components/PublishPanel";
 import FormConfigPanel from "@/components/FormConfigPanel";
+import Tooltip from "@/components/Tooltip";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1524,44 +1525,50 @@ export default function Home() {
 
             {/* 新規作成（LP生成後のみ） */}
             {result && (
-              <button
-                onClick={() => {
-                  if (confirm("現在の編集内容を破棄して新規作成しますか？\n（保存していない変更は失われます）")) {
-                    window.location.href = "/";
-                  }
-                }}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                ＋ <span className="hidden sm:inline">新規</span>
-              </button>
+              <Tooltip text="現在のLPを破棄して新規作成" position="bottom">
+                <button
+                  onClick={() => {
+                    if (confirm("現在の編集内容を破棄して新規作成しますか？\n（保存していない変更は失われます）")) {
+                      window.location.href = "/";
+                    }
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  ＋ <span className="hidden sm:inline">新規</span>
+                </button>
+              </Tooltip>
             )}
 
             {/* 読み込む（常時表示） */}
-            <label className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 cursor-pointer transition-colors">
-              📂
-              <span className="hidden sm:inline">読み込む</span>
-              <input
-                ref={loadFileRef}
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={handleLoadFile}
-              />
-            </label>
+            <Tooltip text="JSONファイルからLPを読み込む" position="bottom">
+              <label className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 cursor-pointer transition-colors">
+                📂
+                <span className="hidden sm:inline">読み込む</span>
+                <input
+                  ref={loadFileRef}
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={handleLoadFile}
+                />
+              </label>
+            </Tooltip>
 
             {/* 保存（LP 生成後のみ） */}
             {result && (
               <div className="relative">
-                <button
-                  onClick={() => setSaveMenuOpen((o) => !o)}
-                  disabled={isSaving}
-                  className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold bg-[#00AFCC] hover:bg-[#0099B3] disabled:opacity-50 text-white rounded-lg transition-colors"
-                >
-                  {isSaving
-                    ? <><div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />保存中</>
-                    : <>💾 <span className="hidden sm:inline">保存</span> ▾</>
-                  }
-                </button>
+                <Tooltip text="クラウド・ローカルに保存" position="bottom">
+                  <button
+                    onClick={() => setSaveMenuOpen((o) => !o)}
+                    disabled={isSaving}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold bg-[#00AFCC] hover:bg-[#0099B3] disabled:opacity-50 text-white rounded-lg transition-colors"
+                  >
+                    {isSaving
+                      ? <><div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />保存中</>
+                      : <>💾 <span className="hidden sm:inline">保存</span> ▾</>
+                    }
+                  </button>
+                </Tooltip>
                 {saveMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-40" onClick={() => setSaveMenuOpen(false)} />
@@ -1631,31 +1638,36 @@ export default function Home() {
 
             {/* 公開ボタン（LP生成後かつログイン中） */}
             {result && user && (
-              <button
-                onClick={() => setShowPublishPanel(true)}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold bg-[#00AFCC] hover:bg-[#0099B3] text-white rounded-lg transition-colors"
-                title={publishedSlug ? "公開設定を変更" : "LPを公開する"}
-              >
-                🚀 <span className="hidden sm:inline">{publishedSlug ? "公開中" : "公開"}</span>
-              </button>
+              <Tooltip text={publishedSlug ? "公開設定を変更する" : "LPを公開URLで公開する"} position="bottom">
+                <button
+                  onClick={() => setShowPublishPanel(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold bg-[#00AFCC] hover:bg-[#0099B3] text-white rounded-lg transition-colors"
+                >
+                  🚀 <span className="hidden sm:inline">{publishedSlug ? "公開中" : "公開"}</span>
+                </button>
+              </Tooltip>
             )}
 
             {/* 使い方 */}
-            <button
-              onClick={() => router.push("/how-to-use")}
-              className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-            >
-              ❓ 使い方
-            </button>
+            <Tooltip text="操作マニュアルを見る" position="bottom">
+              <button
+                onClick={() => router.push("/how-to-use")}
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                ❓ 使い方
+              </button>
+            </Tooltip>
 
             {/* マイLP */}
             {user && (
-              <button
-                onClick={() => router.push("/my-lps")}
-                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                📁 マイLP
-              </button>
+              <Tooltip text="保存済みのLPを管理する" position="bottom">
+                <button
+                  onClick={() => router.push("/my-lps")}
+                  className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  📁 マイLP
+                </button>
+              </Tooltip>
             )}
 
             {/* ユーザー表示 / ログインボタン */}
@@ -1753,23 +1765,24 @@ export default function Home() {
               <div className="flex border-b border-gray-200 shrink-0">
                 {(
                   [
-                    { id: "form", label: "✏ フォーム" },
-                    { id: "url",  label: "🌐 URL" },
-                    { id: "text", label: "📋 貼付" },
-                    { id: "ref",  label: "🔍 参考LP" },
-                  ] as { id: InputMethod; label: string }[]
+                    { id: "form", label: "✏ フォーム", tip: "情報を手入力してLP生成" },
+                    { id: "url",  label: "🌐 URL",     tip: "既存サイトURLから自動入力" },
+                    { id: "text", label: "📋 貼付",    tip: "ヒアリングシートから自動入力" },
+                    { id: "ref",  label: "🔍 参考LP",  tip: "参考LPを分析してスタイルを反映" },
+                  ] as { id: InputMethod; label: string; tip: string }[]
                 ).map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setInputMethod(tab.id)}
-                    className={`flex-1 py-2.5 text-[11px] font-semibold transition-colors border-b-2
-                      ${inputMethod === tab.id
-                        ? "text-[#00AFCC] border-[#00AFCC] bg-[#E6F8FC]"
-                        : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50"
-                      }`}
-                  >
-                    {tab.label}
-                  </button>
+                  <Tooltip key={tab.id} text={tab.tip} position="bottom">
+                    <button
+                      onClick={() => setInputMethod(tab.id)}
+                      className={`flex-1 py-2.5 text-[11px] font-semibold transition-colors border-b-2
+                        ${inputMethod === tab.id
+                          ? "text-[#00AFCC] border-[#00AFCC] bg-[#E6F8FC]"
+                          : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50"
+                        }`}
+                    >
+                      {tab.label}
+                    </button>
+                  </Tooltip>
                 ))}
               </div>
 
@@ -1899,20 +1912,22 @@ export default function Home() {
 
               {/* 画像生成プロンプト */}
               <div className="px-4 py-3 border-b border-gray-100">
-                <button
-                  onClick={() => setPromptAssistantOpen(true)}
-                  className="w-full flex items-center justify-between py-2.5 px-4 bg-[#00AFCC] hover:bg-[#0099B3] text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
-                >
-                  <span className="flex items-center gap-2">
-                    <span>🎨</span>
-                    <span>AI画像プロンプト生成</span>
-                  </span>
-                  {savedPrompts.length > 0 && (
-                    <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      {savedPrompts.length}件保存
+                <Tooltip text="LP内容に合った画像生成プロンプトを作成" position="bottom">
+                  <button
+                    onClick={() => setPromptAssistantOpen(true)}
+                    className="w-full flex items-center justify-between py-2.5 px-4 bg-[#00AFCC] hover:bg-[#0099B3] text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span>🎨</span>
+                      <span>AI画像プロンプト生成</span>
                     </span>
-                  )}
-                </button>
+                    {savedPrompts.length > 0 && (
+                      <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {savedPrompts.length}件保存
+                      </span>
+                    )}
+                  </button>
+                </Tooltip>
               </div>
 
               {/* カラーテーマ */}
@@ -1965,13 +1980,15 @@ export default function Home() {
               {/* セクション追加 & 並び替え */}
               <Accordion title="セクション" defaultOpen>
                 <div className="space-y-3">
-                  <button
-                    onClick={() => setAddSectionOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-[#D8D8D2] hover:border-[#00AFCC] hover:bg-[#E6F8FC] text-[#00AFCC] font-semibold text-sm rounded-xl transition-colors"
-                  >
-                    <span className="text-lg leading-none">＋</span>
-                    セクションを追加
-                  </button>
+                  <Tooltip text="テンプレートから新しいセクションを追加" position="bottom">
+                    <button
+                      onClick={() => setAddSectionOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-[#D8D8D2] hover:border-[#00AFCC] hover:bg-[#E6F8FC] text-[#00AFCC] font-semibold text-sm rounded-xl transition-colors"
+                    >
+                      <span className="text-lg leading-none">＋</span>
+                      セクションを追加
+                    </button>
+                  </Tooltip>
 
                   {/* 吹き出し切り替え（お悩みセクションがある場合は常に表示） */}
                   {findProblemSectionId(sectionOrder) && (
@@ -2170,42 +2187,48 @@ export default function Home() {
                     <>
                       {/* Edit mode toggle */}
                       <div className="flex rounded-lg border border-gray-200 overflow-hidden mr-1">
-                        <button
-                          onClick={() => handleEditModeToggle("text")}
-                          title="テキスト編集モード"
-                          className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "text" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
-                        >✏ テキスト</button>
-                        <button
-                          onClick={() => handleEditModeToggle("style")}
-                          title="スタイル編集モード"
-                          className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "style" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
-                        >🎨 スタイル</button>
-                        <button
-                          onClick={() => handleEditModeToggle("image")}
-                          title="画像挿入モード"
-                          className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "image" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
-                        >📷 画像</button>
+                        <Tooltip text="テキストをクリックして直接編集" position="bottom">
+                          <button
+                            onClick={() => handleEditModeToggle("text")}
+                            className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "text" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
+                          >✏ テキスト</button>
+                        </Tooltip>
+                        <Tooltip text="要素の色・背景・余白を編集" position="bottom">
+                          <button
+                            onClick={() => handleEditModeToggle("style")}
+                            className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "style" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
+                          >🎨 スタイル</button>
+                        </Tooltip>
+                        <Tooltip text="クリックした要素に画像を挿入" position="bottom">
+                          <button
+                            onClick={() => handleEditModeToggle("image")}
+                            className={`px-2.5 py-1.5 text-xs font-semibold transition-colors ${editMode === "image" ? "bg-[#00AFCC] text-white" : "text-gray-500 hover:bg-[#E6F8FC] hover:text-[#00AFCC]"}`}
+                          >📷 画像</button>
+                        </Tooltip>
                       </div>
                       <div className="w-px h-5 bg-gray-200 mx-1" />
-                      <button
-                        onClick={() => setPreviewMode("desktop")}
-                        title="デスクトップ"
-                        className={`p-1.5 rounded text-sm transition-colors ${previewMode === "desktop" ? "bg-[#E6F8FC] text-[#00AFCC]" : "text-gray-400 hover:text-[#00AFCC]"}`}
-                      >🖥️</button>
-                      <button
-                        onClick={() => setPreviewMode("mobile")}
-                        title="モバイル"
-                        className={`p-1.5 rounded text-sm transition-colors ${previewMode === "mobile" ? "bg-[#E6F8FC] text-[#00AFCC]" : "text-gray-400 hover:text-[#00AFCC]"}`}
-                      >📱</button>
+                      <Tooltip text="デスクトップ表示でプレビュー" position="bottom">
+                        <button
+                          onClick={() => setPreviewMode("desktop")}
+                          className={`p-1.5 rounded text-sm transition-colors ${previewMode === "desktop" ? "bg-[#E6F8FC] text-[#00AFCC]" : "text-gray-400 hover:text-[#00AFCC]"}`}
+                        >🖥️</button>
+                      </Tooltip>
+                      <Tooltip text="スマートフォン表示でプレビュー" position="bottom">
+                        <button
+                          onClick={() => setPreviewMode("mobile")}
+                          className={`p-1.5 rounded text-sm transition-colors ${previewMode === "mobile" ? "bg-[#E6F8FC] text-[#00AFCC]" : "text-gray-400 hover:text-[#00AFCC]"}`}
+                        >📱</button>
+                      </Tooltip>
                       <div className="w-px h-5 bg-gray-200 mx-1" />
                     </>
                   )}
-                  <button
-                    onClick={handleUndo}
-                    disabled={undoStack.length === 0}
-                    title={`元に戻す (Ctrl+Z)${undoStack.length > 0 ? ` — ${undoStack.length}件` : ""}`}
-                    className="p-1.5 rounded text-sm text-gray-400 hover:text-[#00AFCC] hover:bg-[#E6F8FC] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-                  >↩</button>
+                  <Tooltip text={`元に戻す (Ctrl+Z)${undoStack.length > 0 ? ` — ${undoStack.length}件` : ""}`} position="bottom">
+                    <button
+                      onClick={handleUndo}
+                      disabled={undoStack.length === 0}
+                      className="p-1.5 rounded text-sm text-gray-400 hover:text-[#00AFCC] hover:bg-[#E6F8FC] disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
+                    >↩</button>
+                  </Tooltip>
                 </div>
               </div>
 

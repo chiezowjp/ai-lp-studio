@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { usePlan } from "@/lib/plan-context";
 import { PLAN_LIMITS, PLAN_LABEL, trialDaysLeft } from "@/lib/plans";
 import type { DbProject } from "@/lib/supabase";
+import Tooltip from "@/components/Tooltip";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -324,13 +325,14 @@ export default function MyLPsPage() {
                       className="w-full text-sm font-bold text-gray-900 border-b border-[#00AFCC] outline-none bg-transparent pb-0.5"
                     />
                   ) : (
-                    <p
-                      className="text-sm font-bold text-gray-900 truncate cursor-pointer hover:text-[#00AFCC] transition-colors"
-                      title="クリックで名前を変更"
-                      onClick={() => handleRenameStart(p)}
-                    >
-                      {p.title}
-                    </p>
+                    <Tooltip text="クリックで名前を変更" position="top">
+                      <p
+                        className="text-sm font-bold text-gray-900 truncate cursor-pointer hover:text-[#00AFCC] transition-colors"
+                        onClick={() => handleRenameStart(p)}
+                      >
+                        {p.title}
+                      </p>
+                    </Tooltip>
                   )}
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     更新: {fmt(p.updated_at)}
@@ -341,34 +343,42 @@ export default function MyLPsPage() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => handleEdit(p.id)}
-                    className="px-3 py-1.5 text-[11px] font-semibold bg-[#00AFCC] text-white rounded-lg hover:bg-[#0099b3] transition-colors"
-                  >
-                    編集
-                  </button>
-                  {p.is_published && (
-                    <Link
-                      href={`/analytics/${p.id}`}
-                      className="px-3 py-1.5 text-[11px] font-semibold border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                  <Tooltip text="エディターで開いて編集する" position="top">
+                    <button
+                      onClick={() => handleEdit(p.id)}
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#00AFCC] text-white rounded-lg hover:bg-[#0099b3] transition-colors"
                     >
-                      📊 分析
-                    </Link>
+                      編集
+                    </button>
+                  </Tooltip>
+                  {p.is_published && (
+                    <Tooltip text="アクセス数・CV率などを確認" position="top">
+                      <Link
+                        href={`/analytics/${p.id}`}
+                        className="px-3 py-1.5 text-[11px] font-semibold border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        📊 分析
+                      </Link>
+                    </Tooltip>
                   )}
-                  <button
-                    onClick={() => handleDuplicate(p)}
-                    disabled={duplicating === p.id}
-                    className="px-3 py-1.5 text-[11px] font-semibold border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                  >
-                    {duplicating === p.id ? "…" : "複製"}
-                  </button>
-                  <button
-                    onClick={() => handleDelete(p.id, p.title)}
-                    disabled={deleting === p.id}
-                    className="px-3 py-1.5 text-[11px] font-semibold border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-                  >
-                    {deleting === p.id ? "…" : "削除"}
-                  </button>
+                  <Tooltip text="このLPのコピーを作成する" position="top">
+                    <button
+                      onClick={() => handleDuplicate(p)}
+                      disabled={duplicating === p.id}
+                      className="px-3 py-1.5 text-[11px] font-semibold border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    >
+                      {duplicating === p.id ? "…" : "複製"}
+                    </button>
+                  </Tooltip>
+                  <Tooltip text="このLPを完全に削除する（取り消し不可）" position="top">
+                    <button
+                      onClick={() => handleDelete(p.id, p.title)}
+                      disabled={deleting === p.id}
+                      className="px-3 py-1.5 text-[11px] font-semibold border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                    >
+                      {deleting === p.id ? "…" : "削除"}
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             ))}
