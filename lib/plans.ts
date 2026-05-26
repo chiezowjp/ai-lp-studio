@@ -198,8 +198,6 @@ export const PLAN_FEATURES: PlanFeature[] = [
   { category: "フォーム・リード", label: "フォーム設置",        trial: true,  pro: true,  highlight: true },
   {                               label: "本番フォーム送信",     trial: false, pro: true,  highlight: true },
   {                               label: "メール通知",           trial: false, pro: true  },
-  {                               label: "Google Sheets 連携",   trial: false, pro: true  },
-  {                               label: "Webhook 送信",         trial: false, pro: true  },
   {                               label: "リード管理",           trial: false, pro: true  },
   {                               label: "CSV エクスポート",     trial: false, pro: true  },
   // ── Analytics・改善（Phase 8）
