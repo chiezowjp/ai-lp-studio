@@ -182,7 +182,9 @@ export default function LeadsPage() {
       if (q)            params.set("q", q);
       if (statusFilter) params.set("status", statusFilter);
 
-      const res = await fetch(`/api/leads?${params}`);
+      const res = await fetch(`/api/leads?${params}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
       if (!res.ok) throw new Error("取得失敗");
       const data = (await res.json()) as ApiResponse;
       setLeads(data.leads);
@@ -210,7 +212,9 @@ export default function LeadsPage() {
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set("status", statusFilter);
-      const res = await fetch(`/api/leads/export?${params}`);
+      const res = await fetch(`/api/leads/export?${params}`, {
+        headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
