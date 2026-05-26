@@ -114,8 +114,8 @@ export default function SupportChat() {
         >
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 bg-[#00AFCC] text-white shrink-0">
-            <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-sm font-black">
-              AI
+            <div className="w-9 h-9 rounded-full bg-white overflow-hidden shrink-0">
+              <img src="/support-avatar.png" alt="サポート" className="w-full h-full object-cover" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold leading-tight">サポートBot</p>
@@ -136,8 +136,8 @@ export default function SupportChat() {
             {messages.length === 0 && (
               <div className="space-y-3">
                 <div className="flex gap-2 items-start">
-                  <div className="w-7 h-7 rounded-full bg-[#00AFCC] flex items-center justify-center text-white text-[10px] font-black shrink-0 mt-0.5">
-                    AI
+                  <div className="w-7 h-7 rounded-full bg-white overflow-hidden border border-gray-200 shrink-0 mt-0.5">
+                    <img src="/support-avatar.png" alt="サポート" className="w-full h-full object-cover" />
                   </div>
                   <div className="bg-white rounded-2xl rounded-tl-sm px-3 py-2.5 text-sm text-gray-700 shadow-sm max-w-[85%]">
                     こんにちは！AI LP STUDIOのサポートBotです。<br />
@@ -166,8 +166,8 @@ export default function SupportChat() {
                 className={`flex gap-2 items-start ${msg.role === "user" ? "flex-row-reverse" : ""}`}
               >
                 {msg.role === "assistant" && (
-                  <div className="w-7 h-7 rounded-full bg-[#00AFCC] flex items-center justify-center text-white text-[10px] font-black shrink-0 mt-0.5">
-                    AI
+                  <div className="w-7 h-7 rounded-full bg-white overflow-hidden border border-gray-200 shrink-0 mt-0.5">
+                    <img src="/support-avatar.png" alt="サポート" className="w-full h-full object-cover" />
                   </div>
                 )}
                 <div
