@@ -117,7 +117,7 @@ export default function MyLPsPage() {
 
   // ── 新規作成 ──────────────────────────────────────────────────────────────
 
-  const handleNew = () => { router.push("/"); };
+  const handleNew = () => { window.location.href = "/"; };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
