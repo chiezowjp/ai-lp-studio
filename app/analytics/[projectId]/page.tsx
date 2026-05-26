@@ -281,19 +281,19 @@ export default function AnalyticsPage() {
               </div>
             )}
 
-            {/* AI 改善提案リンク */}
-            <div className="bg-gradient-to-r from-[#00AFCC]/10 to-blue-50 border border-[#00AFCC]/30 rounded-xl p-5 flex items-center justify-between">
+            {/* AI 改善提案リンク — TODO: 未実装のため一時非表示 */}
+            {/* <div className="bg-gradient-to-r from-[#00AFCC]/10 to-blue-50 border border-[#00AFCC]/30 rounded-xl p-5 flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-gray-800">🤖 AI CV 改善提案</p>
                 <p className="text-xs text-gray-500 mt-0.5">この Analytics データをもとに AI が改善提案を生成します</p>
               </div>
               <button
-                onClick={() => router.push(`/?projectId=${projectId}&ai=improve`)}
+                onClick={() => router.push(`/?p=${projectId}&ai=improve`)}
                 className="text-xs bg-[#00AFCC] text-white px-4 py-2 rounded-lg hover:bg-[#0099b5] whitespace-nowrap"
               >
                 改善提案を見る →
               </button>
-            </div>
+            </div> */}
           </>
         )}
       </main>
