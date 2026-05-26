@@ -439,9 +439,6 @@ export default function FormConfigPanel({ projectId, projectSlug, isPublished }:
                       }
                       className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[#00AFCC]"
                     />
-                    <p className="text-[10px] text-gray-400 mt-1">
-                      RESEND_API_KEY 環境変数の設定が必要です。
-                    </p>
                   </div>
                 )}
               </div>
