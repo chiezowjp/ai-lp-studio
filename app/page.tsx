@@ -1781,7 +1781,7 @@ export default function Home() {
             /* ── Before generation: input method tabs + form ── */
             <div className="flex flex-col h-full">
               {/* Input method tab bar */}
-              <div className="flex border-b border-gray-200 shrink-0">
+              <div className="flex border-b border-gray-200 shrink-0 px-2">
                 {(
                   [
                     { id: "form", label: "✏ フォーム", tip: "情報を手入力してLP生成" },
