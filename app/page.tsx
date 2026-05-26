@@ -580,6 +580,10 @@ export default function Home() {
   // ── Cloud save ──
   /** 現在編集中プロジェクトの Supabase UUID（null = 未保存） */
   const [remoteProjectId, setRemoteProjectId] = useState<string | null>(null);
+  /** ?p= パラメータからのプロジェクト読み込み中フラグ */
+  const [projectLoading, setProjectLoading] = useState<boolean>(() =>
+    typeof window !== "undefined" && !!new URLSearchParams(window.location.search).get("p")
+  );
   type CloudStatus = "idle" | "saving" | "saved" | "error";
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>("idle");
 
@@ -1377,12 +1381,12 @@ export default function Home() {
         if (!res.ok) return;
         const row = await res.json();
         const project = row.project_json as LPProject;
-        if (!project?.html) return;
+        if (!project?.html) { setProjectLoading(false); return; }
         applyProject(project);
         setRemoteProjectId(pid);
         // URL パラメータを消す
         router.replace("/");
-      } catch { /* ignore */ }
+      } catch { /* ignore */ } finally { setProjectLoading(false); }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
@@ -1459,6 +1463,15 @@ export default function Home() {
   ];
 
   // ─── Render ───────────────────────────────────────────────────────────────
+
+  if (projectLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-[#F5F5F2] gap-4">
+        <div className="w-10 h-10 border-4 border-[#00AFCC]/30 border-t-[#00AFCC] rounded-full animate-spin" />
+        <p className="text-sm text-gray-500 font-medium">LP を読み込み中...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#F5F5F2]">
