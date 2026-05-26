@@ -1781,7 +1781,7 @@ export default function Home() {
             /* ── Before generation: input method tabs + form ── */
             <div className="flex flex-col h-full">
               {/* Input method tab bar */}
-              <div className="flex border-b border-gray-200 shrink-0 px-5">
+              <div className="flex border-b border-gray-200 shrink-0">
                 {(
                   [
                     { id: "form", label: "✏ フォーム", tip: "情報を手入力してLP生成" },
@@ -1793,7 +1793,7 @@ export default function Home() {
                   <Tooltip key={tab.id} text={tab.tip} position="bottom">
                     <button
                       onClick={() => setInputMethod(tab.id)}
-                      className={`px-3 py-2.5 text-[11px] font-semibold transition-colors border-b-2 whitespace-nowrap
+                      className={`flex-1 py-2.5 text-[11px] font-semibold transition-colors border-b-2
                         ${inputMethod === tab.id
                           ? "text-[#00AFCC] border-[#00AFCC] bg-[#E6F8FC]"
                           : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50"
@@ -2435,6 +2435,12 @@ export default function Home() {
         {/* Style mode hint when no element selected */}
         {result && editMode === "style" && !selectedElement && (
           <aside className="w-64 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+            <div className="flex items-center justify-end px-3 py-2 border-b border-gray-100 shrink-0">
+              <button
+                onClick={() => setEditMode("text")}
+                className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors text-sm"
+              >✕</button>
+            </div>
             <div className="flex flex-col items-center justify-center h-full p-6 text-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-[#E6F8FC] flex items-center justify-center text-2xl">
                 🎨
