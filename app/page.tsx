@@ -2177,6 +2177,12 @@ export default function Home() {
               <div className="px-4 py-3 text-[11px] text-gray-400">
                 お客様の声はサンプルです。実際の声に差し替えてご利用ください。
               </div>
+
+              {/* Legal links */}
+              <div className="px-4 pb-4 flex gap-3 text-[10px] text-gray-300">
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-gray-500 transition-colors">利用規約</a>
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-gray-500 transition-colors">プライバシーポリシー</a>
+              </div>
             </div>
           )}
         </aside>
