@@ -581,9 +581,13 @@ export default function Home() {
   /** 現在編集中プロジェクトの Supabase UUID（null = 未保存） */
   const [remoteProjectId, setRemoteProjectId] = useState<string | null>(null);
   /** ?p= パラメータからのプロジェクト読み込み中フラグ */
-  const [projectLoading, setProjectLoading] = useState<boolean>(() =>
-    typeof window !== "undefined" && !!new URLSearchParams(window.location.search).get("p")
-  );
+  const [projectLoading, setProjectLoading] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("p")) {
+      setProjectLoading(true);
+    }
+  }, []);
   type CloudStatus = "idle" | "saving" | "saved" | "error";
   const [cloudStatus, setCloudStatus] = useState<CloudStatus>("idle");
 
