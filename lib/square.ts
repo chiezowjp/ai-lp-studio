@@ -90,7 +90,7 @@ export async function createCheckoutLink(userId: string): Promise<string> {
               quantity: "1",
               item_type: "ITEM",
               base_price_money: {
-                amount: 4980,
+                amount: 2980,
                 currency: "JPY",
               },
             },

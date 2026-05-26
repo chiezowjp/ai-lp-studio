@@ -23,7 +23,7 @@ export type BillingStatus =
 // ─── Square Constants ─────────────────────────────────────────────────────────
 
 /** Pro プランの月額（税込、日本円） */
-export const SQUARE_PRO_MONTHLY_PRICE = 4980;
+export const SQUARE_PRO_MONTHLY_PRICE = 2980;
 
 /** Pro プランの表示用金額文字列 */
 export const SQUARE_PRO_MONTHLY_PRICE_LABEL = `¥${SQUARE_PRO_MONTHLY_PRICE.toLocaleString()}`;
@@ -158,8 +158,8 @@ export const PLAN_PRICING: Record<"trial" | "pro", PlanPricing> = {
     desc: "まずは無料で試せます",
   },
   pro: {
-    monthly: 4980,
-    label: "¥4,980",
+    monthly: 2980,
+    label: "¥2,980",
     sub: "/ 月（税込）",
     desc: "すべての機能をフル活用",
   },
