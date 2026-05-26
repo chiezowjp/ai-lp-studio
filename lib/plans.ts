@@ -192,7 +192,6 @@ export const PLAN_FEATURES: PlanFeature[] = [
   // ── エクスポート
   { category: "エクスポート", label: "HTMLコピー",                trial: false, pro: true, highlight: true },
   {                           label: "CSSコピー",                 trial: false, pro: true  },
-  {                           label: "Netlify / GitHub Pages用HTML", trial: false, pro: true, highlight: true },
   {                           label: "JSONダウンロード",           trial: false, pro: true  },
   {                           label: "ZIPダウンロード",            trial: false, pro: true, comingSoon: true },
   // ── フォーム・リード取得（Phase 6）
@@ -205,7 +204,6 @@ export const PLAN_FEATURES: PlanFeature[] = [
   {                               label: "CSV エクスポート",     trial: false, pro: true  },
   // ── Analytics・改善（Phase 8）
   { category: "Analytics・改善", label: "Analytics閲覧",    trial: false, pro: true, highlight: true },
-  {                               label: "AI CV改善提案",    trial: false, pro: true, highlight: true },
   {                               label: "Heatmap基盤",      trial: false, pro: true  },
   {                               label: "Version履歴・Rollback", trial: false, pro: true  },
   {                               label: "Asset Library",    trial: "10件", pro: "無制限", highlight: true },
@@ -224,7 +222,6 @@ export const PLAN_FEATURES: PlanFeature[] = [
 export const EXPORT_PRO_FEATURES = [
   "HTMLコードをコピー・ダウンロード",
   "CSSをWordPressに貼り付け",
-  "Netlify / GitHub Pages にデプロイ",
   "JSONファイルとして書き出し",
 ];
 
