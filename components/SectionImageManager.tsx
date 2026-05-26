@@ -4,10 +4,11 @@ import { useState, useRef, useCallback } from "react";
 import { UploadedImage, LPFormData, UnsplashResult } from "@/types";
 import { useAuth } from "@/lib/auth-context";
 import UnsplashPicker from "./UnsplashPicker";
+import { GALLERY } from "@/lib/gallery";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SectionTab = "direction" | "upload" | "unsplash";
+type SectionTab = "direction" | "upload" | "unsplash" | "gallery";
 
 interface Props {
   sectionOrder: { id: string; label: string }[];
@@ -305,6 +306,107 @@ function UploadPanel({
   );
 }
 
+// ─── Gallery tab ─────────────────────────────────────────────────────────────
+
+function GalleryTab({
+  sectionId,
+  sectionLabel,
+  images,
+  onImagesChange,
+}: {
+  sectionId: string;
+  sectionLabel: string;
+  images: UploadedImage[];
+  onImagesChange: (images: UploadedImage[]) => void;
+}) {
+  const [activeCatId, setActiveCatId] = useState(GALLERY[0]?.id ?? "");
+  const currentImage = images.find((img) => img.placement === sectionId && !img.attribution);
+
+  const handleSelect = (src: string, alt: string) => {
+    const newImage: UploadedImage = {
+      id: `gallery-${Date.now()}`,
+      url: src,
+      name: alt,
+      placement: sectionId,
+    };
+    const others = images.filter((img) => !(img.placement === sectionId && !img.attribution));
+    onImagesChange([...others, newImage]);
+  };
+
+  const remove = () => {
+    onImagesChange(images.filter((img) => !(img.placement === sectionId && !img.attribution)));
+  };
+
+  const activeCategory = GALLERY.find((c) => c.id === activeCatId);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] text-gray-500">
+        「{sectionLabel}」の背景画像をギャラリーから選択して差し替えます。
+      </p>
+
+      {/* 現在の画像 */}
+      {currentImage && (
+        <div className="relative">
+          <img src={currentImage.url} alt={currentImage.name}
+            className="w-full h-24 object-cover rounded-xl border border-gray-200" />
+          <div className="absolute top-1.5 right-1.5">
+            <button onClick={remove}
+              className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white text-xs rounded-full flex items-center justify-center shadow transition-colors font-bold">
+              ×
+            </button>
+          </div>
+          <p className="text-[10px] text-green-600 font-semibold mt-1">✓ LP に反映されています</p>
+        </div>
+      )}
+
+      {/* カテゴリタブ */}
+      <div className="flex flex-wrap gap-1">
+        {GALLERY.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCatId(cat.id)}
+            className={`px-2 py-1 text-[10px] font-semibold rounded-lg border transition-colors ${
+              activeCatId === cat.id
+                ? "bg-[#00AFCC] text-white border-[#00AFCC]"
+                : "text-gray-500 border-gray-200 hover:border-[#00AFCC] hover:text-[#00AFCC]"
+            }`}
+          >
+            {cat.icon} {cat.label}
+            {cat.images.length > 0 && (
+              <span className="ml-1 opacity-70">({cat.images.length})</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* 画像グリッド */}
+      {!activeCategory || activeCategory.images.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center">
+          <p className="text-xs text-gray-400">このカテゴリに画像がありません</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          {activeCategory.images.map((img, i) => (
+            <button
+              key={i}
+              onClick={() => handleSelect(img.src, img.alt)}
+              className="group relative aspect-video rounded-xl overflow-hidden border-2 border-transparent hover:border-[#00AFCC] transition-all shadow-sm"
+            >
+              <img src={img.src} alt={img.alt}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <p className="text-white text-[9px] font-medium truncate">{img.alt}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 const FALLBACK_SECTIONS = [{ id: "hero", label: "ファーストビュー" }];
@@ -313,6 +415,7 @@ const TABS: { id: SectionTab; label: string; title: string }[] = [
   { id: "direction", label: "🎨 ディレクション", title: "参考画像から ChatGPT 指示文を生成" },
   { id: "upload",    label: "📤 差し替え",       title: "画像を直接アップロードして差し替え" },
   { id: "unsplash",  label: "🔍 Unsplash",       title: "Unsplash から無料画像を選択" },
+  { id: "gallery",   label: "🖼 ギャラリー",     title: "テンプレ画像から選んで差し替え" },
 ];
 
 export default function SectionImageManager({
@@ -402,6 +505,16 @@ export default function SectionImageManager({
 
       {activeTab === "upload" && (
         <UploadPanel
+          key={selectedId}
+          sectionId={selectedId}
+          sectionLabel={selectedSection?.label ?? "セクション"}
+          images={images}
+          onImagesChange={onImagesChange}
+        />
+      )}
+
+      {activeTab === "gallery" && (
+        <GalleryTab
           key={selectedId}
           sectionId={selectedId}
           sectionLabel={selectedSection?.label ?? "セクション"}
