@@ -1781,7 +1781,7 @@ export default function Home() {
             /* ── Before generation: input method tabs + form ── */
             <div className="flex flex-col h-full">
               {/* Input method tab bar */}
-              <div className="flex border-b border-gray-200 shrink-0 px-4">
+              <div className="flex border-b border-gray-200 shrink-0 px-5">
                 {(
                   [
                     { id: "form", label: "✏ フォーム", tip: "情報を手入力してLP生成" },
@@ -1793,7 +1793,7 @@ export default function Home() {
                   <Tooltip key={tab.id} text={tab.tip} position="bottom">
                     <button
                       onClick={() => setInputMethod(tab.id)}
-                      className={`flex-1 py-2.5 text-[11px] font-semibold transition-colors border-b-2
+                      className={`px-3 py-2.5 text-[11px] font-semibold transition-colors border-b-2 whitespace-nowrap
                         ${inputMethod === tab.id
                           ? "text-[#00AFCC] border-[#00AFCC] bg-[#E6F8FC]"
                           : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50"
