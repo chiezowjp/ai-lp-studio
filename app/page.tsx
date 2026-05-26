@@ -1059,10 +1059,14 @@ export default function Home() {
   // ─── Project: apply（復元・読み込み共通）────────────────────────────────────
 
   const applyProject = useCallback((project: LPProject) => {
-    // セクション順序は保存データから復元するが、ラベルは HTML 再スキャンで上書きする
-    // （useEffect [result?.html] が発火してラベルを最新化する）
-    // ID だけ保持した順序データを先にセットしておく
-    setSectionOrder(project.sectionOrder.map((s) => ({ id: s.id, label: s.id })));
+    // HTML から直接ラベルを抽出して sectionOrder を構築する
+    // （useEffect に依存せず、同一HTMLの再ロードでも正しく反映される）
+    const fresh = parseSectionOrder(project.html);
+    const labelMap = new Map(fresh.map((s) => [s.id, s.label]));
+    setSectionOrder(project.sectionOrder.map((s) => ({
+      id: s.id,
+      label: labelMap.get(s.id) ?? s.id,
+    })));
     setResult({ html: project.html, css: project.css });
     setLastFormData(project.formData);
     setServiceName(project.formData.serviceName);
