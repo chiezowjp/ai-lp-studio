@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
-const HIDDEN_PATHS = ["/p/", "/preview/"];
+const HIDDEN_PATHS = ["/p/", "/preview/", "/terms", "/privacy"];
 
 export default function LegalFooter() {
   const pathname = usePathname();
