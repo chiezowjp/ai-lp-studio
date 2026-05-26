@@ -1912,7 +1912,7 @@ export default function Home() {
 
               {/* 画像生成プロンプト */}
               <div className="px-4 py-3 border-b border-gray-100">
-                <Tooltip text="LP内容に合った画像生成プロンプトを作成" position="bottom">
+                <Tooltip text="LP内容に合った画像生成プロンプトを作成" position="bottom" className="w-full">
                   <button
                     onClick={() => setPromptAssistantOpen(true)}
                     className="w-full flex items-center justify-between py-2.5 px-4 bg-[#00AFCC] hover:bg-[#0099B3] text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
@@ -1980,7 +1980,7 @@ export default function Home() {
               {/* セクション追加 & 並び替え */}
               <Accordion title="セクション" defaultOpen>
                 <div className="space-y-3">
-                  <Tooltip text="テンプレートから新しいセクションを追加" position="bottom">
+                  <Tooltip text="テンプレートから新しいセクションを追加" position="bottom" className="w-full">
                     <button
                       onClick={() => setAddSectionOpen(true)}
                       className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-[#D8D8D2] hover:border-[#00AFCC] hover:bg-[#E6F8FC] text-[#00AFCC] font-semibold text-sm rounded-xl transition-colors"
