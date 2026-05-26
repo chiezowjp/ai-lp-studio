@@ -149,7 +149,7 @@ function LeadDetail({
 // ─── メインコンポーネント ─────────────────────────────────────────────────────
 
 export default function LeadsPage() {
-  const { user, session } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const router = useRouter();
 
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -166,8 +166,8 @@ export default function LeadsPage() {
 
   // ── 未ログインはリダイレクト ──
   useEffect(() => {
-    if (user === null) router.push("/");
-  }, [user, router]);
+    if (!authLoading && user === null) router.push("/");
+  }, [authLoading, user, router]);
 
   // ── データ取得 ──
   const fetchLeads = useCallback(async () => {
@@ -228,7 +228,7 @@ export default function LeadsPage() {
   };
 
   // ── ローディング中（ユーザー未確定） ──
-  if (user === undefined) {
+  if (authLoading || user === undefined) {
     return (
       <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
         読み込み中…
