@@ -30,6 +30,8 @@ export default function MyLPsPage() {
   const [deleting, setDeleting]   = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
   const [error, setError]         = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
 
   // ── 一覧取得 ──────────────────────────────────────────────────────────────
 
@@ -106,6 +108,35 @@ export default function MyLPsPage() {
       alert(e instanceof Error ? e.message : "複製に失敗しました");
     } finally {
       setDuplicating(null);
+    }
+  };
+
+  // ── タイトル編集 ─────────────────────────────────────────────────────────
+
+  const handleRenameStart = (p: DbProject) => {
+    setEditingId(p.id);
+    setEditingTitle(p.title);
+  };
+
+  const handleRenameSubmit = async (id: string) => {
+    if (!session) return;
+    const title = editingTitle.trim();
+    if (!title) { setEditingId(null); return; }
+    try {
+      const res = await fetch(`/api/projects/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "更新失敗");
+      setProjects((prev) => prev.map((p) => p.id === id ? { ...p, title } : p));
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "名前の変更に失敗しました");
+    } finally {
+      setEditingId(null);
     }
   };
 
@@ -280,7 +311,27 @@ export default function MyLPsPage() {
               >
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-gray-900 truncate">{p.title}</p>
+                  {editingId === p.id ? (
+                    <input
+                      autoFocus
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      onBlur={() => handleRenameSubmit(p.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleRenameSubmit(p.id);
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      className="w-full text-sm font-bold text-gray-900 border-b border-[#00AFCC] outline-none bg-transparent pb-0.5"
+                    />
+                  ) : (
+                    <p
+                      className="text-sm font-bold text-gray-900 truncate cursor-pointer hover:text-[#00AFCC] transition-colors"
+                      title="クリックで名前を変更"
+                      onClick={() => handleRenameStart(p)}
+                    >
+                      {p.title}
+                    </p>
+                  )}
                   <p className="text-[11px] text-gray-400 mt-0.5">
                     更新: {fmt(p.updated_at)}
                     <span className="mx-1.5 text-gray-200">|</span>

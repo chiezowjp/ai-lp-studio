@@ -62,6 +62,41 @@ export async function PUT(req: NextRequest, ctx: RouteCtx) {
   return NextResponse.json(data);
 }
 
+// ─── PATCH /api/projects/[id]  ── タイトルのみ更新 ───────────────────────────
+
+export async function PATCH(req: NextRequest, ctx: RouteCtx) {
+  const user = await getUserFromRequest(req);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await ctx.params;
+  const { title } = await req.json() as { title: string };
+
+  if (!title || title.trim().length === 0) {
+    return NextResponse.json({ error: "タイトルを入力してください" }, { status: 400 });
+  }
+
+  const admin = createAdminClient();
+
+  const { data: existing } = await admin
+    .from("projects")
+    .select("user_id")
+    .eq("id", id)
+    .single();
+  if (!existing || existing.user_id !== user.id) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const { data, error } = await admin
+    .from("projects")
+    .update({ title: title.trim(), updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
+
 // ─── DELETE /api/projects/[id]  ── 削除 ───────────────────────────────────────
 
 export async function DELETE(req: NextRequest, ctx: RouteCtx) {
