@@ -10,7 +10,7 @@ const POLL_INTERVAL = 5000; // 5 秒ごと
 
 const PRO_FEATURES = [
   "HTMLコード / CSS をコピー・ダウンロード",
-  "Netlify / GitHub Pages にデプロイ",
+  "LP公開・独自URLで公開",
   "LP保存 10 件・月間 LP 生成 100 回",
   "AI 編集 300 回 / 月",
 ];
