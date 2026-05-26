@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("projects")
-    .select("id, title, html, css, project_json, thumbnail, created_at, updated_at")
+    .select("id, title, html, css, project_json, thumbnail, is_published, slug, created_at, updated_at")
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
 
