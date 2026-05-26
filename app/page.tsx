@@ -39,6 +39,7 @@ import LockScreen from "@/components/LockScreen";
 import PublishPanel from "@/components/PublishPanel";
 import FormConfigPanel from "@/components/FormConfigPanel";
 import Tooltip from "@/components/Tooltip";
+import GalleryModal from "@/components/GalleryModal";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -638,6 +639,7 @@ export default function Home() {
 
   // ── Image prompt assistant ──
   const [promptAssistantOpen, setPromptAssistantOpen] = useState(false);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [savedPrompts, setSavedPrompts] = useState<SavedImagePrompt[]>([]);
   /** templateId → css （型ごとに1度だけ追加） */
   const [additionalCssByType, setAdditionalCssByType] = useState<Record<string, string>>({});
@@ -1504,6 +1506,19 @@ export default function Home() {
         onClose={() => setAddSectionOpen(false)}
         onAdd={handleAddSection}
       />
+      <GalleryModal
+        open={galleryOpen}
+        onClose={() => setGalleryOpen(false)}
+        onSelect={(img) => {
+          const newImage = {
+            id: `gallery-${Date.now()}`,
+            url: img.src,
+            name: img.alt,
+            placement: "gallery" as const,
+          };
+          handleImageSelect(newImage as Parameters<typeof handleImageSelect>[0]);
+        }}
+      />
       <ImagePromptAssistant
         open={promptAssistantOpen}
         onClose={() => setPromptAssistantOpen(false)}
@@ -2080,6 +2095,18 @@ export default function Home() {
 
               {/* 画像管理 */}
               <Accordion title="🖼 画像" defaultOpen>
+                {/* テンプレ画像ギャラリー */}
+                <div className="mb-3">
+                  <Tooltip text="業種別テンプレ画像から選んで挿入" position="bottom" className="w-full">
+                    <button
+                      onClick={() => setGalleryOpen(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-[#D8D8D2] hover:border-[#00AFCC] hover:bg-[#E6F8FC] text-gray-500 hover:text-[#00AFCC] font-semibold text-xs rounded-xl transition-colors"
+                    >
+                      <span>🖼</span>
+                      テンプレ画像ギャラリー
+                    </button>
+                  </Tooltip>
+                </div>
                 <SectionImageManager
                   sectionOrder={sectionOrder}
                   images={images}
