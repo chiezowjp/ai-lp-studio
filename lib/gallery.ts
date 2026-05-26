@@ -32,7 +32,11 @@ export const GALLERY: GalleryCategory[] = [
     label: "美容・サロン",
     icon: "💄",
     images: [
-      // 例: { src: "/gallery/beauty/hero1.jpg", alt: "サロン外観" },
+      { src: "/gallery/beauty/beauty1.png", alt: "美容サロン素材1" },
+      { src: "/gallery/beauty/beauty2.png", alt: "美容サロン素材2" },
+      { src: "/gallery/beauty/beauty3.png", alt: "美容サロン素材3" },
+      { src: "/gallery/beauty/beauty4.png", alt: "美容サロン素材4" },
+      { src: "/gallery/beauty/tasukare2.png", alt: "美容サロン素材5" },
     ],
   },
   {
