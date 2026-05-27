@@ -973,6 +973,16 @@ export default function Home() {
   const handleAddSection = (html: string, css: string, templateId: string) => {
     if (!result) return;
     const template = SECTION_TEMPLATES.find((t) => t.id === templateId);
+
+    // 非 multipleAllowed テンプレートの重複チェック — 既に存在する場合は追加しない
+    if (!template?.multipleAllowed && !template?.insertAtEnd) {
+      if (sectionOrder.some((s) => s.id === templateId)) {
+        setSaveToast(`「${template?.label ?? templateId}」は既にLPに追加されています`);
+        setTimeout(() => setSaveToast(null), 3000);
+        return;
+      }
+    }
+
     const newHtml = insertSectionHtml(result.html, html, template?.insertAtEnd);
     applyHtml(newHtml, true);
     // CSS は型ごとに1度だけ（複数インスタンスでも共通CSSは1回のみ）
@@ -985,28 +995,8 @@ export default function Home() {
         return [...prev, { id: templateId, label: meta }];
       });
     } else {
-      setSectionOrder((prev) => {
-        // multipleAllowed テンプレート：HTML から一意クラスを取り出してインスタンス ID にする
-        let sectionId = templateId;
-        if (template?.multipleAllowed && typeof window !== "undefined") {
-          const doc = new DOMParser().parseFromString(html, "text/html");
-          const sec = doc.querySelector(`.lp-${templateId}`);
-          if (sec) {
-            const uniqueCls = Array.from(sec.classList).find(
-              (c) => c !== `lp-${templateId}` && c.startsWith(`lp-${templateId}_`)
-            );
-            if (uniqueCls) sectionId = uniqueCls.replace(/^lp-/, "");
-          }
-        }
-        // 通常テンプレートは重複追加を防ぐ
-        if (!template?.multipleAllowed && prev.some((s) => s.id === sectionId)) return prev;
-        const label = SECTION_META[templateId] ?? template?.label ?? templateId;
-        // CTA の前に挿入
-        const ctaIdx = prev.findIndex((s) => s.id === "cta");
-        const next = [...prev];
-        next.splice(ctaIdx >= 0 ? ctaIdx : next.length, 0, { id: sectionId, label });
-        return next;
-      });
+      // 追加後の HTML からセクション順を再解析して確実に同期する
+      setSectionOrder(parseSectionOrder(newHtml));
     }
   };
 
