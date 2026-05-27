@@ -2576,6 +2576,11 @@ export default function Home() {
                   },
                 });
               }}
+              uniqueClassOverride={
+                // data-element-id付与後にselectorが変わっても正確なセクションを特定するため
+                // lpClasses から直接 lp-freeblock_xxx を取得して渡す
+                selectedElement.lpClasses?.find((c) => c.startsWith("lp-freeblock_")) ?? null
+              }
             />
           </aside>
         )}

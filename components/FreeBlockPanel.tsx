@@ -397,10 +397,17 @@ interface FreeBlockPanelProps {
   bgColor?: string;
   /** 背景色変更コールバック（CSS visual styles 経由）。未設定時は HTML inline style にフォールバック */
   onBgColorChange?: (color: string) => void;
+  /** data-element-id 付与後にセレクターが変わっても正確なセクションを特定するための一意クラス。
+   *  page.tsx 側で lpClasses から抽出して渡す（selector より優先）。*/
+  uniqueClassOverride?: string | null;
 }
 
-export default function FreeBlockPanel({ selector, html, onUpdate, bgColor: bgColorProp, onBgColorChange }: FreeBlockPanelProps) {
-  const uniqueClass = useMemo(() => extractFbUniqueClass(selector), [selector]);
+export default function FreeBlockPanel({ selector, html, onUpdate, bgColor: bgColorProp, onBgColorChange, uniqueClassOverride }: FreeBlockPanelProps) {
+  // uniqueClassOverride が渡された場合はそれを優先（selector が [data-element-id="..."] に変わっても正確）
+  const uniqueClass = useMemo(
+    () => uniqueClassOverride !== undefined ? uniqueClassOverride : extractFbUniqueClass(selector),
+    [uniqueClassOverride, selector]
+  );
   const elements = useMemo(() => parseFbElements(html, uniqueClass), [html, uniqueClass]);
   // bgColor: 外部 prop（visual styles）が優先。なければ HTML inline style から読み取る（後方互換）
   const bgColorFromHtml = useMemo(() => getFbBgColor(html, uniqueClass), [html, uniqueClass]);
