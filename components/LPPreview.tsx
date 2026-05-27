@@ -60,7 +60,6 @@ const STYLE_SELECT_JS = `(function () {
     var fixed = 'lp-hero,lp-problem,lp-reason,lp-service,lp-testimonial,lp-cta,lp-faq,lp-gallery,lp-map,lp-contact,lp-voices,lp-beforeafter,lp-linecta,lp-fixedcta,lp-imgblock,lp-wrapper,lp-freeblock,lp-customhtml'.split(',');
     fixed.forEach(function(c) { if (sels.indexOf('.' + c) === -1) sels.push('.' + c); });
     var joined = sels.join(',');
-    console.log('[LP-VS] SECTION_SEL:', joined);
     return joined;
   })();
 
@@ -429,7 +428,6 @@ const STYLE_SELECT_JS = `(function () {
     if (parentSec && parentSec !== t) {
       parentSec.classList.forEach(function(c) { if (c.startsWith('lp-') && !c.startsWith('lp-vs')) parentSectionLpClasses.push(c); });
     }
-    console.log('[LP-VS] click:', t.tagName, t.className, '-> parentSec:', parentSec && parentSec.className, 'parentSectionLpClasses:', parentSectionLpClasses);
     window.parent.postMessage({
       type: 'lp-vs-select',
       elementType: getType(t),

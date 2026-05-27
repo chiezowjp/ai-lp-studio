@@ -672,10 +672,13 @@ export default function Home() {
 
     let css = headingWeightCss + replaceColors(result.css, colorReplacements);
     if (additionalCss) css += "\n/* 追加セクション */\n" + additionalCss;
-    const imgCss = buildImageCss(images, result.html);
-    if (imgCss) css += "\n/* 画像オーバーライド */\n" + imgCss;
+    // visualCss を先に、imgCss を後に配置する。
+    // どちらも !important を使うため、カスケードで後勝ちになる。
+    // 画像オーバーライドはビジュアル編集（background-image: none 等）より優先する必要があるため後配置。
     const visualCss = buildVisualCss(visualStyles);
     if (visualCss) css += "\n" + visualCss;
+    const imgCss = buildImageCss(images, result.html);
+    if (imgCss) css += "\n/* 画像オーバーライド */\n" + imgCss;
     const fontCss = buildFontCss(globalFont);
     css += "\n" + fontCss;
     return css;
