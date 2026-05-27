@@ -1,19 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { extractAndParseJSON } from "@/lib/parseAIJson";
 import { requirePlanGuard } from "@/lib/plan-guard";
 import { checkRateLimitBoth, getClientIp } from "@/lib/rate-limiter";
 import { checkInputSize, checkContentLength } from "@/lib/input-guard";
 import { logRateLimitExceeded } from "@/lib/audit-logger";
 
-const SYSTEM_PROMPT = `あなたはJSON APIです。
-ユーザーの指示に従い、必ず有効なJSONオブジェクトのみを返してください。
-以下のルールを厳守してください：
-- レスポンスは必ず { で始まり } で終わること
-- JSONの前後に説明文・コメント・Markdownコードブロック（\`\`\`）を絶対に含めないこと
-- JSON内の文字列値でダブルクォーテーション（"）を使う場合は必ず \\\" にエスケープすること
-- JSON内の文字列値で改行を含める場合は \\n を使用すること
-- 出力はJSONパーサーで直接パースできる形式のみとすること`;
+const SYSTEM_PROMPT = `あなたはLPのHTML/CSSを編集するアシスタントです。
+ユーザーの修正指示に従い、以下の形式で必ず出力してください。
+
+===HTML_START===
+（修正後のHTMLをここに出力）
+===HTML_END===
+===CSS_START===
+（修正後のCSSをここに出力）
+===CSS_END===
+
+ルール：
+- 上記の区切り文字は必ず正確に使うこと
+- 区切り文字の外に説明文を書かないこと
+- 修正指示に含まれない部分は変更しないこと
+- CSSクラス名の "lp-" プレフィックスは維持すること`;
+
+/** 区切り文字形式のレスポンスからHTMLとCSSを抽出する */
+function parseDelimitedResponse(raw: string): { html: string; css: string } | null {
+  const htmlMatch = raw.match(/===HTML_START===\s*([\s\S]*?)\s*===HTML_END===/);
+  const cssMatch  = raw.match(/===CSS_START===\s*([\s\S]*?)\s*===CSS_END===/);
+
+  if (!htmlMatch?.[1] || !cssMatch?.[1]) return null;
+
+  return {
+    html: htmlMatch[1].trim(),
+    css:  cssMatch[1].trim(),
+  };
+}
 
 export async function POST(req: NextRequest) {
   // ── Content-Length 早期チェック ──
@@ -51,7 +70,6 @@ export async function POST(req: NextRequest) {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const prompt = `以下の既存LP（HTML+CSS）に対して、【修正指示】に従って編集してください。
-修正指示に含まれない部分は変更しないでください。CSSクラス名の "lp-" プレフィックスは維持してください。
 
 【修正指示】
 ${instruction}
@@ -60,42 +78,23 @@ ${instruction}
 ${html}
 
 【現在のCSS】
-${css}
+${css}`;
 
-【厳守事項】
-あなたのレスポンス全体が以下のJSONオブジェクトそのものでなければなりません。
-前後に一切のテキストを付けないでください。
+    const response = await client.messages.create({
+      model: "claude-opus-4-7",
+      max_tokens: 16000,
+      thinking: { type: "adaptive" },
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+    });
 
-{"html":"（修正後のHTMLコード）","css":"（修正後のCSSコード）"}`;
+    const textBlock = response.content.find((b) => b.type === "text");
+    const raw = textBlock?.type === "text" ? textBlock.text : "";
 
-    // 最大2回リトライ
-    let parsed: { html: string; css: string } | null = null;
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const response = await client.messages.create({
-          model: "claude-opus-4-7",
-          max_tokens: 16000,
-          thinking: { type: "adaptive" },
-          system: SYSTEM_PROMPT,
-          messages: [{ role: "user", content: prompt }],
-        });
-
-        const textBlock = response.content.find((b) => b.type === "text");
-        const raw = textBlock?.type === "text" ? textBlock.text : "";
-        parsed = extractAndParseJSON<{ html: string; css: string }>(raw);
-
-        if (parsed.html && parsed.css) break; // 成功
-        lastError = new Error("AI出力の整形に失敗しました。");
-      } catch (e) {
-        lastError = e instanceof Error ? e : new Error("不明なエラー");
-        if (attempt < 2) continue; // リトライ
-      }
-    }
+    const parsed = parseDelimitedResponse(raw);
 
     if (!parsed?.html || !parsed?.css) {
-      throw lastError ?? new Error("AI出力の整形に失敗しました。");
+      throw new Error("AI出力の解析に失敗しました。");
     }
 
     return NextResponse.json({ html: parsed.html, css: parsed.css });
