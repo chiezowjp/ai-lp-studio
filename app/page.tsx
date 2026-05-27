@@ -2531,8 +2531,8 @@ export default function Home() {
 
         {/* ═══ RIGHT PANEL — Visual Style Editor ═══ */}
         {result && editMode === "style" && selectedElement &&
-          !selectedElement.selector.endsWith(".lp-freeblock") &&
-          !selectedElement.selector.includes(".lp-customhtml") && (
+          !selectedElement.lpClasses?.includes("lp-freeblock") &&
+          !selectedElement.lpClasses?.includes("lp-customhtml") && (
           <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
             <VisualStylePanel
               element={selectedElement}
@@ -2556,7 +2556,7 @@ export default function Home() {
         )}
 
         {/* ═══ RIGHT PANEL — Free Block Editor ═══ */}
-        {result && editMode === "style" && selectedElement?.selector.endsWith(".lp-freeblock") && (
+        {result && editMode === "style" && selectedElement?.lpClasses?.includes("lp-freeblock") && (
           <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
             <FreeBlockPanel
               selector={selectedElement.selector}
@@ -2570,7 +2570,7 @@ export default function Home() {
         )}
 
         {/* ═══ RIGHT PANEL — Custom HTML Editor ═══ */}
-        {result && editMode === "style" && selectedElement?.selector.includes(".lp-customhtml") && (
+        {result && editMode === "style" && selectedElement?.lpClasses?.includes("lp-customhtml") && (
           <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
             <CustomHtmlPanel
               selector={selectedElement.selector}
