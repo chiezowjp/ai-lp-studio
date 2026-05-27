@@ -118,6 +118,63 @@ export function removeFbElement(html: string, elId: string, uniqueClass: string 
   return serializeFbElements(html, els, uniqueClass);
 }
 
+// ─── Section Style Helpers ────────────────────────────────────────────────────
+
+/** freeblock セクションの背景色を取得（hex, rgb, rgba, named color など）。
+ *  input[type=color] 用に hex6 へ変換する。変換できなければ "#ffffff" を返す。 */
+export function getFbBgColor(html: string, uniqueClass: string | null): string {
+  if (typeof window === "undefined") return "#ffffff";
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const section = uniqueClass
+    ? doc.querySelector(`.${uniqueClass}`)
+    : doc.querySelector(".lp-freeblock");
+  if (!section) return "#ffffff";
+  const attrStyle = section.getAttribute("style") ?? "";
+  const match = attrStyle.match(/background(?:-color)?:\s*([^;]+)/i);
+  if (!match) return "#ffffff";
+  const colorVal = match[1].trim();
+  if (/^#[0-9a-f]{6}$/i.test(colorVal)) return colorVal.toLowerCase();
+  if (/^#[0-9a-f]{3}$/i.test(colorVal)) {
+    const [, r, g, b] = colorVal.match(/^#(.)(.)(.)$/)!;
+    return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+  }
+  // canvas でその他フォーマット（rgb/rgba/named）→ hex に変換
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 1;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = colorVal;
+    ctx.fillRect(0, 0, 1, 1);
+    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+    return "#" + [r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return "#ffffff";
+  }
+}
+
+/** freeblock セクションの背景色を更新して HTML を返す */
+export function setFbBgColor(html: string, uniqueClass: string | null, color: string): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const section = uniqueClass
+    ? doc.querySelector(`.${uniqueClass}`)
+    : doc.querySelector(".lp-freeblock");
+  if (!section) return html;
+  const attrStyle = section.getAttribute("style") ?? "";
+  // 既存の background / background-color を除去して新しい値を追加
+  let newStyle = attrStyle.replace(/background(?:-color)?:\s*[^;]+;?\s*/gi, "").trim();
+  if (newStyle && !newStyle.endsWith(";")) newStyle += ";";
+  if (color && color.toLowerCase() !== "#ffffff") {
+    newStyle = `${newStyle} background-color:${color};`.trim();
+  }
+  if (newStyle) {
+    section.setAttribute("style", newStyle);
+  } else {
+    section.removeAttribute("style");
+  }
+  return doc.body.innerHTML;
+}
+
 /** Move element up or down */
 export function moveFbElement(html: string, elId: string, dir: "up" | "down", uniqueClass: string | null): string {
   const els = parseFbElements(html, uniqueClass);
@@ -341,6 +398,7 @@ interface FreeBlockPanelProps {
 export default function FreeBlockPanel({ selector, html, onUpdate }: FreeBlockPanelProps) {
   const uniqueClass = useMemo(() => extractFbUniqueClass(selector), [selector]);
   const elements = useMemo(() => parseFbElements(html, uniqueClass), [html, uniqueClass]);
+  const bgColor = useMemo(() => getFbBgColor(html, uniqueClass), [html, uniqueClass]);
 
   function handleAdd(type: FbElType) {
     onUpdate(addFbElement(html, type, uniqueClass));
@@ -356,6 +414,36 @@ export default function FreeBlockPanel({ selector, html, onUpdate }: FreeBlockPa
             <p className="text-sm font-bold text-gray-800">空セクション編集</p>
             <p className="text-xs text-gray-400">要素を追加して自由にレイアウト</p>
           </div>
+        </div>
+      </div>
+
+      {/* Section style */}
+      <div className="shrink-0 px-4 py-3 border-b border-gray-100">
+        <p className="text-[11px] font-semibold text-gray-500 mb-2">セクションスタイル</p>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-gray-600 w-16 shrink-0">背景色</label>
+          <div className="relative">
+            <input
+              type="color"
+              value={bgColor}
+              onChange={(e) => onUpdate(setFbBgColor(html, uniqueClass, e.target.value))}
+              className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0.5 bg-white"
+              title={bgColor}
+            />
+            {bgColor !== "#ffffff" && (
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-indigo-500 rounded-full border border-white" />
+            )}
+          </div>
+          <span className="text-[10px] text-gray-400 font-mono">{bgColor}</span>
+          {bgColor !== "#ffffff" && (
+            <button
+              onClick={() => onUpdate(setFbBgColor(html, uniqueClass, "#ffffff"))}
+              className="text-[10px] text-gray-400 hover:text-red-500 ml-auto shrink-0"
+              title="リセット"
+            >
+              ✕
+            </button>
+          )}
         </div>
       </div>
 
