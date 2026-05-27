@@ -915,10 +915,38 @@ export default function Home() {
         },
         body: JSON.stringify({ html: result.html, css: result.css, instruction }),
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "修正に失敗しました");
-      setResult(json as GeneratedLP);
-      setSectionOrder(parseSectionOrder((json as GeneratedLP).html));
+
+      // エラーレスポンス（プランガード・レートリミット等）は JSON で返ってくる
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error((json as { error?: string }).error ?? "修正に失敗しました");
+      }
+
+      // 正常時はテキストストリームで返ってくる（タイムアウト回避のため）
+      if (!res.body) throw new Error("レスポンスの読み取りに失敗しました");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        accumulated += decoder.decode(value, { stream: true });
+      }
+
+      // ストリーム末尾にエラーマーカーが埋め込まれている場合は例外に変換
+      const errMatch = accumulated.match(/===REVISE_ERROR===\s*([\s\S]*?)\s*===REVISE_ERROR_END===/);
+      if (errMatch) throw new Error(errMatch[1].trim());
+
+      // 区切り文字形式からHTML/CSSを抽出
+      const htmlMatch = accumulated.match(/===HTML_START===\s*([\s\S]*?)\s*===HTML_END===/);
+      const cssMatch  = accumulated.match(/===CSS_START===\s*([\s\S]*?)\s*===CSS_END===/);
+      if (!htmlMatch?.[1] || !cssMatch?.[1]) {
+        throw new Error("AI出力の解析に失敗しました。再試行してください。");
+      }
+      const revised: GeneratedLP = { html: htmlMatch[1].trim(), css: cssMatch[1].trim() };
+
+      setResult(revised);
+      setSectionOrder(parseSectionOrder(revised.html));
       setActiveTab("preview");
       recordUsage("ai_edit");
     } catch (err: unknown) {

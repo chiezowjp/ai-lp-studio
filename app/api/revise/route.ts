@@ -5,6 +5,9 @@ import { checkRateLimitBoth, getClientIp } from "@/lib/rate-limiter";
 import { checkInputSize, checkContentLength } from "@/lib/input-guard";
 import { logRateLimitExceeded } from "@/lib/audit-logger";
 
+// Vercel Pro では最大 300 秒まで許容（LP が大きいと生成に時間がかかるため）
+export const maxDuration = 300;
+
 const SYSTEM_PROMPT = `あなたはLPのHTML/CSSを編集するアシスタントです。
 ユーザーの修正指示に従い、以下の形式で必ず出力してください。
 
@@ -20,19 +23,6 @@ const SYSTEM_PROMPT = `あなたはLPのHTML/CSSを編集するアシスタン�
 - 区切り文字の外に説明文を書かないこと
 - 修正指示に含まれない部分は変更しないこと
 - CSSクラス名の "lp-" プレフィックスは維持すること`;
-
-/** 区切り文字形式のレスポンスからHTMLとCSSを抽出する */
-function parseDelimitedResponse(raw: string): { html: string; css: string } | null {
-  const htmlMatch = raw.match(/===HTML_START===\s*([\s\S]*?)\s*===HTML_END===/);
-  const cssMatch  = raw.match(/===CSS_START===\s*([\s\S]*?)\s*===CSS_END===/);
-
-  if (!htmlMatch?.[1] || !cssMatch?.[1]) return null;
-
-  return {
-    html: htmlMatch[1].trim(),
-    css:  cssMatch[1].trim(),
-  };
-}
 
 export async function POST(req: NextRequest) {
   // ── Content-Length 早期チェック ──
@@ -55,21 +45,26 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  let body: { html: string; css: string; instruction: string };
   try {
-    const body = await req.json();
-    const { html, css, instruction } = body as { html: string; css: string; instruction: string };
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "リクエストの解析に失敗しました" }, { status: 400 });
+  }
 
-    // ── 入力サイズ検証 ──
-    const sizeCheck = checkInputSize(body as Record<string, unknown>, { hasHtml: true });
-    if (sizeCheck) return sizeCheck;
+  const { html, css, instruction } = body;
 
-    if (!html || !css || !instruction?.trim()) {
-      return NextResponse.json({ error: "html, css, instruction は必須です" }, { status: 400 });
-    }
+  // ── 入力サイズ検証 ──
+  const sizeCheck = checkInputSize(body as Record<string, unknown>, { hasHtml: true });
+  if (sizeCheck) return sizeCheck;
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  if (!html || !css || !instruction?.trim()) {
+    return NextResponse.json({ error: "html, css, instruction は必須です" }, { status: 400 });
+  }
 
-    const prompt = `以下の既存LP（HTML+CSS）に対して、【修正指示】に従って編集してください。
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  const prompt = `以下の既存LP（HTML+CSS）に対して、【修正指示】に従って編集してください。
 
 【修正指示】
 ${instruction}
@@ -80,27 +75,43 @@ ${html}
 【現在のCSS】
 ${css}`;
 
-    const response = await client.messages.create({
-      model: "claude-opus-4-7",
-      max_tokens: 32000,
-      thinking: { type: "adaptive" },
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: prompt }],
-    });
+  // ── ストリーミングレスポンス（Vercel タイムアウト回避）──
+  // client.messages.create() はブロッキングのため大きな LP では 60 秒を超えてタイムアウトする。
+  // ReadableStream で Anthropic のストリームをそのままクライアントへ流すことで
+  // 「接続が生きている間は応答を受け取り続ける」構造に変える。
+  const encoder = new TextEncoder();
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    const raw = textBlock?.type === "text" ? textBlock.text : "";
+  const readable = new ReadableStream({
+    async start(controller) {
+      try {
+        const stream = client.messages.stream({
+          model: "claude-opus-4-7",
+          max_tokens: 16000,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: prompt }],
+        });
 
-    const parsed = parseDelimitedResponse(raw);
+        for await (const chunk of stream) {
+          if (
+            chunk.type === "content_block_delta" &&
+            chunk.delta.type === "text_delta"
+          ) {
+            controller.enqueue(encoder.encode(chunk.delta.text));
+          }
+        }
+        controller.close();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "不明なエラー";
+        // エラーはストリーム末尾に埋め込んでクライアント側で検出する
+        controller.enqueue(
+          encoder.encode(`\n===REVISE_ERROR===\n${msg}\n===REVISE_ERROR_END===`)
+        );
+        controller.close();
+      }
+    },
+  });
 
-    if (!parsed?.html || !parsed?.css) {
-      throw new Error("AI出力の解析に失敗しました。");
-    }
-
-    return NextResponse.json({ html: parsed.html, css: parsed.css });
-  } catch (err: unknown) {
-    console.error("LP修正エラー:", err);
-    const message = err instanceof Error ? err.message : "不明なエラー";
-    return NextResponse.json({ error: `LP修正に失敗しました: ${message}` }, { status: 500 });
-  }
+  return new Response(readable, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
 }
