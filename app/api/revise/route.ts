@@ -82,7 +82,7 @@ ${css}`;
 
     const response = await client.messages.create({
       model: "claude-opus-4-7",
-      max_tokens: 16000,
+      max_tokens: 32000,
       thinking: { type: "adaptive" },
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
