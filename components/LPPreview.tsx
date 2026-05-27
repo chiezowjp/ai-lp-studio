@@ -42,49 +42,26 @@ const STYLE_SELECT_JS = `(function () {
   var SECTION_SEL = (function() {
     var wrapper = document.querySelector('.lp-wrapper') || document.body;
     var sels = [];
-    function addLpClasses(el) {
-      Array.prototype.forEach.call(el.classList, function(c) {
-        if (/^lp-[a-z][a-z0-9]*([_-][a-z0-9]+)*$/.test(c) && !c.startsWith('lp-vs') && sels.indexOf('.' + c) === -1) {
+    // lp-wrapper 内の全子孫を一括スキャン。
+    // 「lp-WORD」2パーツ形式のクラスのみセクションとして登録する。
+    // lp-hero-btn, lp-solution-card などの 3パーツ以上はカード/サブ要素なので除外。
+    // これによりタグ名・ネスト深さに依存せず確実に検出できる。
+    var allEls = wrapper.querySelectorAll('*');
+    Array.prototype.forEach.call(allEls, function(el) {
+      if (!el.classList || !el.classList.length) return;
+      el.classList.forEach(function(c) {
+        // ^lp-[a-z][a-z0-9]*$ = 「lp-」+英小文字・数字のみ（ハイフンなし）→ 2パーツ確定
+        if (/^lp-[a-z][a-z0-9]*$/.test(c) && sels.indexOf('.' + c) === -1) {
           sels.push('.' + c);
         }
       });
-    }
-    // lp-wrapper の直接子をスキャン
-    Array.prototype.forEach.call(wrapper.children, function(child) {
-      addLpClasses(child);
     });
-    // lp-wrapper 内の section/article タグをすべてスキャン（タグ名ベースの深掘り）
-    var nestedSections = wrapper.querySelectorAll('section, article');
-    Array.prototype.forEach.call(nestedSections, function(el) {
-      addLpClasses(el);
-    });
-    // BFS: 既知セクションの直接子 div/section/article も再帰的にスキャン
-    // AIが <section class="lp-faq"> 内に <div class="lp-solution"> をネストする場合に対応。
-    // タグ名に依存しないため div ネストも正しく検出できる。
-    var queue = sels.slice();
-    var visited = {};
-    while (queue.length > 0) {
-      var sel = queue.shift();
-      if (visited[sel]) continue;
-      visited[sel] = true;
-      try {
-        var parents = wrapper.querySelectorAll(sel);
-        Array.prototype.forEach.call(parents, function(parentEl) {
-          Array.prototype.forEach.call(parentEl.children, function(child) {
-            var tag = child.tagName;
-            if (tag !== 'DIV' && tag !== 'SECTION' && tag !== 'ARTICLE') return;
-            var before = sels.length;
-            addLpClasses(child);
-            // 新しいクラスが追加されたらキューに追加して再帰スキャン
-            for (var i = before; i < sels.length; i++) { queue.push(sels[i]); }
-          });
-        });
-      } catch(e) {}
-    }
     // フォールバック: 静的リストをマージ（DOM スキャンが空の場合の保険）
     var fixed = 'lp-hero,lp-problem,lp-reason,lp-service,lp-testimonial,lp-cta,lp-faq,lp-gallery,lp-map,lp-contact,lp-voices,lp-beforeafter,lp-linecta,lp-fixedcta,lp-imgblock,lp-wrapper,lp-freeblock,lp-customhtml'.split(',');
     fixed.forEach(function(c) { if (sels.indexOf('.' + c) === -1) sels.push('.' + c); });
-    return sels.join(',');
+    var joined = sels.join(',');
+    console.log('[LP-VS] SECTION_SEL:', joined);
+    return joined;
   })();
 
   var st = document.createElement('style');
@@ -452,6 +429,7 @@ const STYLE_SELECT_JS = `(function () {
     if (parentSec && parentSec !== t) {
       parentSec.classList.forEach(function(c) { if (c.startsWith('lp-') && !c.startsWith('lp-vs')) parentSectionLpClasses.push(c); });
     }
+    console.log('[LP-VS] click:', t.tagName, t.className, '-> parentSec:', parentSec && parentSec.className, 'parentSectionLpClasses:', parentSectionLpClasses);
     window.parent.postMessage({
       type: 'lp-vs-select',
       elementType: getType(t),
