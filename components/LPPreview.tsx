@@ -58,7 +58,7 @@ const STYLE_SELECT_JS = `(function () {
   st.setAttribute('data-lp-vs','1');
   st.textContent = [
     '.lp-vs-h{outline:2px dashed rgba(99,102,241,.55)!important;outline-offset:3px!important;cursor:pointer!important;}',
-    '.lp-vs-a{outline:3px solid #6366f1!important;outline-offset:3px!important;background:rgba(99,102,241,.05)!important;}'
+    '.lp-vs-a{outline:2px solid #00AFCC!important;outline-offset:2px!important;}'
   ].join('');
   document.head.appendChild(st);
 
@@ -382,7 +382,7 @@ const EDIT_JS = `(function () {
   st.setAttribute('data-lp-editor','1');
   st.textContent = [
     '.lp-eh { outline:2px dashed rgba(99,102,241,.65)!important; outline-offset:2px!important; cursor:text!important; }',
-    '.lp-ea { outline:2px solid #6366f1!important; outline-offset:2px!important; background:rgba(99,102,241,.06)!important; border-radius:2px!important; }'
+    '.lp-ea { outline:2px solid #00AFCC!important; outline-offset:2px!important; border-radius:2px!important; }'
   ].join('');
   document.head.appendChild(st);
 
