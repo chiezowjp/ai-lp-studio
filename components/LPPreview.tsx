@@ -799,11 +799,9 @@ ${BUBBLE_GUIDE_CSS}
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    // モード切替時のみスクロールをリセット。HTML・CSS 変更（画像差し替え等）では位置を保持する。
-    // セクション追加/削除/並び替えは forceRefreshWithHtml 経由のため skipNextRef で処理済み。
-    const scrollY = !modeChanged
-      ? (iframe.contentWindow?.scrollY ?? 0)
-      : 0;
+    // モード切替・HTML・CSS 変更すべてでスクロール位置を保持する。
+    const scrollY = iframe.contentWindow?.scrollY ?? 0;
+    void modeChanged; // 参照を維持（lint 警告抑制）
 
     iframe.srcdoc = buildContent();
 
