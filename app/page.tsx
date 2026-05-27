@@ -937,14 +937,22 @@ export default function Home() {
       const errMatch = accumulated.match(/===REVISE_ERROR===\s*([\s\S]*?)\s*===REVISE_ERROR_END===/);
       if (errMatch) throw new Error(errMatch[1].trim());
 
-      // 区切り文字形式からHTML/CSSを抽出
-      const htmlMatch = accumulated.match(/===HTML_START===\s*([\s\S]*?)\s*===HTML_END===/);
-      const cssMatch  = accumulated.match(/===CSS_START===\s*([\s\S]*?)\s*===CSS_END===/);
-      if (!htmlMatch?.[1] || !cssMatch?.[1]) {
+      // 差分CSS（CSS_PATCH）または HTML 全体（HTML_START）を抽出
+      const cssPatchMatch = accumulated.match(/===CSS_PATCH_START===\s*([\s\S]*?)\s*===CSS_PATCH_END===/);
+      const htmlMatch     = accumulated.match(/===HTML_START===\s*([\s\S]*?)\s*===HTML_END===/);
+
+      // どちらも見つからなければ失敗
+      if (!cssPatchMatch?.[1] && !htmlMatch?.[1]) {
         throw new Error("AI出力の解析に失敗しました。再試行してください。");
       }
-      const revised: GeneratedLP = { html: htmlMatch[1].trim(), css: cssMatch[1].trim() };
 
+      const newHtml = htmlMatch?.[1]?.trim() ?? result.html;
+      const newCss  = cssPatchMatch?.[1]?.trim()
+        // CSS差分は既存CSSの末尾に追記（カスケードで上書き）
+        ? `${result.css}\n\n/* AI修正 */\n${cssPatchMatch[1].trim()}`
+        : result.css;
+
+      const revised: GeneratedLP = { html: newHtml, css: newCss };
       setResult(revised);
       setSectionOrder(parseSectionOrder(revised.html));
       setActiveTab("preview");

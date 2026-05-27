@@ -5,36 +5,39 @@ import { checkRateLimitBoth, getClientIp } from "@/lib/rate-limiter";
 import { checkInputSize, checkContentLength } from "@/lib/input-guard";
 import { logRateLimitExceeded } from "@/lib/audit-logger";
 
-// Vercel Pro では最大 300 秒まで許容（LP が大きいと生成に時間がかかるため）
 export const maxDuration = 300;
 
-const SYSTEM_PROMPT = `あなたはLPのHTML/CSSを編集するアシスタントです。
-ユーザーの修正指示に従い、以下の形式で必ず出力してください。
+// CSS のみの変更（色・サイズ・背景等）は差分 CSS だけ返させる。
+// HTML 構造変更・テキスト変更が必要な場合のみ HTML 全体も返す。
+// これにより出力が 100〜500 トークン程度になり高速化・安定化する。
+const SYSTEM_PROMPT = `あなたはLPのHTML/CSS編集アシスタントです。
+修正指示を分析して、必要最小限の出力をしてください。
 
+【CSSの変更がある場合（色・背景・サイズ・フォント・枠等）】
+===CSS_PATCH_START===
+（変更・追加するCSSルールのみ出力。既存CSSの末尾に追記されます）
+===CSS_PATCH_END===
+
+【HTMLの変更がある場合（テキスト変更・要素の追加削除・構造変更）】
 ===HTML_START===
-（修正後のHTMLをここに出力）
+（修正後のHTML全体を出力）
 ===HTML_END===
-===CSS_START===
-（修正後のCSSをここに出力）
-===CSS_END===
 
 ルール：
-- 上記の区切り文字は必ず正確に使うこと
-- 区切り文字の外に説明文を書かないこと
-- 修正指示に含まれない部分は変更しないこと
-- CSSクラス名の "lp-" プレフィックスは維持すること`;
+- CSSのみの変更（色・背景・枠・サイズ等）はCSS_PATCHのみ出力し、HTMLは出力しない
+- テキストやHTML構造の変更がある場合はHTML_STARTも出力する
+- 変更のない方は出力しない
+- CSSクラス名の "lp-" プレフィックスは維持する
+- CSS_PATCHは末尾追記で上書きされるため、変更したいプロパティを含む完全なルールを書く`;
 
 export async function POST(req: NextRequest) {
-  // ── Content-Length 早期チェック ──
   const clCheck = checkContentLength(req);
   if (clCheck) return clCheck;
 
-  // ── サーバーサイド プラン・課金ガード ──
   const guard = await requirePlanGuard(req, { checkUsage: "ai_edit" });
   if (guard instanceof NextResponse) return guard;
   const { user, planType } = guard;
 
-  // ── レートリミット ──
   const ip = getClientIp(req);
   const rl = checkRateLimitBoth(ip, user.id, "ai_edit", planType);
   if (!rl.allowed) {
@@ -54,7 +57,6 @@ export async function POST(req: NextRequest) {
 
   const { html, css, instruction } = body;
 
-  // ── 入力サイズ検証 ──
   const sizeCheck = checkInputSize(body as Record<string, unknown>, { hasHtml: true });
   if (sizeCheck) return sizeCheck;
 
@@ -64,9 +66,7 @@ export async function POST(req: NextRequest) {
 
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-  const prompt = `以下の既存LP（HTML+CSS）に対して、【修正指示】に従って編集してください。
-
-【修正指示】
+  const prompt = `【修正指示】
 ${instruction}
 
 【現在のHTML】
@@ -75,10 +75,6 @@ ${html}
 【現在のCSS】
 ${css}`;
 
-  // ── ストリーミングレスポンス（Vercel タイムアウト回避）──
-  // client.messages.create() はブロッキングのため大きな LP では 60 秒を超えてタイムアウトする。
-  // ReadableStream で Anthropic のストリームをそのままクライアントへ流すことで
-  // 「接続が生きている間は応答を受け取り続ける」構造に変える。
   const encoder = new TextEncoder();
 
   const readable = new ReadableStream({
@@ -86,7 +82,7 @@ ${css}`;
       try {
         const stream = client.messages.stream({
           model: "claude-opus-4-7",
-          max_tokens: 16000,
+          max_tokens: 32000,
           system: SYSTEM_PROMPT,
           messages: [{ role: "user", content: prompt }],
         });
@@ -102,7 +98,6 @@ ${css}`;
         controller.close();
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "不明なエラー";
-        // エラーはストリーム末尾に埋め込んでクライアント側で検出する
         controller.enqueue(
           encoder.encode(`\n===REVISE_ERROR===\n${msg}\n===REVISE_ERROR_END===`)
         );
