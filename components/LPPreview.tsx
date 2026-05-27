@@ -73,52 +73,6 @@ const STYLE_SELECT_JS = `(function () {
 
   var activeEl = null;
 
-  // ─── セクション選択バッジ ────────────────────────────────────────────────────
-  // 非セクション要素（テキスト・見出し等）にホバーしたとき、親セクション上部に
-  // 「▣ セクションを選択」バッジを表示。クリックでセクションパネルに直接遷移する。
-  var _sBadge = document.createElement('div');
-  _sBadge.setAttribute('data-lp-vs','1');
-  _sBadge.style.cssText='position:fixed;z-index:999999;background:#6366f1;color:#fff;font:600 10px/1.2 system-ui,sans-serif;padding:3px 9px;border-radius:0 0 6px 6px;cursor:pointer;display:none;white-space:nowrap;pointer-events:auto;user-select:none;box-shadow:0 2px 6px rgba(0,0,0,.18);';
-  _sBadge.textContent='▣ セクションを選択';
-  document.body.appendChild(_sBadge);
-  var _sBadgeSec=null, _sBadgeOver=false;
-  function _showBadge(sec){
-    _sBadgeSec=sec;
-    var r=sec.getBoundingClientRect();
-    _sBadge.style.left=(r.left+8)+'px';
-    _sBadge.style.top=Math.max(0,r.top)+'px';
-    _sBadge.style.display='block';
-  }
-  function _hideBadge(force){
-    if(force||!_sBadgeOver){_sBadge.style.display='none';_sBadgeSec=null;}
-  }
-  _sBadge.addEventListener('mouseenter',function(){_sBadgeOver=true;});
-  _sBadge.addEventListener('mouseleave',function(){_sBadgeOver=false;_hideBadge(true);});
-  _sBadge.addEventListener('click',function(e){
-    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
-    var sec=_sBadgeSec; if(!sec)return;
-    _hideBadge(true);
-    if(activeEl){activeEl.classList.remove('lp-vs-a');activeEl=null;}
-    var secId=sec.getAttribute('data-element-id');
-    if(!secId){secId='el-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6);sec.setAttribute('data-element-id',secId);}
-    sec.classList.remove('lp-vs-h');
-    var secSt=getStyles(sec);
-    sec.classList.add('lp-vs-a');activeEl=sec;
-    var secCls=[];sec.classList.forEach(function(c){if(c.startsWith('lp-')&&!c.startsWith('lp-vs'))secCls.push(c);});
-    var cl=document.body.cloneNode(true);
-    cl.querySelectorAll('script').forEach(function(s){s.parentNode&&s.parentNode.removeChild(s);});
-    cl.querySelectorAll('.lp-vs-h,.lp-vs-a').forEach(function(el){el.classList.remove('lp-vs-h');el.classList.remove('lp-vs-a');});
-    cl.querySelectorAll('details[open]').forEach(function(d){d.removeAttribute('open');});
-    window.parent.postMessage({type:'lp-vs-select',elementType:'section',selector:buildSelector(sec),elementId:secId,tagName:sec.tagName.toLowerCase(),label:(sec.textContent||'').trim().slice(0,40),computedStyles:secSt,lpClasses:secCls,updatedHtml:cl.innerHTML},'*');
-  },true);
-  window.addEventListener('scroll',function(){
-    if(_sBadgeSec&&_sBadge.style.display!=='none'){
-      var r=_sBadgeSec.getBoundingClientRect();
-      _sBadge.style.left=(r.left+8)+'px';
-      _sBadge.style.top=Math.max(0,r.top)+'px';
-    }
-  },true);
-
   // カード系要素の判定
   // CARD_TYPES: lp-X-{キーワード} の末尾パターン
   var CARD_TYPES = ['card','item','box','panel','block','featured','highlight','special','recommend','popular','main','pickup','plan'];
@@ -364,17 +318,10 @@ const STYLE_SELECT_JS = `(function () {
     document.querySelectorAll('.lp-vs-h').forEach(function(el) { el.classList.remove('lp-vs-h'); });
     if (t && t !== activeEl) t.classList.add('lp-vs-h');
     // セクション選択バッジ: 非セクション要素ホバー時に親セクション上部へ表示
-    if (t && getType(t) !== 'section') {
-      var ps = t.closest && t.closest(SECTION_SEL);
-      if (ps) _showBadge(ps); else _hideBadge();
-    } else {
-      _hideBadge();
-    }
   });
   document.addEventListener('mouseout', function(e) {
     var t = findTarget(e.target);
     if (t && t !== activeEl) t.classList.remove('lp-vs-h');
-    _hideBadge();
   });
 
   // キャプチャフェーズで登録することで、子要素の stopPropagation に関係なく必ずクリックを補足する
