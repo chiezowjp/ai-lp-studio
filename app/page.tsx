@@ -745,15 +745,6 @@ export default function Home() {
     [extractedColors, colorReplacements]
   );
 
-  const handleColorReplace = useCallback((orig: string, next: string) => {
-    setColorReplacements((prev) => ({ ...prev, [orig]: next }));
-  }, []);
-
-  const handleColorReset = useCallback(() => {
-    pushUndo();
-    setColorReplacements({});
-  }, [pushUndo]);
-
   const unsplashImages = images.filter((img) => img.attribution);
 
   // ── 削除保護セクション（hero 常時・CTA は1つだけなら保護）──
@@ -801,6 +792,15 @@ export default function Home() {
     };
     setUndoStack((h) => [...h.slice(-19), snapshot]);
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleColorReplace = useCallback((orig: string, next: string) => {
+    setColorReplacements((prev) => ({ ...prev, [orig]: next }));
+  }, []);
+
+  const handleColorReset = useCallback(() => {
+    pushUndo();
+    setColorReplacements({});
+  }, [pushUndo]);
 
   const handleUndo = useCallback(() => {
     if (undoStack.length === 0) return;
