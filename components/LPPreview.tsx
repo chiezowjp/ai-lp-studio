@@ -43,7 +43,7 @@ const STYLE_SELECT_JS = `(function () {
     var sels = [];
     Array.prototype.forEach.call(wrapper.children, function(child) {
       Array.prototype.forEach.call(child.classList, function(c) {
-        if (/^lp-[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(c) && !c.startsWith('lp-vs') && sels.indexOf('.' + c) === -1) {
+        if (/^lp-[a-z][a-z0-9]*([_-][a-z0-9]+)*$/.test(c) && !c.startsWith('lp-vs') && sels.indexOf('.' + c) === -1) {
           sels.push('.' + c);
         }
       });
