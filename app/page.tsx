@@ -112,9 +112,20 @@ async function generateWithRetry(
  * iframe から受け取った computedStyles.backgroundColor が transparent/白の場合のフォールバックとして使用。
  * background-color（solid）・background shorthand（gradient 含む）の両方に対応。
  */
-function extractBgFromSelector(selector: string, css: string): string {
-  const lpClass = selector.replace(/^\./, ""); // ".lp-hero" → "lp-hero"
-  const re = new RegExp(`(?:^|[^\\w-])(\\.${lpClass})\\s*\\{([^}]+)\\}`, "gm");
+function extractBgFromSelector(selector: string, css: string, lpClasses?: string[]): string {
+  // 検索対象の lp-* クラス名リストを決定
+  // lpClasses が渡された場合はそれを優先（[data-element-id=...] セレクターでも正しく動作する）
+  let classesToSearch: string[];
+  if (lpClasses && lpClasses.length > 0) {
+    classesToSearch = lpClasses.filter(c => c.startsWith("lp-") && !c.startsWith("lp-vs"));
+  } else {
+    const lpClass = selector.replace(/^\./, ""); // ".lp-hero" → "lp-hero"
+    // [data-element-id="..."] 等の非クラスセレクターは正規表現に使えないため早期リターン
+    if (!lpClass.startsWith("lp-") || /[[\]"'=]/.test(lpClass)) return "";
+    classesToSearch = [lpClass];
+  }
+  if (!classesToSearch.length) return "";
+
   const isClear = (v: string) =>
     !v || v === "transparent" || /^rgba?\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(v.trim());
   const firstColor = (v: string) => {
@@ -122,20 +133,19 @@ function extractBgFromSelector(selector: string, css: string): string {
     return m ? m[0] : "";
   };
   let found = "";
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(css)) !== null) {
-    const block = match[2];
-    // background-color を先に確認
-    const m1 = block.match(/background-color\s*:\s*([^;!}\n]+)/);
-    if (m1) {
-      const v = m1[1].trim();
-      if (!isClear(v) && v !== "initial" && v !== "inherit") found = v;
-    }
-    // background shorthand（gradient 含む）— background-image: 等は除外
-    const m2 = block.match(/(?<![a-z-])background\s*:\s*([^;!}\n]+)/);
-    if (m2) {
-      const c = firstColor(m2[1].trim());
-      if (c && !isClear(c)) found = c;
+  let bestPos = -1;
+  for (const lpClass of classesToSearch) {
+    const re = new RegExp(`(?:^|[^\\w-])(\\.${lpClass})\\s*\\{([^}]+)\\}`, "gm");
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(css)) !== null) {
+      const pos = match.index;
+      const block = match[2];
+      let blockFound = "";
+      const m1 = block.match(/background-color\s*:\s*([^;!}\n]+)/);
+      if (m1) { const v = m1[1].trim(); if (!isClear(v) && v !== "initial" && v !== "inherit") blockFound = v; }
+      const m2 = block.match(/(?<![a-z-])background\s*:\s*([^;!}\n]+)/);
+      if (m2) { const c = firstColor(m2[1].trim()); if (c && !isClear(c)) blockFound = c; }
+      if (blockFound && pos > bestPos) { found = blockFound; bestPos = pos; }
     }
   }
   return found;
@@ -1046,7 +1056,7 @@ export default function Home() {
       if (isBgUnclear) {
         // result.css に colorReplacements を適用したものを使う（visual/image override は除外）
         const baseCss = result?.css ? replaceColors(result.css, colorReplacements) : "";
-        const fromCss = extractBgFromSelector(el.selector, baseCss);
+        const fromCss = extractBgFromSelector(el.selector, baseCss, el.lpClasses);
         if (fromCss) {
           el = { ...el, computedStyles: { ...el.computedStyles, backgroundColor: fromCss } };
         }
