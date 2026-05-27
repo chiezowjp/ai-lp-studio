@@ -1192,15 +1192,26 @@ export default function ImageInsertPanel({
   onUpdate,
   onDeselect,
 }: Props) {
-  /** data-element-id を持つ要素クリック（挿入済み画像 or ギャラリーimg）*/
+  /** data-element-id を持つ要素クリック（挿入済み画像 or ギャラリーimg）
+   * NOTE: img タグ以外の要素（freeblock section など）が data-element-id を持っていても
+   * InsertedImageEditPanel に誤ルーティングしないよう tagName チェックを行う。
+   */
   const insertedImageId = useMemo(() => {
     if (!selectedElement) return null;
+    // img 要素以外は挿入済み画像として扱わない
+    if (selectedElement.tagName !== "img") return null;
     const m = selectedElement.selector.match(/\[data-element-id="([^"]+)"\]/);
     return m ? m[1] : null;
   }, [selectedElement]);
 
-  /** imgblock セクション内の要素をクリックしたか */
-  const isImgBlock = !!selectedElement?.selector?.startsWith(".lp-imgblock");
+  /** imgblock セクション内の要素をクリックしたか
+   * NOTE: data-element-id が付与されると selector が変わるため、
+   * lpClasses / parentSectionLpClasses でもフォールバック検出する。
+   */
+  const isImgBlock =
+    !!selectedElement?.selector?.startsWith(".lp-imgblock") ||
+    !!selectedElement?.lpClasses?.some((c) => c.startsWith("lp-imgblock")) ||
+    !!selectedElement?.parentSectionLpClasses?.includes("lp-imgblock");
 
   /** お客様の声カードをクリックしたか */
   const voiceCardElementId = useMemo((): string | null => {
