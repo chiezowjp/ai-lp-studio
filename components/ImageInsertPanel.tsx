@@ -347,7 +347,7 @@ function parsePaddingShorthand(p: string) {
   return { t: parts[0], r: parts[1], b: parts[2], l: parts[3] };
 }
 
-function buildImgBlockHtml(cfg: ImgBlockCfg): string {
+function buildImgBlockHtml(cfg: ImgBlockCfg, uniqueClass?: string | null): string {
   const alignMod =
     cfg.alignment === "left" ? "left" : cfg.alignment === "right" ? "right" : "center";
   const src = cfg.imageUrl || "https://placehold.co/800x450?text=Image";
@@ -365,17 +365,21 @@ function buildImgBlockHtml(cfg: ImgBlockCfg): string {
   const ph = cfg.paddingH || "0";
   const sectionStyle =
     `padding-top:${pt};padding-bottom:${pb};padding-left:${ph};padding-right:${ph}`;
-  return `<section class="lp-imgblock" style="${sectionStyle}">
+  // 一意クラスがある場合は保持して2つ目以降のセクションと区別できるようにする
+  const classAttr = uniqueClass ? `${uniqueClass} lp-imgblock` : "lp-imgblock";
+  return `<section class="${classAttr}" style="${sectionStyle}">
   <div class="lp-imgblock-inner lp-imgblock-inner--${alignMod}">
     <img class="lp-imgblock-img" src="${src}" alt="${cfg.alt}"${imgStyle ? ` style="${imgStyle}"` : ""}>
   </div>
 </section>`;
 }
 
-function parseImgBlockFromHtml(html: string): ImgBlockCfg | null {
+function parseImgBlockFromHtml(html: string, uniqueClass?: string | null): ImgBlockCfg | null {
   if (typeof window === "undefined") return null;
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const section = doc.querySelector(".lp-imgblock");
+  // 一意クラスがある場合はそれを使って正確なセクションを特定する
+  const selector = uniqueClass ? `.${uniqueClass}` : ".lp-imgblock";
+  const section = doc.querySelector(selector);
   const img = section?.querySelector("img");
   if (!section || !img) return null;
   const ss = section.getAttribute("style") ?? "";
@@ -406,12 +410,13 @@ function parseImgBlockFromHtml(html: string): ImgBlockCfg | null {
   };
 }
 
-function replaceImgBlockInHtml(html: string, cfg: ImgBlockCfg): string {
+function replaceImgBlockInHtml(html: string, cfg: ImgBlockCfg, uniqueClass?: string | null): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
-  const section = doc.querySelector(".lp-imgblock");
+  const selector = uniqueClass ? `.${uniqueClass}` : ".lp-imgblock";
+  const section = doc.querySelector(selector);
   if (!section) return html;
-  const newDoc = new DOMParser().parseFromString(buildImgBlockHtml(cfg), "text/html");
+  const newDoc = new DOMParser().parseFromString(buildImgBlockHtml(cfg, uniqueClass), "text/html");
   const newSection = newDoc.body.firstElementChild;
   if (newSection) section.replaceWith(newSection);
   return doc.body.innerHTML;
@@ -423,19 +428,21 @@ interface ImgBlockEditProps {
   html: string;
   onUpdate: (newHtml: string) => void;
   onDeselect: () => void;
+  /** 複数 imgblock を区別するための一意クラス（例: "lp-imgblock_abc123"）*/
+  uniqueClass?: string | null;
 }
 
-function ImgBlockEditPanel({ html, onUpdate, onDeselect }: ImgBlockEditProps) {
-  const cfg = useMemo(() => parseImgBlockFromHtml(html), [html]);
+function ImgBlockEditPanel({ html, onUpdate, onDeselect, uniqueClass }: ImgBlockEditProps) {
+  const cfg = useMemo(() => parseImgBlockFromHtml(html, uniqueClass), [html, uniqueClass]);
   const [isDragging, setIsDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const upd = useCallback(
     (partial: Partial<ImgBlockCfg>) => {
       if (!cfg) return;
-      onUpdate(replaceImgBlockInHtml(html, { ...cfg, ...partial }));
+      onUpdate(replaceImgBlockInHtml(html, { ...cfg, ...partial }, uniqueClass));
     },
-    [cfg, html, onUpdate],
+    [cfg, html, onUpdate, uniqueClass],
   );
 
   const handleFile = (file: File) => {
@@ -1213,6 +1220,18 @@ export default function ImageInsertPanel({
     !!selectedElement?.lpClasses?.some((c) => c.startsWith("lp-imgblock")) ||
     !!selectedElement?.parentSectionLpClasses?.includes("lp-imgblock");
 
+  /** 複数 imgblock を区別するための一意クラス（例: "lp-imgblock_abc123"）
+   * lpClasses → parentSectionLpClasses の順で探す。旧形式（一意クラスなし）は null。
+   */
+  const imgBlockUniqueClass = useMemo((): string | null => {
+    if (!selectedElement) return null;
+    const allClasses = [
+      ...(selectedElement.lpClasses ?? []),
+      ...(selectedElement.parentSectionLpClasses ?? []),
+    ];
+    return allClasses.find((c) => c.startsWith("lp-imgblock_")) ?? null;
+  }, [selectedElement]);
+
   /** お客様の声カードをクリックしたか */
   const voiceCardElementId = useMemo((): string | null => {
     if (selectedElement?.selector === ".lp-voice-card") {
@@ -1281,6 +1300,7 @@ export default function ImageInsertPanel({
         ) : isImgBlock ? (
           <ImgBlockEditPanel
             html={html}
+            uniqueClass={imgBlockUniqueClass}
             onUpdate={onUpdate}
             onDeselect={onDeselect}
           />
