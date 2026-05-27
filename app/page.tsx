@@ -737,13 +737,22 @@ export default function Home() {
 
   const extractedColors = useMemo(() => {
     if (!result?.css) return [];
-    return extractTopColors(result.css);
+    return extractTopColors(result.css, 8);
   }, [result?.css]);
 
   const colorSwatches = useMemo(
     () => extractedColors.map((orig) => ({ original: orig, current: colorReplacements[orig] ?? orig })),
     [extractedColors, colorReplacements]
   );
+
+  const handleColorReplace = useCallback((orig: string, next: string) => {
+    setColorReplacements((prev) => ({ ...prev, [orig]: next }));
+  }, []);
+
+  const handleColorReset = useCallback(() => {
+    pushUndo();
+    setColorReplacements({});
+  }, [pushUndo]);
 
   const unsplashImages = images.filter((img) => img.attribution);
 
@@ -2048,10 +2057,9 @@ export default function Home() {
               >
                 <ColorThemePicker
                   swatches={colorSwatches}
-                  onReplace={(orig, next) =>
-                    setColorReplacements((prev) => ({ ...prev, [orig]: next }))
-                  }
-                  onReset={() => setColorReplacements({})}
+                  onPickStart={pushUndo}
+                  onReplace={handleColorReplace}
+                  onReset={handleColorReset}
                 />
               </Accordion>
 

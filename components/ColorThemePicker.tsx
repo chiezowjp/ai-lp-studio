@@ -5,14 +5,17 @@ interface Props {
   swatches: { original: string; current: string }[];
   onReplace: (original: string, newColor: string) => void;
   onReset: () => void;
+  /** カラーピッカーを開く直前に呼ばれる（アンドゥ用スナップショット取得） */
+  onPickStart?: () => void;
 }
 
 const SWATCH_LABELS = [
   "カラー 1", "カラー 2", "カラー 3",
   "カラー 4", "カラー 5", "カラー 6",
+  "カラー 7", "カラー 8",
 ];
 
-export default function ColorThemePicker({ swatches, onReplace, onReset }: Props) {
+export default function ColorThemePicker({ swatches, onReplace, onReset, onPickStart }: Props) {
   if (swatches.length === 0) {
     return <p className="text-xs text-gray-400">CSSからカラーを抽出中…</p>;
   }
@@ -35,6 +38,7 @@ export default function ColorThemePicker({ swatches, onReplace, onReset }: Props
               <input
                 type="color"
                 value={swatch.current}
+                onMouseDown={() => onPickStart?.()}
                 onChange={(e) => onReplace(swatch.original, e.target.value)}
                 className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0.5 bg-white"
                 title={`${swatch.current} (元: ${swatch.original})`}
