@@ -317,7 +317,6 @@ const STYLE_SELECT_JS = `(function () {
     var t = findTarget(e.target);
     document.querySelectorAll('.lp-vs-h').forEach(function(el) { el.classList.remove('lp-vs-h'); });
     if (t && t !== activeEl) t.classList.add('lp-vs-h');
-    // セクション選択バッジ: 非セクション要素ホバー時に親セクション上部へ表示
   });
   document.addEventListener('mouseout', function(e) {
     var t = findTarget(e.target);
@@ -364,6 +363,8 @@ const STYLE_SELECT_JS = `(function () {
       el.classList.remove('lp-vs-h');
       el.classList.remove('lp-vs-a');
     });
+    // 内部用バッジ等（data-lp-vs 属性を持つ非 style/script 要素）を除去してHTMLに混入しないようにする
+    clone.querySelectorAll('[data-lp-vs]').forEach(function(el) { if (el.tagName !== 'STYLE' && el.tagName !== 'SCRIPT') { el.parentNode && el.parentNode.removeChild(el); } });
     // <details open> を保存しない
     clone.querySelectorAll('details[open]').forEach(function(d) { d.removeAttribute('open'); });
     // 要素の lp-* クラス一覧を収集（背景色 CSS 解析で使用）
@@ -438,6 +439,7 @@ const STYLE_SELECT_JS = `(function () {
       var clone2 = document.body.cloneNode(true);
       clone2.querySelectorAll('script').forEach(function(s) { s.parentNode && s.parentNode.removeChild(s); });
       clone2.querySelectorAll('.lp-vs-h,.lp-vs-a').forEach(function(el) { el.classList.remove('lp-vs-h'); el.classList.remove('lp-vs-a'); });
+      clone2.querySelectorAll('[data-lp-vs]').forEach(function(el) { if (el.tagName !== 'STYLE' && el.tagName !== 'SCRIPT') { el.parentNode && el.parentNode.removeChild(el); } });
       clone2.querySelectorAll('details[open]').forEach(function(d) { d.removeAttribute('open'); });
       window.parent.postMessage({
         type: 'lp-vs-select',
@@ -646,7 +648,14 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
   }, [selectedSelector]);
 
   const buildContent = useCallback((htmlOverride?: string) => {
-    const effectiveHtml = htmlOverride ?? html;
+    // Strip leftover internal elements (e.g. old "セクションを選択" badges that were
+    // accidentally captured in cloneNode snapshots and saved into result.html)
+    let effectiveHtml = htmlOverride ?? html;
+    try {
+      const tmpDoc = new DOMParser().parseFromString(effectiveHtml, "text/html");
+      tmpDoc.querySelectorAll("[data-lp-vs]:not(style):not(script)").forEach((el) => el.remove());
+      effectiveHtml = tmpDoc.body.innerHTML;
+    } catch { /* ignore parse errors */ }
 
     // 吹き出しセクション（data-bubble-layout="1"）を検出
     const bubbleIds = new Set<string>();
