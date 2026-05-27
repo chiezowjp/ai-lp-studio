@@ -325,7 +325,6 @@ function reorderHtmlSections(html: string, newOrder: string[]): string {
   return doc.body.innerHTML;
 }
 
-/** 指定セクションを HTML から削除（DOM全スキャン） */
 /** elementId または selector で要素を HTML から削除する（セクション以外の個別要素用） */
 function deleteElementFromHtml(html: string, elementId?: string, selector?: string): string {
   if (typeof window === "undefined") return html;
@@ -334,7 +333,12 @@ function deleteElementFromHtml(html: string, elementId?: string, selector?: stri
   if (elementId) el = doc.querySelector(`[data-element-id="${elementId}"]`);
   if (!el && selector) el = doc.querySelector(selector);
   if (!el) return html;
-  el.remove();
+  // 挿入済み画像（.lp-inserted-img > img）は wrapper ごと削除してマージンも残らないようにする
+  const toRemove =
+    el.tagName === "IMG" && el.parentElement?.classList.contains("lp-inserted-img")
+      ? el.parentElement
+      : el;
+  toRemove.remove();
   return doc.body.innerHTML;
 }
 
