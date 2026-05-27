@@ -439,7 +439,8 @@ export default function SectionImageManager({
 
   const handleSectionChange = (id: string) => {
     setSelectedId(id);
-    setActiveTab("direction");
+    // activeTab はリセットしない — 差し替え/ギャラリータブを開いているときに
+    // セクションを変えても同じタブに留まれるようにする
   };
 
   return (

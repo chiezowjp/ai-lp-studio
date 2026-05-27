@@ -47,12 +47,13 @@ type ResultTab = "preview" | "html" | "css";
 type InputMethod = "form" | "url" | "text" | "ref";
 type EditMode = "text" | "style" | "image";
 
-/** Undo スナップショット — HTML・セクション順・スタイル・フォントをまとめて保存 */
+/** Undo スナップショット — HTML・セクション順・スタイル・フォント・画像をまとめて保存 */
 type UndoSnapshot = {
   html: string;
   sectionOrder: SortableSection[];
   visualStyles: VisualStyles;
   globalFont: string;
+  images: UploadedImage[];
 };
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -630,6 +631,8 @@ export default function Home() {
   sectionOrderRef.current = sectionOrder;
   const visualStylesRef = useRef<VisualStyles>({});
   visualStylesRef.current = visualStyles;
+  const imagesRef = useRef<UploadedImage[]>([]);
+  imagesRef.current = images;
   const resultRef = useRef(result);
   resultRef.current = result;
 
@@ -735,6 +738,7 @@ export default function Home() {
           sectionOrder: [...sectionOrderRef.current],
           visualStyles: { ...visualStylesRef.current },
           globalFont: globalFontRef.current,
+          images: [...imagesRef.current],
         };
         setUndoStack((h) => [...h.slice(-19), snapshot]);
       }
@@ -752,6 +756,7 @@ export default function Home() {
       sectionOrder: [...sectionOrderRef.current],
       visualStyles: { ...visualStylesRef.current },
       globalFont: globalFontRef.current,
+      images: [...imagesRef.current],
     };
     setUndoStack((h) => [...h.slice(-19), snapshot]);
   }, [result]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -764,6 +769,7 @@ export default function Home() {
     setSectionOrder(snapshot.sectionOrder);
     setVisualStyles(snapshot.visualStyles);
     setGlobalFont(snapshot.globalFont ?? DEFAULT_FONT_ID);
+    setImages(snapshot.images ?? []);
   }, [undoStack]);
 
   // ─── Generate ─────────────────────────────────────────────────────────────
@@ -1021,6 +1027,7 @@ export default function Home() {
   };
 
   const handleImageSelect = (image: UploadedImage) => {
+    pushUndo();
     setImages((prev) => [
       ...prev.filter((img) => !(img.placement === image.placement && img.attribution)),
       image,
@@ -1028,8 +1035,15 @@ export default function Home() {
   };
 
   const handleImageDeselect = (placement: string) => {
+    pushUndo();
     setImages((prev) => prev.filter((img) => !(img.placement === placement && img.attribution)));
   };
+
+  /** 画像追加・差し替え・削除を undo スタックに記録してから適用する */
+  const handleImagesChange = useCallback((newImages: UploadedImage[]) => {
+    pushUndo();
+    setImages(newImages);
+  }, [pushUndo]);
 
   // ─── Visual style update ──────────────────────────────────────────────────
 
@@ -2142,7 +2156,7 @@ export default function Home() {
                 <SectionImageManager
                   sectionOrder={sectionOrder}
                   images={images}
-                  onImagesChange={setImages}
+                  onImagesChange={handleImagesChange}
                   unsplashResult={unsplashResult}
                   unsplashLoading={unsplashLoading}
                   unsplashError={unsplashError}
