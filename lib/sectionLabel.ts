@@ -6,23 +6,36 @@
  * すべてで同じ名前が出るよう、ここで一元管理する。
  *
  * 優先順位：
- *   0. h1 のテキスト（ヒーローセクション向け）
- *   1. h2 のテキスト（lp-* ネスト要素内は除外）
- *   2. h3 のテキスト（同上）
- *   3. 代表テキスト（最初の非空テキストノード, 最大 24 文字）
- *   4. SECTION_META の日本語名
+ *   0. SECTION_META の日本語名（既知 ID は必ずこれを使う — 誤ラベル防止）
+ *   1. h1 のテキスト（未知 ID のカスタムセクション向け）
+ *   2. h2 のテキスト（lp-* ネスト要素内は除外）
+ *   3. h3 のテキスト（同上）
+ *   4. 代表テキスト（最初の非空テキストノード, 最大 24 文字）
  *   5. セクション ID そのまま
+ *
+ * SECTION_META を最優先にする理由:
+ *   AI 生成 LP のヒーローセクション（lp-hero）の h2 に「こんなお悩みありませんか？」など
+ *   他セクションの見出しと同じ文言が入ることがある。テキスト抽出を優先すると
+ *   「ファーストビュー」が「お悩みセクション」に誤ラベルされ、画像設定が意図しない
+ *   セクションに適用されてしまう。既知 ID は SECTION_META で固定することでこれを防ぐ。
  */
 
-/** page.tsx の SECTION_META と同じマップ（循環 import を避けるため複製） */
+/** page.tsx の SECTION_META と同じマップ（循環 import を避けるため複製）
+ *  AI 生成で使われる全セクション ID を網羅すること。 */
 const SECTION_META: Record<string, string> = {
+  // AI 生成セクション（generate/route.ts のプロンプトで指定されているもの）
   hero:             "ファーストビュー",
-  benefits:         "メリット",
-  features:         "特徴",
+  problem:          "お悩み",
+  reason:           "選ばれる理由",
+  service:          "サービス内容",
+  price:            "料金",
+  testimonial:      "お客様の声",
   faq:              "よくある質問",
   cta:              "CTA",
+  // 追加セクションテンプレート
+  benefits:         "メリット",
+  features:         "特徴",
   testimonials:     "お客様の声",
-  price:            "料金",
   pricing:          "料金プラン",
   pricing_table:    "料金プラン",
   contact:          "お問い合わせ",
@@ -45,29 +58,31 @@ const SECTION_META: Record<string, string> = {
  * @returns    人が読める表示名
  */
 export function extractSectionLabel(el: Element, id: string): string {
-  // 0. h1（ヒーローセクションは h1 をメイン見出しとして使うことが多い）
-  //    h2 より先に参照することで、h1 を持つセクションが正しくラベル付けされる
+  // 0. 既知 ID は SECTION_META を最優先で返す
+  //    → ヒーローが「こんなお悩みありませんか？」等に誤ラベルされるのを防ぐ
+  if (SECTION_META[id]) return SECTION_META[id];
+
+  // 以下はカスタムセクション（未知 ID）向けのフォールバック
+
+  // 1. h1
   const h1 = el.querySelector("h1");
   if (h1) {
     const text = h1.textContent?.trim() ?? "";
     if (text) return truncate(text, 28);
   }
 
-  // 1. h2（lp-* クラスを持つネスト要素の内側にある h2 は除外して誤ラベルを防ぐ）
+  // 2. h2（lp-* クラスを持つネスト要素の内側にある h2 は除外して誤ラベルを防ぐ）
   const h2 = findTopHeading(el, "h2");
   if (h2) return truncate(h2, 28);
 
-  // 2. h3（同様に lp-* ネスト内を除外）
+  // 3. h3（同様に lp-* ネスト内を除外）
   const h3 = findTopHeading(el, "h3");
   if (h3) return truncate(h3, 28);
 
-  // 3. 最初の意味のあるテキストノード（button・script・style は除外）
+  // 4. 最初の意味のあるテキストノード（button・script・style は除外）
   const SKIP = new Set(["SCRIPT", "STYLE", "BUTTON", "INPUT", "TEXTAREA", "SELECT", "NAV"]);
   const candidate = firstMeaningfulText(el, SKIP);
   if (candidate) return truncate(candidate, 24);
-
-  // 4. SECTION_META
-  if (SECTION_META[id]) return SECTION_META[id];
 
   // 5. ID そのまま
   return id;
