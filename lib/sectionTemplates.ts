@@ -463,6 +463,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     label: "画像",
     icon: "🖼️",
     description: "画像を1枚追加して、LP内に表示",
+    multipleAllowed: true,
     inputs: [
       {
         key: "imageUrl",
@@ -550,7 +551,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       const sectionStyle =
         `padding-top:${paddingTop};padding-bottom:${paddingBottom};` +
         `padding-left:${paddingH};padding-right:${paddingH}`;
-      return `<section class="lp-imgblock" style="${sectionStyle}">
+      const uid = Math.random().toString(36).slice(2, 9);
+      return `<section class="lp-imgblock_${uid} lp-imgblock" style="${sectionStyle}">
   <div class="lp-imgblock-inner lp-imgblock-inner--${alignMod}">
     <img class="lp-imgblock-img" src="${src}" alt="${alt}"${imgStyle ? ` style="${imgStyle}"` : ""}>
   </div>
