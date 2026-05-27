@@ -37,12 +37,14 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     label: "Googleマップ",
     icon: "🗺️",
     description: "住所を入力してアクセスマップを表示",
+    multipleAllowed: true,
     inputs: [
       { key: "address", label: "住所・地名", placeholder: "東京都渋谷区神南1-1-1", required: true },
       { key: "title", label: "セクション見出し", placeholder: "アクセス", defaultValue: "アクセス" },
     ],
-    generateHtml: ({ address = "東京都渋谷区", title = "アクセス" }) => `
-<section class="lp-map">
+    generateHtml: ({ address = "東京都渋谷区", title = "アクセス" }) => {
+      const uid = Math.random().toString(36).slice(2, 9);
+      return `<section class="lp-map_${uid} lp-map">
   <div class="lp-map-inner">
     <h2 class="lp-map-title">${title}</h2>
     <div class="lp-map-frame">
@@ -53,7 +55,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     </div>
     <p class="lp-map-addr">📍 ${address}</p>
   </div>
-</section>`.trim(),
+</section>`.trim();
+    },
     generateCss: () => `
 .lp-map { padding: 64px 20px; background: #f9fafb; }
 .lp-map-inner { max-width: 900px; margin: 0 auto; text-align: center; }
@@ -70,6 +73,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     label: "お問い合わせフォーム",
     icon: "📝",
     description: "CF7・Formspree・mailtoから送信方式を選択",
+    multipleAllowed: true,
     inputs: [
       {
         key: "method",
@@ -126,6 +130,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       const formspreeUrl = values.formspreeUrl || "https://formspree.io/f/xxxxxxxx";
       const cf7Shortcode = values.cf7Shortcode || '[contact-form-7 id="1" title="Contact form 1"]';
       const mailtoEmail  = values.mailtoEmail  || "info@example.com";
+      const uid = Math.random().toString(36).slice(2, 9);
 
       const commonFields = `
       <div class="lp-cf-row">
@@ -148,7 +153,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       /* ─ CF7 ─ */
       if (method === "cf7") {
         return `
-<section class="lp-contact">
+<section class="lp-contact_${uid} lp-contact">
   <div class="lp-contact-inner">
     <h2 class="lp-contact-title">${title}</h2>
     <p class="lp-contact-lead">${lead}</p>
@@ -168,7 +173,7 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       /* ─ mailto ─ */
       if (method === "mailto") {
         return `
-<section class="lp-contact">
+<section class="lp-contact_${uid} lp-contact">
   <div class="lp-contact-inner">
     <h2 class="lp-contact-title">${title}</h2>
     <p class="lp-contact-lead">${lead}</p>
@@ -185,22 +190,22 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
 
       /* ─ Formspree (default) ─ */
       return `
-<section class="lp-contact">
+<section class="lp-contact_${uid} lp-contact">
   <div class="lp-contact-inner">
     <h2 class="lp-contact-title">${title}</h2>
     <p class="lp-contact-lead">${lead}</p>
-    <form class="lp-contact-form" id="lp-cf-form" action="${formspreeUrl}" method="POST">
+    <form class="lp-contact-form" id="lp-cf-form-${uid}" action="${formspreeUrl}" method="POST">
       ${commonFields}
       <div class="lp-cf-submit-wrap">
-        <button class="lp-cf-submit" type="submit" id="lp-cf-btn">送信する →</button>
+        <button class="lp-cf-submit" type="submit" id="lp-cf-btn-${uid}">送信する →</button>
       </div>
     </form>
-    <div id="lp-cf-success" class="lp-cf-result lp-cf-success" style="display:none">
+    <div id="lp-cf-success-${uid}" class="lp-cf-result lp-cf-success" style="display:none">
       <div class="lp-cf-result-icon">✅</div>
       <p class="lp-cf-result-title">送信ありがとうございます！</p>
       <p class="lp-cf-result-sub">担当者よりご連絡いたします。</p>
     </div>
-    <div id="lp-cf-error" class="lp-cf-result lp-cf-error-msg" style="display:none">
+    <div id="lp-cf-error-${uid}" class="lp-cf-result lp-cf-error-msg" style="display:none">
       <div class="lp-cf-result-icon">⚠️</div>
       <p class="lp-cf-result-title">送信に失敗しました</p>
       <p class="lp-cf-result-sub">しばらくしてからお試しください。</p>
@@ -208,8 +213,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
   </div>
   <script>
 (function(){
-  var form = document.getElementById('lp-cf-form');
-  var btn  = document.getElementById('lp-cf-btn');
+  var form = document.getElementById('lp-cf-form-${uid}');
+  var btn  = document.getElementById('lp-cf-btn-${uid}');
   if (!form || !btn) return;
   form.addEventListener('submit', function(e) {
     e.preventDefault();
@@ -224,15 +229,15 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       .then(function(j){
         if (j.ok) {
           form.style.display = 'none';
-          document.getElementById('lp-cf-success').style.display = 'flex';
+          document.getElementById('lp-cf-success-${uid}').style.display = 'flex';
         } else {
-          document.getElementById('lp-cf-error').style.display = 'flex';
+          document.getElementById('lp-cf-error-${uid}').style.display = 'flex';
           btn.disabled = false;
           btn.textContent = '送信する →';
         }
       })
       .catch(function(){
-        document.getElementById('lp-cf-error').style.display = 'flex';
+        document.getElementById('lp-cf-error-${uid}').style.display = 'flex';
         btn.disabled = false;
         btn.textContent = '送信する →';
       });
@@ -297,8 +302,11 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     label: "FAQ",
     icon: "❓",
     description: "よくある質問・回答のアコーディオン",
-    generateHtml: () => `
-<section class="lp-faqblock">
+    multipleAllowed: true,
+    generateHtml: () => {
+      const uid = Math.random().toString(36).slice(2, 9);
+      return `
+<section class="lp-faqblock_${uid} lp-faqblock">
   <div class="lp-faqb-inner">
     <h2 class="lp-faqb-title">よくある質問</h2>
     <div class="lp-faqb-list">
@@ -320,7 +328,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       </details>
     </div>
   </div>
-</section>`.trim(),
+</section>`.trim();
+    },
     generateCss: () => `
 .lp-faqblock { padding: 64px 20px; background: #f9fafb; }
 .lp-faqb-inner { max-width: 760px; margin: 0 auto; }
@@ -343,8 +352,11 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     label: "ギャラリー",
     icon: "🖼️",
     description: "施工事例・写真ギャラリー（6枚グリッド）",
-    generateHtml: () => `
-<section class="lp-gallery">
+    multipleAllowed: true,
+    generateHtml: () => {
+      const uid = Math.random().toString(36).slice(2, 9);
+      return `
+<section class="lp-gallery_${uid} lp-gallery">
   <div class="lp-gallery-inner">
     <h2 class="lp-gallery-title">ギャラリー</h2>
     <p class="lp-gallery-sub">施工事例・サービスの様子をご覧ください</p>
@@ -357,7 +369,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       <div class="lp-gallery-item"><img class="lp-gallery-img" src="https://placehold.co/400x300?text=6" alt=""></div>
     </div>
   </div>
-</section>`.trim(),
+</section>`.trim();
+    },
     generateCss: () => `
 .lp-gallery { padding: 64px 20px; background: #fff; }
 .lp-gallery-inner { max-width: 960px; margin: 0 auto; text-align: center; }
@@ -376,8 +389,11 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     label: "お客様の声",
     icon: "💬",
     description: "星評価付きのレビュー・体験談カード",
-    generateHtml: () => `
-<section class="lp-voices">
+    multipleAllowed: true,
+    generateHtml: () => {
+      const uid = Math.random().toString(36).slice(2, 9);
+      return `
+<section class="lp-voices_${uid} lp-voices">
   <div class="lp-voices-inner">
     <h2 class="lp-voices-title">お客様の声</h2>
     <div class="lp-voices-grid">
@@ -399,7 +415,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     </div>
     <p class="lp-voices-note">※お客様の声はサンプルです。実際の声に差し替えてください。</p>
   </div>
-</section>`.trim(),
+</section>`.trim();
+    },
     generateCss: () => `
 .lp-voices { padding: 64px 20px; background: #f9fafb; }
 .lp-voices-inner { max-width: 960px; margin: 0 auto; text-align: center; }
@@ -419,8 +436,11 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     label: "Before / After",
     icon: "🔄",
     description: "施術・サービス前後の比較を並べて表示",
-    generateHtml: () => `
-<section class="lp-beforeafter">
+    multipleAllowed: true,
+    generateHtml: () => {
+      const uid = Math.random().toString(36).slice(2, 9);
+      return `
+<section class="lp-beforeafter_${uid} lp-beforeafter">
   <div class="lp-ba-inner">
     <h2 class="lp-ba-title">Before / After</h2>
     <p class="lp-ba-sub">サービスによる変化をご覧ください</p>
@@ -437,7 +457,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       </div>
     </div>
   </div>
-</section>`.trim(),
+</section>`.trim();
+    },
     generateCss: () => `
 .lp-beforeafter { padding: 64px 20px; background: #fff; }
 .lp-ba-inner { max-width: 820px; margin: 0 auto; text-align: center; }
@@ -574,13 +595,16 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
     label: "LINE CTA",
     icon: "💚",
     description: "LINEで問い合わせを促す目立つバナー",
+    multipleAllowed: true,
     inputs: [
       { key: "lineUrl", label: "LINE URL", placeholder: "https://line.me/ti/p/XXXXXX", type: "url", required: true },
       { key: "headline", label: "見出しテキスト", placeholder: "LINEで無料相談受付中！", defaultValue: "LINEで無料相談受付中！" },
       { key: "sub", label: "サブテキスト", placeholder: "お気軽にメッセージください", defaultValue: "お気軽にメッセージください" },
     ],
-    generateHtml: ({ lineUrl = "#", headline = "LINEで無料相談受付中！", sub = "お気軽にメッセージください" }) => `
-<section class="lp-linecta">
+    generateHtml: ({ lineUrl = "#", headline = "LINEで無料相談受付中！", sub = "お気軽にメッセージください" }) => {
+      const uid = Math.random().toString(36).slice(2, 9);
+      return `
+<section class="lp-linecta_${uid} lp-linecta">
   <div class="lp-lc-inner">
     <div class="lp-lc-icon">
       <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="36" height="36" rx="8" fill="#06C755"/><path d="M28 16.3c0-4.7-4.7-8.5-10.5-8.5S7 11.6 7 16.3c0 4.2 3.7 7.7 8.7 8.4.34.07.8.23.92.52.1.27.07.68.04.95l-.15.9c-.05.27-.22 1.06.93.58 1.15-.48 6.2-3.65 8.46-6.25C27.4 19.4 28 17.94 28 16.3z" fill="white"/></svg>
@@ -591,7 +615,8 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
       LINEで相談する（無料）
     </a>
   </div>
-</section>`.trim(),
+</section>`.trim();
+    },
     generateCss: () => `
 .lp-linecta { padding: 56px 20px; background: #06C755; }
 .lp-lc-inner { max-width: 560px; margin: 0 auto; text-align: center; }

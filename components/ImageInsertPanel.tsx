@@ -8,6 +8,7 @@ import { SelectedElement } from "@/types";
 export interface InsertedImageConfig {
   id: string;
   url: string;
+  mobileImageUrl: string; // "" = スマホ専用画像なし
   alt: string;
   width: string;
   alignment: "left" | "center" | "right";
@@ -47,7 +48,19 @@ function buildWrapper(doc: Document, cfg: InsertedImageConfig): HTMLElement {
       `border-radius:${cfg.borderRadius}px`,
     ].join(";"),
   );
-  div.appendChild(img);
+
+  if (cfg.mobileImageUrl) {
+    // スマホ用画像がある場合は <picture> でラップ
+    const picture = doc.createElement("picture");
+    const source = doc.createElement("source");
+    source.setAttribute("media", "(max-width: 640px)");
+    source.setAttribute("srcset", cfg.mobileImageUrl);
+    picture.appendChild(source);
+    picture.appendChild(img);
+    div.appendChild(picture);
+  } else {
+    div.appendChild(img);
+  }
   return div;
 }
 
@@ -114,7 +127,8 @@ export function updateInsertedImage(
   const doc = new DOMParser().parseFromString(html, "text/html");
   const img = doc.querySelector(`[data-element-id="${imageId}"]`);
   if (!img) return html;
-  const wrapper = img.parentElement;
+  // <picture> でラップされている場合も考慮して closest で .lp-inserted-img を探す
+  const wrapper = img.closest(".lp-inserted-img");
   if (!wrapper) return html;
   const current = parseInsertedImageFromDoc(doc, imageId);
   if (!current) return html;
@@ -128,7 +142,7 @@ export function deleteInsertedImage(html: string, imageId: string): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
   const img = doc.querySelector(`[data-element-id="${imageId}"]`);
-  const wrapper = img?.parentElement;
+  const wrapper = img?.closest(".lp-inserted-img");
   wrapper?.remove();
   return doc.body.innerHTML;
 }
@@ -136,12 +150,17 @@ export function deleteInsertedImage(html: string, imageId: string): string {
 function parseInsertedImageFromDoc(doc: Document, imageId: string): InsertedImageConfig | null {
   const img = doc.querySelector(`[data-element-id="${imageId}"]`) as HTMLImageElement | null;
   if (!img) return null;
-  const wrapper = img.parentElement;
+  // <picture> でラップされていても .lp-inserted-img を確実に取得
+  const wrapper = img.closest(".lp-inserted-img");
   const ws = wrapper?.getAttribute("style") ?? "";
   const is = img.getAttribute("style") ?? "";
+  // スマホ用画像（<source media="(max-width: 640px)">）を取得
+  const sourceEl = wrapper?.querySelector("picture > source[media]") as HTMLSourceElement | null;
+  const mobileImageUrl = sourceEl?.getAttribute("srcset") ?? "";
   return {
     id: imageId,
     url: img.src,
+    mobileImageUrl,
     alt: img.alt ?? "",
     width: is.match(/width:([^;]+)/)?.[1]?.trim() ?? "80%",
     alignment: (ws.match(/text-align:\s*(left|center|right)/)?.[1] ?? "center") as InsertedImageConfig["alignment"],
@@ -192,6 +211,8 @@ interface EditProps {
 function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditProps) {
   const cfg = useMemo(() => parseInsertedImage(html, imageId), [html, imageId]);
   const replaceRef = useRef<HTMLInputElement>(null);
+  const mobileFileRef = useRef<HTMLInputElement>(null);
+  const [showMobilePanel, setShowMobilePanel] = useState(false);
 
   if (!cfg) {
     return (
@@ -211,6 +232,12 @@ function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditPro
     reader.readAsDataURL(file);
   };
 
+  const handleMobileFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => upd({ mobileImageUrl: e.target?.result as string });
+    reader.readAsDataURL(file);
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -227,12 +254,73 @@ function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditPro
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* PC画像プレビュー */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={cfg.url}
           alt={cfg.alt || "画像"}
           className="w-full h-28 object-contain rounded-xl border border-gray-200 bg-gray-50"
         />
+
+        {/* スマホ用画像パネル */}
+        {showMobilePanel || cfg.mobileImageUrl ? (
+          <div className="border border-indigo-200 rounded-xl p-3 space-y-2 bg-indigo-50/40">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-indigo-600">📱 スマホ用画像</p>
+              <div className="flex gap-2">
+                {cfg.mobileImageUrl && (
+                  <button
+                    onClick={() => { upd({ mobileImageUrl: "" }); setShowMobilePanel(false); }}
+                    className="text-[10px] text-red-400 hover:text-red-600 transition-colors"
+                  >
+                    削除
+                  </button>
+                )}
+                {!cfg.mobileImageUrl && (
+                  <button
+                    onClick={() => setShowMobilePanel(false)}
+                    className="text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    閉じる
+                  </button>
+                )}
+              </div>
+            </div>
+            {cfg.mobileImageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={cfg.mobileImageUrl}
+                alt="スマホ用"
+                className="w-full h-20 object-contain rounded-lg border border-indigo-200 bg-white"
+              />
+            )}
+            <label className="flex items-center justify-center gap-2 w-full py-2 border-2 border-dashed border-indigo-300 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors text-[10px] text-indigo-500">
+              <span>📁</span>
+              {cfg.mobileImageUrl ? "差し替える" : "画像を選択"}
+              <input
+                ref={mobileFileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleMobileFile(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <p className="text-[10px] text-indigo-400/80 leading-relaxed">
+              640px以下の画面でこの画像に自動切替えされます
+            </p>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowMobilePanel(true)}
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-[10px] font-semibold rounded-xl border border-dashed border-gray-300 text-gray-500 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50/40 transition-colors"
+          >
+            <span>📱</span> スマホ用画像を追加
+          </button>
+        )}
 
         <div>
           <label className="block text-[10px] font-semibold text-gray-500 mb-1">配置</label>
@@ -328,6 +416,7 @@ function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditPro
 
 interface ImgBlockCfg {
   imageUrl: string;
+  mobileImageUrl: string; // "" = スマホ専用画像なし
   alt: string;
   alignment: "left" | "center" | "right";
   width: string;
@@ -367,9 +456,14 @@ function buildImgBlockHtml(cfg: ImgBlockCfg, uniqueClass?: string | null): strin
     `padding-top:${pt};padding-bottom:${pb};padding-left:${ph};padding-right:${ph}`;
   // 一意クラスがある場合は保持して2つ目以降のセクションと区別できるようにする
   const classAttr = uniqueClass ? `${uniqueClass} lp-imgblock` : "lp-imgblock";
+  const imgTag = `<img class="lp-imgblock-img" src="${src}" alt="${cfg.alt}"${imgStyle ? ` style="${imgStyle}"` : ""}>`;
+  // スマホ用画像がある場合は <picture> でラップする
+  const innerImg = cfg.mobileImageUrl
+    ? `<picture>\n      <source media="(max-width: 640px)" srcset="${cfg.mobileImageUrl}">\n      ${imgTag}\n    </picture>`
+    : imgTag;
   return `<section class="${classAttr}" style="${sectionStyle}">
   <div class="lp-imgblock-inner lp-imgblock-inner--${alignMod}">
-    <img class="lp-imgblock-img" src="${src}" alt="${cfg.alt}"${imgStyle ? ` style="${imgStyle}"` : ""}>
+    ${innerImg}
   </div>
 </section>`;
 }
@@ -397,8 +491,13 @@ function parseImgBlockFromHtml(html: string, uniqueClass?: string | null): ImgBl
   const paddingBottom = ss.match(/padding-bottom:\s*([^;]+)/)?.[1]?.trim() ?? sh?.b ?? "0";
   const paddingH      = ss.match(/padding-left:\s*([^;]+)/)?.[1]?.trim()   ?? sh?.l ?? "0";
 
+  // <picture><source> があればスマホ用画像を取得
+  const sourceEl = section.querySelector("picture > source[media]") as HTMLSourceElement | null;
+  const mobileImageUrl = sourceEl?.getAttribute("srcset") ?? "";
+
   return {
     imageUrl: img.getAttribute("src") ?? "",
+    mobileImageUrl,
     alt: img.getAttribute("alt") ?? "",
     alignment: (alignMatch?.[1] ?? "center") as "left" | "center" | "right",
     width: is.match(/width:\s*([^;]+)/)?.[1]?.trim() ?? "100%",
@@ -435,7 +534,9 @@ interface ImgBlockEditProps {
 function ImgBlockEditPanel({ html, onUpdate, onDeselect, uniqueClass }: ImgBlockEditProps) {
   const cfg = useMemo(() => parseImgBlockFromHtml(html, uniqueClass), [html, uniqueClass]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isMobileDragging, setIsMobileDragging] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mobileFileRef = useRef<HTMLInputElement>(null);
 
   const upd = useCallback(
     (partial: Partial<ImgBlockCfg>) => {
@@ -449,6 +550,13 @@ function ImgBlockEditPanel({ html, onUpdate, onDeselect, uniqueClass }: ImgBlock
     if (!file.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = (e) => upd({ imageUrl: e.target?.result as string });
+    reader.readAsDataURL(file);
+  };
+
+  const handleMobileFile = (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (e) => upd({ mobileImageUrl: e.target?.result as string });
     reader.readAsDataURL(file);
   };
 
@@ -518,6 +626,63 @@ function ImgBlockEditPanel({ html, onUpdate, onDeselect, uniqueClass }: ImgBlock
               }}
             />
           </label>
+        </div>
+
+        {/* スマホ用画像 */}
+        <div className="border border-gray-200 rounded-xl p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold text-gray-600">📱 スマホ用画像</p>
+            {cfg.mobileImageUrl && (
+              <button
+                onClick={() => upd({ mobileImageUrl: "" })}
+                className="text-[10px] text-red-400 hover:text-red-600 transition-colors"
+              >
+                削除
+              </button>
+            )}
+          </div>
+          {cfg.mobileImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={cfg.mobileImageUrl}
+              alt="スマホ用"
+              className="w-full h-20 object-contain rounded-lg border border-gray-200 bg-gray-50"
+            />
+          ) : (
+            <p className="text-[10px] text-gray-400">未設定（PC画像をそのまま使用）</p>
+          )}
+          <label
+            className={`flex items-center justify-center gap-2 w-full py-2 border-2 border-dashed rounded-xl cursor-pointer transition-colors text-[10px] text-gray-500 ${
+              isMobileDragging
+                ? "border-indigo-400 bg-indigo-50"
+                : "border-gray-300 hover:border-[#00AFCC] hover:bg-[#E6F8FC]"
+            }`}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsMobileDragging(false);
+              const f = e.dataTransfer.files?.[0];
+              if (f) handleMobileFile(f);
+            }}
+            onDragOver={(e) => { e.preventDefault(); setIsMobileDragging(true); }}
+            onDragLeave={() => setIsMobileDragging(false)}
+          >
+            <span>📁</span>
+            {cfg.mobileImageUrl ? "スマホ画像を差し替え" : "スマホ用画像をアップロード"}
+            <input
+              ref={mobileFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleMobileFile(f);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <p className="text-[10px] text-gray-400 leading-relaxed">
+            640px以下の画面でこの画像に自動切替えされます
+          </p>
         </div>
 
         {/* バナープリセット */}
@@ -1085,6 +1250,7 @@ function InsertFlow({ selectedElement, html, onUpdate, onDeselect }: InsertFlowP
       const cfg: InsertedImageConfig = {
         id: newId(),
         url: e.target?.result as string,
+        mobileImageUrl: "",
         alt: "",
         width: "80%",
         alignment: "center",
