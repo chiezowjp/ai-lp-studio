@@ -68,21 +68,34 @@ ${css}
 
 {"html":"（修正後のHTMLコード）","css":"（修正後のCSSコード）"}`;
 
-    const response = await client.messages.create({
-      model: "claude-opus-4-7",
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: prompt }],
-    });
+    // 最大2回リトライ
+    let parsed: { html: string; css: string } | null = null;
+    let lastError: Error | null = null;
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    const raw = textBlock?.type === "text" ? textBlock.text : "";
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await client.messages.create({
+          model: "claude-opus-4-7",
+          max_tokens: 16000,
+          thinking: { type: "adaptive" },
+          system: SYSTEM_PROMPT,
+          messages: [{ role: "user", content: prompt }],
+        });
 
-    const parsed = extractAndParseJSON<{ html: string; css: string }>(raw);
+        const textBlock = response.content.find((b) => b.type === "text");
+        const raw = textBlock?.type === "text" ? textBlock.text : "";
+        parsed = extractAndParseJSON<{ html: string; css: string }>(raw);
 
-    if (!parsed.html || !parsed.css) {
-      throw new Error("AI出力の整形に失敗しました。再生成してください。");
+        if (parsed.html && parsed.css) break; // 成功
+        lastError = new Error("AI出力の整形に失敗しました。");
+      } catch (e) {
+        lastError = e instanceof Error ? e : new Error("不明なエラー");
+        if (attempt < 2) continue; // リトライ
+      }
+    }
+
+    if (!parsed?.html || !parsed?.css) {
+      throw lastError ?? new Error("AI出力の整形に失敗しました。");
     }
 
     return NextResponse.json({ html: parsed.html, css: parsed.css });

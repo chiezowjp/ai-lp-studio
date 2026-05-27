@@ -525,6 +525,7 @@ export default function Home() {
   const [result, setResult] = useState<GeneratedLP | null>(null);
   const [loading, setLoading] = useState(false);
   const [revisionLoading, setRevisionLoading] = useState(false);
+  const [lastRevisionInstruction, setLastRevisionInstruction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [revisionError, setRevisionError] = useState<string | null>(null);
   const [retryMessage, setRetryMessage] = useState<string | null>(null);
@@ -839,6 +840,7 @@ export default function Home() {
     }
     setRevisionLoading(true);
     setRevisionError(null);
+    setLastRevisionInstruction(instruction);
     setUndoStack([]);
     try {
       const res = await fetch("/api/revise", {
@@ -2125,7 +2127,19 @@ export default function Home() {
               <Accordion title="AI修正">
                 <RevisionForm onRevise={handleRevise} loading={revisionLoading} />
                 {revisionError && (
-                  <div className="mt-2 text-xs text-red-600 bg-red-50 rounded p-2">{revisionError}</div>
+                  <div className="mt-2 bg-red-50 border border-red-100 rounded-xl p-3 space-y-2">
+                    <p className="text-xs text-red-600 font-semibold">修正に失敗しました</p>
+                    <p className="text-[11px] text-red-500">指示が複雑すぎた可能性があります。指示を短くシンプルにするか、そのまま再試行してください。</p>
+                    {lastRevisionInstruction && (
+                      <button
+                        onClick={() => handleRevise(lastRevisionInstruction)}
+                        disabled={revisionLoading}
+                        className="w-full py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 border border-red-200 rounded-lg transition-colors"
+                      >
+                        🔄 同じ指示で再試行
+                      </button>
+                    )}
+                  </div>
                 )}
                 {revisionLoading && (
                   <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
