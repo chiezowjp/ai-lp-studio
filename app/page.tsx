@@ -233,11 +233,15 @@ function extractTopColors(css: string, limit = 6): string[] {
     .map(([c]) => c);
 }
 
-/** 色の全置換 */
+/** 色の全置換（大文字小文字を区別しない — CSS hex カラーは case-insensitive）*/
 function replaceColors(css: string, replacements: Record<string, string>): string {
   let result = css;
   for (const [from, to] of Object.entries(replacements)) {
-    if (from !== to) result = result.split(from).join(to);
+    if (from === to) continue;
+    // #xxxxxx は英字部分が大文字/小文字どちらでも書かれうるため RegExp + gi フラグで置換
+    // from は extractTopColors が小文字化したもの。CSS は大文字で書かれていても正しく置換される。
+    const escaped = from.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+    result = result.replace(new RegExp(escaped, "gi"), to);
   }
   return result;
 }
