@@ -153,18 +153,41 @@ function extractBgFromSelector(selector: string, css: string, lpClasses?: string
 }
 
 /**
- * placement が "other" の場合は汎用ラッパー、それ以外は `.lp-{placement}` を使用。
- * sectionOrder がどう変わっても LP の lp-* クラスに確実にマッチする。
+ * placement が "other" の場合は汎用ラッパー、それ以外は `.lp-wrapper > :nth-child(N)` を使用。
+ *
+ * `.lp-{placement}` クラスセレクタではなく nth-child 位置セレクタを使う理由:
+ * AI が生成した HTML でまれに複数要素が同じ lp-* クラスを持つ場合があり、
+ * クラスセレクタだと意図しない別セクションにも画像が当たってしまう。
+ * 位置セレクタは .lp-wrapper の直下の何番目かで一意に特定するため衝突が起きない。
  *
  * data-bubble-layout="1" 付きセクションは背景画像を contain/center で表示
  * （人物画像を大きく中央表示させるため）。
  */
 function buildImageCss(images: UploadedImage[], html: string = ""): string {
-  // HTML から吹き出しセクション ID を検出
+  // HTML からセクション位置マップ（placement id → 1-based nth-child index）と
+  // 吹き出しセクション ID を同時に検出
+  const positionMap = new Map<string, number>();
   const bubbleIds = new Set<string>();
+
   if (typeof window !== "undefined" && html) {
     try {
       const doc = new DOMParser().parseFromString(html, "text/html");
+      const wrapper = doc.querySelector(".lp-wrapper") ?? doc.body;
+      const sectionClass = /^lp-([a-z][a-z0-9_]*)$/;
+      const seen = new Set<string>();
+      let childIndex = 1; // nth-child は 1 始まり
+      for (const child of Array.from(wrapper.children)) {
+        for (const cls of Array.from(child.classList)) {
+          const m = cls.match(sectionClass);
+          if (m && !seen.has(m[1])) {
+            seen.add(m[1]);
+            positionMap.set(m[1], childIndex);
+            break;
+          }
+        }
+        childIndex++;
+      }
+      // 吹き出しセクション ID を検出
       doc.querySelectorAll("[data-bubble-layout]").forEach((el) => {
         for (const cls of Array.from(el.classList)) {
           const m = cls.match(/^lp-([a-z0-9-]+)$/);
@@ -176,7 +199,16 @@ function buildImageCss(images: UploadedImage[], html: string = ""): string {
 
   return images
     .map((img) => {
-      const sel = img.placement === "other" ? ".lp-wrapper" : `.lp-${img.placement}`;
+      let sel: string;
+      if (img.placement === "other") {
+        sel = ".lp-wrapper";
+      } else {
+        const pos = positionMap.get(img.placement);
+        // 位置が分かればピンポイント nth-child、分からなければクラス名にフォールバック
+        sel = pos !== undefined
+          ? `.lp-wrapper > :nth-child(${pos})`
+          : `.lp-${img.placement}`;
+      }
       if (img.placement !== "other" && bubbleIds.has(img.placement)) {
         // 吹き出しセクション：人物画像を背景に contain で表示
         return `${sel} { background-image: url("${img.url}") !important; background-size: contain !important; background-position: center !important; background-repeat: no-repeat !important; }`;
