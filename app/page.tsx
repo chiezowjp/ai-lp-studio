@@ -1455,6 +1455,19 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ─── Project: remoteProjectId が確定したら即座に localStorage を更新 ───────
+  // クラウド自動保存（30s）後に remoteId が決まっても、ローカル自動保存（2s）の
+  // deps に remoteProjectId が入っていないため、内容変更がないと localStorage に
+  // remoteId が書き込まれない。これによりリロード後に新規プロジェクトが重複作成される
+  // バグを防ぐため、remoteProjectId 変化時に localStorage を即時更新する。
+  useEffect(() => {
+    if (!remoteProjectId) return;
+    const p = loadFromLocal();
+    if (p && p.remoteId !== remoteProjectId) {
+      saveToLocal({ ...p, remoteId: remoteProjectId });
+    }
+  }, [remoteProjectId]);
+
   // ─── Project: URL ?p=<id> でクラウドからロード ───────────────────────────
   // useSearchParams は Suspense 必須のため window.location.search で代替する
 
@@ -1868,10 +1881,10 @@ export default function Home() {
                     { id: "ref",  label: "🔍 参考LP",  tip: "参考LPを分析してスタイルを反映" },
                   ] as { id: InputMethod; label: string; tip: string }[]
                 ).map((tab) => (
-                  <Tooltip key={tab.id} text={tab.tip} position="bottom">
+                  <Tooltip key={tab.id} text={tab.tip} position="bottom" className="flex-1">
                     <button
                       onClick={() => setInputMethod(tab.id)}
-                      className={`flex-1 py-2.5 text-[11px] font-semibold transition-colors border-b-2
+                      className={`w-full py-2.5 text-[11px] font-semibold transition-colors border-b-2
                         ${inputMethod === tab.id
                           ? "text-[#00AFCC] border-[#00AFCC] bg-[#E6F8FC]"
                           : "text-gray-500 border-transparent hover:text-gray-700 hover:bg-gray-50"
