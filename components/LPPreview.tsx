@@ -179,9 +179,10 @@ const STYLE_SELECT_JS = `(function () {
   }
 
   function buildSelector(el) {
-    // 挿入済み画像は data-element-id で一意識別
-    if (el.tagName === 'IMG' && el.getAttribute('data-element-id')) {
-      return '[data-element-id="' + el.getAttribute('data-element-id') + '"]';
+    // data-element-id があれば常に一意識別（画像・見出し・テキスト共通）
+    var elId = el.getAttribute('data-element-id');
+    if (elId) {
+      return '[data-element-id="' + elId + '"]';
     }
     var t = el.tagName.toLowerCase();
     var lpCls = [];
