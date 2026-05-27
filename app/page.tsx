@@ -2569,6 +2569,17 @@ export default function Home() {
                 pushUndo();
                 applyHtml(newHtml, false);
               }}
+              bgColor={visualStyles[selectedElement.selector]?.styles?.backgroundColor as string | undefined}
+              onBgColorChange={(color) => {
+                handleStyleUpdate(selectedElement.selector, {
+                  ...(visualStyles[selectedElement.selector] ?? {}),
+                  styles: {
+                    ...(visualStyles[selectedElement.selector]?.styles ?? {}),
+                    backgroundColor: color,
+                    backgroundImage: "none",
+                  },
+                });
+              }}
             />
           </aside>
         )}

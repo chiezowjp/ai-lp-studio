@@ -393,12 +393,18 @@ interface FreeBlockPanelProps {
   selector: string;
   html: string;
   onUpdate: (newHtml: string) => void;
+  /** 背景色（CSS visual styles 経由で管理）。未設定時は "#ffffff" */
+  bgColor?: string;
+  /** 背景色変更コールバック（CSS visual styles 経由）。未設定時は HTML inline style にフォールバック */
+  onBgColorChange?: (color: string) => void;
 }
 
-export default function FreeBlockPanel({ selector, html, onUpdate }: FreeBlockPanelProps) {
+export default function FreeBlockPanel({ selector, html, onUpdate, bgColor: bgColorProp, onBgColorChange }: FreeBlockPanelProps) {
   const uniqueClass = useMemo(() => extractFbUniqueClass(selector), [selector]);
   const elements = useMemo(() => parseFbElements(html, uniqueClass), [html, uniqueClass]);
-  const bgColor = useMemo(() => getFbBgColor(html, uniqueClass), [html, uniqueClass]);
+  // bgColor: 外部 prop（visual styles）が優先。なければ HTML inline style から読み取る（後方互換）
+  const bgColorFromHtml = useMemo(() => getFbBgColor(html, uniqueClass), [html, uniqueClass]);
+  const bgColor = bgColorProp ?? bgColorFromHtml;
 
   function handleAdd(type: FbElType) {
     onUpdate(addFbElement(html, type, uniqueClass));
@@ -426,7 +432,13 @@ export default function FreeBlockPanel({ selector, html, onUpdate }: FreeBlockPa
             <input
               type="color"
               value={bgColor}
-              onChange={(e) => onUpdate(setFbBgColor(html, uniqueClass, e.target.value))}
+              onChange={(e) => {
+                if (onBgColorChange) {
+                  onBgColorChange(e.target.value);
+                } else {
+                  onUpdate(setFbBgColor(html, uniqueClass, e.target.value));
+                }
+              }}
               className="w-8 h-8 rounded cursor-pointer border border-gray-200 p-0.5 bg-white"
               title={bgColor}
             />
@@ -437,7 +449,13 @@ export default function FreeBlockPanel({ selector, html, onUpdate }: FreeBlockPa
           <span className="text-[10px] text-gray-400 font-mono">{bgColor}</span>
           {bgColor !== "#ffffff" && (
             <button
-              onClick={() => onUpdate(setFbBgColor(html, uniqueClass, "#ffffff"))}
+              onClick={() => {
+                if (onBgColorChange) {
+                  onBgColorChange("#ffffff");
+                } else {
+                  onUpdate(setFbBgColor(html, uniqueClass, "#ffffff"));
+                }
+              }}
               className="text-[10px] text-gray-400 hover:text-red-500 ml-auto shrink-0"
               title="リセット"
             >
