@@ -1554,13 +1554,19 @@ export default function Home() {
     // localStorage 2秒デバウンス
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = setTimeout(() => {
-      const snap: ProjectSnapshot = {
-        formData: lastFormData,
-        html: result.html, css: result.css,
-        colorReplacements, visualStyles, sectionOrder, additionalCssByType,
-        images: serializeImagesSync(images),
-      };
-      saveToLocal(buildProject(snap, { remoteId: remoteProjectIdRef.current ?? undefined }));
+      // blob: URL → base64 変換を含む非同期シリアライズ（ユーザーアップロード画像を正しく保存）
+      void serializeImages(images).then((serializedImages) => {
+        const snap: ProjectSnapshot = {
+          formData: lastFormData,
+          html: result.html, css: result.css,
+          colorReplacements, visualStyles, sectionOrder, additionalCssByType,
+          images: serializedImages,
+        };
+        const project = buildProject(snap, { remoteId: remoteProjectIdRef.current ?? undefined });
+        saveToLocal(project);
+        // savedProject state を更新してタイムスタンプ表示を最新にする
+        setSavedProject(project);
+      }).catch((e) => console.warn("[autosave] failed:", e));
     }, 2000);
     // 変更フラグを立てる（クラウド自動保存用）
     isDirtyRef.current = true;
