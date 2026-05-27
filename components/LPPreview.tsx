@@ -53,12 +53,34 @@ const STYLE_SELECT_JS = `(function () {
     Array.prototype.forEach.call(wrapper.children, function(child) {
       addLpClasses(child);
     });
-    // さらに lp-wrapper 内の section/article タグを深さに関係なくスキャン
-    // （AIが section を別の section 内にネストした構造にも対応）
+    // lp-wrapper 内の section/article タグをすべてスキャン（タグ名ベースの深掘り）
     var nestedSections = wrapper.querySelectorAll('section, article');
     Array.prototype.forEach.call(nestedSections, function(el) {
       addLpClasses(el);
     });
+    // BFS: 既知セクションの直接子 div/section/article も再帰的にスキャン
+    // AIが <section class="lp-faq"> 内に <div class="lp-solution"> をネストする場合に対応。
+    // タグ名に依存しないため div ネストも正しく検出できる。
+    var queue = sels.slice();
+    var visited = {};
+    while (queue.length > 0) {
+      var sel = queue.shift();
+      if (visited[sel]) continue;
+      visited[sel] = true;
+      try {
+        var parents = wrapper.querySelectorAll(sel);
+        Array.prototype.forEach.call(parents, function(parentEl) {
+          Array.prototype.forEach.call(parentEl.children, function(child) {
+            var tag = child.tagName;
+            if (tag !== 'DIV' && tag !== 'SECTION' && tag !== 'ARTICLE') return;
+            var before = sels.length;
+            addLpClasses(child);
+            // 新しいクラスが追加されたらキューに追加して再帰スキャン
+            for (var i = before; i < sels.length; i++) { queue.push(sels[i]); }
+          });
+        });
+      } catch(e) {}
+    }
     // フォールバック: 静的リストをマージ（DOM スキャンが空の場合の保険）
     var fixed = 'lp-hero,lp-problem,lp-reason,lp-service,lp-testimonial,lp-cta,lp-faq,lp-gallery,lp-map,lp-contact,lp-voices,lp-beforeafter,lp-linecta,lp-fixedcta,lp-imgblock,lp-wrapper,lp-freeblock,lp-customhtml'.split(',');
     fixed.forEach(function(c) { if (sels.indexOf('.' + c) === -1) sels.push('.' + c); });
@@ -463,7 +485,17 @@ const STYLE_SELECT_JS = `(function () {
         for (var ci = 0; ci < classes.length; ci++) {
           try {
             var found = document.querySelector('.' + classes[ci]);
-            if (found && found.matches(SECTION_SEL)) { sec = found; break; }
+            // SECTION_SEL に含まれていれば優先。含まれなくても lp-* クラスを持つ
+            // ブロック要素なら「ネストdivセクション」として許容する。
+            if (!found) continue;
+            var isSec = found.matches(SECTION_SEL);
+            if (!isSec) {
+              var ft = found.tagName;
+              isSec = (ft === 'DIV' || ft === 'SECTION' || ft === 'ARTICLE') &&
+                       found.className && typeof found.className === 'string' &&
+                       found.className.split(' ').some(function(c){ return /^lp-[a-z]/.test(c) && !c.startsWith('lp-vs'); });
+            }
+            if (isSec) { sec = found; break; }
           } catch(err2) {}
         }
       }
