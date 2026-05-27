@@ -702,26 +702,50 @@ function BackgroundOverlayPanel({
 
 // ─── Section Panel ────────────────────────────────────────────────────────────
 
-function extractBgFromCss(selector: string, css: string): string {
-  if (!selector || !css) return "";
-  const lpClass = selector.replace(/^\./, "");
-  const re = new RegExp(`(?:^|[^\\w-])(\\.${lpClass})\\s*\\{([^}]+)\\}`, "gm");
+/**
+ * CSS テキストから lp-* クラスの背景色を抽出する。
+ * selector は ".lp-foo" 形式でも "[data-element-id='...']" 形式でも動作する。
+ * lpClasses が提供された場合はそれを優先して使用（data-element-id 形式の selector でも正しく動作）。
+ */
+function extractBgFromCss(selector: string, css: string, lpClasses?: string[]): string {
+  if (!css) return "";
+
+  // 検索対象の lp-* クラス名リストを決定
+  let classes: string[];
+  if (lpClasses && lpClasses.length > 0) {
+    classes = lpClasses.filter(c => c.startsWith("lp-") && !c.startsWith("lp-vs"));
+  } else {
+    // セレクターから .lp-* クラス名を抽出（複合セレクター ".lp-foo.lp-bar" にも対応）
+    const matches = selector.match(/\.lp-[^.[\s:{]+/g) ?? [];
+    classes = matches.map(c => c.slice(1));
+  }
+  if (!classes.length) return "";
+
   const isClear = (v: string) =>
     !v || v === "transparent" || /^rgba?\s*\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(v.trim());
   const firstColor = (v: string) => {
     const m = v.match(/rgba?\([^)]+\)|#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}\b/);
     return m ? m[0] : "";
   };
-  let found = "";
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(css)) !== null) {
-    const block = match[2];
-    const m1 = block.match(/background-color\s*:\s*([^;!}\n]+)/);
-    if (m1) { const v = m1[1].trim(); if (!isClear(v) && v !== "initial" && v !== "inherit") found = v; }
-    const m2 = block.match(/(?<![a-z-])background\s*:\s*([^;!}\n]+)/);
-    if (m2) { const c = firstColor(m2[1].trim()); if (c && !isClear(c)) found = c; }
+
+  // 各クラスを個別に検索し、CSS ソース内で最後に登場したルールを採用（カスケード再現）
+  let bestFound = "";
+  let bestPos = -1;
+  for (const lpClass of classes) {
+    const re = new RegExp(`(?:^|[^\\w-])(\\.${lpClass})\\s*\\{([^}]+)\\}`, "gm");
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(css)) !== null) {
+      const pos = match.index;
+      const block = match[2];
+      let blockFound = "";
+      const m1 = block.match(/background-color\s*:\s*([^;!}\n]+)/);
+      if (m1) { const v = m1[1].trim(); if (!isClear(v) && v !== "initial" && v !== "inherit") blockFound = v; }
+      const m2 = block.match(/(?<![a-z-])background\s*:\s*([^;!}\n]+)/);
+      if (m2) { const c = firstColor(m2[1].trim()); if (c && !isClear(c)) blockFound = c; }
+      if (blockFound && pos > bestPos) { bestFound = blockFound; bestPos = pos; }
+    }
   }
-  return found;
+  return bestFound;
 }
 
 function SectionPanel({
@@ -732,6 +756,7 @@ function SectionPanel({
   onUpdate,
   selector = "",
   effectiveCss = "",
+  lpClasses,
 }: {
   s: Record<string, string>;
   cs: Record<string, string>;
@@ -740,6 +765,7 @@ function SectionPanel({
   onUpdate: (partial: Partial<StyleRule>) => void;
   selector?: string;
   effectiveCss?: string;
+  lpClasses?: string[];
 }) {
   // 透明 or 白（グラデーション由来のフォールバック値）の場合は CSS から直接取得する
   const isBgUnclear = (v: string) =>
@@ -757,7 +783,7 @@ function SectionPanel({
   const sHasBg = s.backgroundColor && !isBgUnclear(s.backgroundColor);
   const rawBg = sHasBg ? s.backgroundColor! : cs.backgroundColor || "";
   const resolvedBg = isBgUnclear(rawBg)
-    ? (extractBgFromCss(selector, baseCssForBg) || "#ffffff")
+    ? (extractBgFromCss(selector, baseCssForBg, lpClasses) || "#ffffff")
     : rawBg;
   return (
     <div className="space-y-4">
@@ -1391,6 +1417,8 @@ interface Props {
   onDeselect: () => void;
   onDelete?: () => void;
   effectiveCss?: string;
+  /** 親セクションの背景色編集ボタンが押された時のコールバック */
+  onSelectSection?: (lpClasses: string[]) => void;
 }
 
 const TYPE_ICONS: Record<string, string> = {
@@ -1418,6 +1446,7 @@ export default function VisualStylePanel({
   onDeselect,
   onDelete,
   effectiveCss = "",
+  onSelectSection,
 }: Props) {
   const s = currentRule?.styles ?? {};
   const cs = element.computedStyles;
@@ -1470,6 +1499,17 @@ export default function VisualStylePanel({
         </button>
       </div>
 
+      {/* セクション背景編集への誘導ボタン（セクション以外の要素が選択されていて、親セクションがある場合） */}
+      {element.type !== "section" && element.parentSectionLpClasses && element.parentSectionLpClasses.length > 0 && onSelectSection && (
+        <button
+          onClick={() => onSelectSection(element.parentSectionLpClasses!)}
+          className="mx-4 mt-2 mb-0 py-1.5 w-[calc(100%-2rem)] text-[11px] font-semibold text-[#00AFCC] border border-[#00AFCC] rounded-lg hover:bg-[#E6F8FC] transition-colors flex items-center justify-center gap-1"
+        >
+          <span>▣</span>
+          <span>セクション背景を編集</span>
+        </button>
+      )}
+
       {/* Controls (scrollable) */}
       <div className="flex-1 overflow-y-auto p-4">
         {element.type === "heading" && (
@@ -1480,7 +1520,7 @@ export default function VisualStylePanel({
           <ButtonPanel rule={currentRule} cs={cs} onUpdate={updRule} />
         )}
         {element.type === "section" && (
-          <SectionPanel s={s} cs={cs} upd={upd} rule={currentRule} onUpdate={updRule} selector={element.selector} effectiveCss={effectiveCss} />
+          <SectionPanel s={s} cs={cs} upd={upd} rule={currentRule} onUpdate={updRule} selector={element.selector} effectiveCss={effectiveCss} lpClasses={element.lpClasses} />
         )}
         {element.type === "image" && <ImagePanel s={s} cs={cs} upd={upd} />}
         {element.type === "card" && <CardPanel s={s} cs={cs} upd={upd} />}

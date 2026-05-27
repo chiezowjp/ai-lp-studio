@@ -11,6 +11,17 @@ const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder";
  */
 export const supabase = createClient(url, anon);
 
+/** 一覧表示用の軽量型（html / css / project_json は含まない） */
+export interface DbProjectSummary {
+  id: string;
+  title: string;
+  thumbnail: string | null;
+  is_published: boolean;
+  slug: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Supabase の DB projects 行の型 */
 export interface DbProject {
   id: string;

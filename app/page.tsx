@@ -1085,7 +1085,11 @@ export default function Home() {
     setUnsplashResult(null);
     setSavedProject(project);
     setShowRestoreBanner(false);
-  }, []);
+    // JSON ファイルから読み込んだ場合は remoteId があれば復元する（上書き保存に使用）
+    if (project.remoteId) setRemoteProjectId(project.remoteId);
+  // setRemoteProjectId は安定した参照なので依存配列への追加は不要だが明示しておく
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setRemoteProjectId]);
 
   // ─── Project: スナップショットを API ペイロードに変換 ─────────────────────────
 
@@ -1155,7 +1159,10 @@ export default function Home() {
       colorReplacements, visualStyles, sectionOrder, additionalCssByType,
       images: serializeImagesSync(images),
     };
-    const project = buildProject(snap);
+    const project = buildProject(snap, {
+      existingId: savedProject?.id,
+      remoteId: remoteProjectId ?? undefined,
+    });
     saveToLocal(project);
     setSavedProject(project);
     setSaveMenuOpen(false);
@@ -1177,7 +1184,10 @@ export default function Home() {
         colorReplacements, visualStyles, sectionOrder, additionalCssByType,
         images: serializedImages,
       };
-      const project = buildProject(snap);
+      const project = buildProject(snap, {
+        existingId: savedProject?.id,
+        remoteId: remoteProjectId ?? undefined,
+      });
       saveToLocal(project);
       setSavedProject(project);
       downloadProject(project);
@@ -1218,6 +1228,8 @@ export default function Home() {
     setShowRestoreBanner(false);
     clearLocal();
     setSavedProject(null);
+    // 復元しない場合はクラウドIDもリセット（新規LPが既存エントリを上書きしないようにする）
+    setRemoteProjectId(null);
   };
 
   // ─── Ref LP complete ──────────────────────────────────────────────────────
@@ -1375,7 +1387,12 @@ export default function Home() {
 
   useEffect(() => {
     const p = loadFromLocal();
-    if (p) { setSavedProject(p); setShowRestoreBanner(true); }
+    if (p) {
+      setSavedProject(p);
+      setShowRestoreBanner(true);
+      // クラウド保存済みの場合は remoteId を復元し、再保存時に重複が起きないようにする
+      if (p.remoteId) setRemoteProjectId(p.remoteId);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1428,7 +1445,7 @@ export default function Home() {
         colorReplacements, visualStyles, sectionOrder, additionalCssByType,
         images: serializeImagesSync(images),
       };
-      saveToLocal(buildProject(snap));
+      saveToLocal(buildProject(snap, { remoteId: remoteProjectIdRef.current ?? undefined }));
     }, 2000);
     // 変更フラグを立てる（クラウド自動保存用）
     isDirtyRef.current = true;
@@ -2413,6 +2430,7 @@ export default function Home() {
                 setSelectedElement(null);
               }}
               effectiveCss={effectiveCss}
+              onSelectSection={(lpClasses) => previewRef.current?.selectSection(lpClasses)}
             />
           </aside>
         )}

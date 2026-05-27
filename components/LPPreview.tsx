@@ -38,15 +38,26 @@ const SCROLL_JS = `(function () {
 const STYLE_SELECT_JS = `(function () {
   // SECTION_SEL: DOM をスキャンして実際に存在する lp-* セクションクラスを動的に収集する。
   // AI が生成したカスタムクラス（.lp-price, .lp-plan 等）も含める。
+  // ネスト構造（section/article が lp-wrapper の直接子の内側にある場合）にも対応する。
   var SECTION_SEL = (function() {
     var wrapper = document.querySelector('.lp-wrapper') || document.body;
     var sels = [];
-    Array.prototype.forEach.call(wrapper.children, function(child) {
-      Array.prototype.forEach.call(child.classList, function(c) {
+    function addLpClasses(el) {
+      Array.prototype.forEach.call(el.classList, function(c) {
         if (/^lp-[a-z][a-z0-9]*([_-][a-z0-9]+)*$/.test(c) && !c.startsWith('lp-vs') && sels.indexOf('.' + c) === -1) {
           sels.push('.' + c);
         }
       });
+    }
+    // lp-wrapper の直接子をスキャン
+    Array.prototype.forEach.call(wrapper.children, function(child) {
+      addLpClasses(child);
+    });
+    // さらに lp-wrapper 内の section/article タグを深さに関係なくスキャン
+    // （AIが section を別の section 内にネストした構造にも対応）
+    var nestedSections = wrapper.querySelectorAll('section, article');
+    Array.prototype.forEach.call(nestedSections, function(el) {
+      addLpClasses(el);
     });
     // フォールバック: 静的リストをマージ（DOM スキャンが空の場合の保険）
     var fixed = 'lp-hero,lp-problem,lp-reason,lp-service,lp-testimonial,lp-cta,lp-faq,lp-gallery,lp-map,lp-contact,lp-voices,lp-beforeafter,lp-linecta,lp-fixedcta,lp-imgblock,lp-wrapper,lp-freeblock,lp-customhtml'.split(',');
@@ -158,6 +169,17 @@ const STYLE_SELECT_JS = `(function () {
       if (isCardEl(cardCheck)) return cardCheck;
       if (cardCheck.matches && cardCheck.matches(SECTION_SEL)) break;
       cardCheck = cardCheck.parentElement;
+    }
+    // ④ SECTION_SEL に含まれない section/article タグを独立したセクションとして扱う（保険）
+    // SECTION_SEL の querySelectorAll スキャンで拾えなかった要素（動的追加等）に対応
+    var secFallback = el;
+    while (secFallback && secFallback !== document.body) {
+      if (secFallback.matches && secFallback.matches(SECTION_SEL)) break;
+      var stag = secFallback.tagName;
+      if ((stag === 'SECTION' || stag === 'ARTICLE') && !isCardEl(secFallback)) {
+        return secFallback;
+      }
+      secFallback = secFallback.parentElement;
     }
     var sec = el.closest && el.closest(SECTION_SEL);
     if (sec) return sec;
@@ -345,6 +367,15 @@ const STYLE_SELECT_JS = `(function () {
     });
     // <details open> を保存しない
     clone.querySelectorAll('details[open]').forEach(function(d) { d.removeAttribute('open'); });
+    // 要素の lp-* クラス一覧を収集（背景色 CSS 解析で使用）
+    var lpClasses = [];
+    t.classList.forEach(function(c) { if (c.startsWith('lp-') && !c.startsWith('lp-vs')) lpClasses.push(c); });
+    // 親セクションの lp-* クラスを収集（セクション背景色編集ボタン用）
+    var parentSec = t.closest && t.closest(SECTION_SEL);
+    var parentSectionLpClasses = [];
+    if (parentSec && parentSec !== t) {
+      parentSec.classList.forEach(function(c) { if (c.startsWith('lp-') && !c.startsWith('lp-vs')) parentSectionLpClasses.push(c); });
+    }
     window.parent.postMessage({
       type: 'lp-vs-select',
       elementType: getType(t),
@@ -353,6 +384,8 @@ const STYLE_SELECT_JS = `(function () {
       tagName: t.tagName.toLowerCase(),
       label: (t.textContent || '').trim().slice(0, 40),
       computedStyles: styles,
+      lpClasses: lpClasses,
+      parentSectionLpClasses: parentSectionLpClasses,
       updatedHtml: clone.innerHTML
     }, '*');
   }, true);
@@ -367,6 +400,47 @@ const STYLE_SELECT_JS = `(function () {
           if (el) { el.classList.add('lp-vs-a'); activeEl = el; }
         } catch(err) {}
       }
+    }
+    // 親セクションをプログラム的に選択する
+    if (e.data && e.data.type === 'lp-vs-select-section') {
+      var sec = null;
+      var classes = e.data.lpClasses;
+      if (classes && classes.length) {
+        for (var ci = 0; ci < classes.length; ci++) {
+          try {
+            var found = document.querySelector('.' + classes[ci]);
+            if (found && found.matches(SECTION_SEL)) { sec = found; break; }
+          } catch(err2) {}
+        }
+      }
+      if (!sec) return;
+      if (activeEl) { activeEl.classList.remove('lp-vs-a'); activeEl = null; }
+      var secId = sec.getAttribute('data-element-id');
+      if (!secId) {
+        secId = 'el-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6);
+        sec.setAttribute('data-element-id', secId);
+      }
+      sec.classList.remove('lp-vs-h');
+      var secStyles = getStyles(sec);
+      sec.classList.add('lp-vs-a');
+      activeEl = sec;
+      var secLpCls = [];
+      sec.classList.forEach(function(c) { if (c.startsWith('lp-') && !c.startsWith('lp-vs')) secLpCls.push(c); });
+      var clone2 = document.body.cloneNode(true);
+      clone2.querySelectorAll('script').forEach(function(s) { s.parentNode && s.parentNode.removeChild(s); });
+      clone2.querySelectorAll('.lp-vs-h,.lp-vs-a').forEach(function(el) { el.classList.remove('lp-vs-h'); el.classList.remove('lp-vs-a'); });
+      clone2.querySelectorAll('details[open]').forEach(function(d) { d.removeAttribute('open'); });
+      window.parent.postMessage({
+        type: 'lp-vs-select',
+        elementType: 'section',
+        selector: buildSelector(sec),
+        elementId: secId,
+        tagName: sec.tagName.toLowerCase(),
+        label: (sec.textContent || '').trim().slice(0, 40),
+        computedStyles: secStyles,
+        lpClasses: secLpCls,
+        updatedHtml: clone2.innerHTML
+      }, '*');
     }
   });
 })();`;
@@ -515,6 +589,8 @@ export interface LPPreviewHandle {
    * React の非同期チェーン（buildContent effect）を待たないため確実。
    */
   forceRefreshWithHtml: (newHtml: string) => void;
+  /** lp-* クラスで指定したセクションをプログラム的に選択する（背景色編集ボタン等から呼び出し） */
+  selectSection: (lpClasses: string[]) => void;
 }
 
 const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
@@ -779,6 +855,12 @@ ${BUBBLE_GUIDE_CSS}
       skipNextRef.current = true;
       iframe.srcdoc = buildContent(newHtml);
     },
+    selectSection: (lpClasses: string[]) => {
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: "lp-vs-select-section", lpClasses },
+        "*"
+      );
+    },
   }), [buildContent]); // buildContent が変わるたびに最新クロージャを反映
 
   // Sync iframe content — skip when triggered by our own edit
@@ -854,6 +936,8 @@ ${BUBBLE_GUIDE_CSS}
           tagName: e.data.tagName,
           label: e.data.label,
           computedStyles: e.data.computedStyles,
+          lpClasses: e.data.lpClasses as string[] | undefined,
+          parentSectionLpClasses: e.data.parentSectionLpClasses as string[] | undefined,
         });
       }
       if (e.data?.type === "lp-vs-deselect") {

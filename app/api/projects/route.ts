@@ -9,9 +9,10 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const admin = createAdminClient();
+  // 一覧表示に必要なフィールドのみ取得（html / css / project_json は個別取得時のみ）
   const { data, error } = await admin
     .from("projects")
-    .select("id, title, html, css, project_json, thumbnail, is_published, slug, created_at, updated_at")
+    .select("id, title, thumbnail, is_published, slug, created_at, updated_at")
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
 

@@ -183,6 +183,10 @@ export interface SelectedElement {
   tagName: string;
   label: string;
   computedStyles: Record<string, string>;
+  /** 要素が持つ lp-* クラス名一覧（背景色 CSS 解析などで使用） */
+  lpClasses?: string[];
+  /** 最も近い祖先セクションの lp-* クラス名（セクション背景色編集ボタン用） */
+  parentSectionLpClasses?: string[];
 }
 
 export interface ButtonImageConfig {

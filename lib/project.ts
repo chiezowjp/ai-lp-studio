@@ -32,6 +32,8 @@ export interface SerializedImage {
 export interface LPProject {
   version: 1;
   id: string;
+  /** Supabase プロジェクト UUID（クラウド保存済みの場合のみ設定） */
+  remoteId?: string;
   /** サービス名 or "名称未設定" */
   name: string;
   savedAt: string;
@@ -127,10 +129,11 @@ export function deserializeImages(imgs: SerializedImage[]): UploadedImage[] {
 
 // ─── Project build ────────────────────────────────────────────────────────────
 
-export function buildProject(snap: ProjectSnapshot): LPProject {
+export function buildProject(snap: ProjectSnapshot, opts?: { existingId?: string; remoteId?: string }): LPProject {
   return {
     version: PROJECT_VERSION,
-    id: crypto.randomUUID(),
+    id: opts?.existingId ?? crypto.randomUUID(),
+    ...(opts?.remoteId ? { remoteId: opts.remoteId } : {}),
     name: snap.formData.serviceName || "名称未設定",
     savedAt: new Date().toISOString(),
     ...snap,

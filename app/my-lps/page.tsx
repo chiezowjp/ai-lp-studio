@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { usePlan } from "@/lib/plan-context";
 import { PLAN_LIMITS, PLAN_LABEL, trialDaysLeft } from "@/lib/plans";
-import type { DbProject } from "@/lib/supabase";
+import type { DbProjectSummary } from "@/lib/supabase";
 import Tooltip from "@/components/Tooltip";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ export default function MyLPsPage() {
   const days = trialDaysLeft(trialEndsAt);
   const router = useRouter();
 
-  const [projects, setProjects]   = useState<DbProject[]>([]);
+  const [projects, setProjects]   = useState<DbProjectSummary[]>([]);
   const [fetching, setFetching]   = useState(false);
   const [deleting, setDeleting]   = useState<string | null>(null);
   const [duplicating, setDuplicating] = useState<string | null>(null);
@@ -77,9 +77,9 @@ export default function MyLPsPage() {
 
   // ── 複製 ──────────────────────────────────────────────────────────────────
 
-  const handleDuplicate = async (project: DbProject) => {
+  const handleDuplicate = async (project: DbProjectSummary) => {
     if (!session) return;
-    // 保存数上限チェック
+    // 保存数上限チェック（サーバー側でも確認するがUXのため早期リターン）
     if (planType) {
       const maxProjects = PLAN_LIMITS[planType].maxProjects;
       if (projects.length >= maxProjects) {
@@ -89,21 +89,13 @@ export default function MyLPsPage() {
     }
     setDuplicating(project.id);
     try {
-      const res = await fetch("/api/projects", {
+      // サーバー側で SELECT → INSERT するため html/css/json をクライアントで持つ必要なし
+      const res = await fetch(`/api/projects/${project.id}/duplicate`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          title: `${project.title} のコピー`,
-          html: project.html,
-          css: project.css,
-          project_json: project.project_json,
-        }),
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (!res.ok) throw new Error((await res.json()).error ?? "複製失敗");
-      const created: DbProject = await res.json();
+      const created: DbProjectSummary = await res.json();
       setProjects((prev) => [created, ...prev]);
     } catch (e) {
       alert(e instanceof Error ? e.message : "複製に失敗しました");
@@ -114,7 +106,7 @@ export default function MyLPsPage() {
 
   // ── タイトル編集 ─────────────────────────────────────────────────────────
 
-  const handleRenameStart = (p: DbProject) => {
+  const handleRenameStart = (p: DbProjectSummary) => {
     setEditingId(p.id);
     setEditingTitle(p.title);
   };
