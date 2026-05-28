@@ -1180,6 +1180,7 @@ export default function Home() {
     setVisualStyles(project.visualStyles);
     setAdditionalCssByType(project.additionalCssByType);
     setImages(deserializeImages(project.images));
+    setGlobalFont(project.globalFont ?? DEFAULT_FONT_ID);
     setUndoStack([]);
     setActiveTab("preview");
     setEditMode("text");
@@ -1202,6 +1203,7 @@ export default function Home() {
       formData: lastFormData, html: result.html, css: result.css,
       colorReplacements, visualStyles, sectionOrder, additionalCssByType,
       images: imgs,
+      globalFont: globalFontRef.current,
     };
     const project = buildProject(snap);
     return {
@@ -1260,6 +1262,7 @@ export default function Home() {
       html: result.html, css: result.css,
       colorReplacements, visualStyles, sectionOrder, additionalCssByType,
       images: serializeImagesSync(images),
+      globalFont: globalFontRef.current,
     };
     const project = buildProject(snap, {
       existingId: savedProject?.id,
@@ -1285,6 +1288,7 @@ export default function Home() {
         html: result.html, css: result.css,
         colorReplacements, visualStyles, sectionOrder, additionalCssByType,
         images: serializedImages,
+        globalFont: globalFontRef.current,
       };
       const project = buildProject(snap, {
         existingId: savedProject?.id,
@@ -1561,12 +1565,17 @@ export default function Home() {
           html: result.html, css: result.css,
           colorReplacements, visualStyles, sectionOrder, additionalCssByType,
           images: serializedImages,
+          globalFont: globalFontRef.current,
         };
         const project = buildProject(snap, { remoteId: remoteProjectIdRef.current ?? undefined });
         saveToLocal(project);
         // savedProject state を更新してタイムスタンプ表示を最新にする
         setSavedProject(project);
-      }).catch((e) => console.warn("[autosave] failed:", e));
+      }).catch((e) => {
+        console.warn("[autosave] failed:", e);
+        setSaveToast("自動保存に失敗しました");
+        setTimeout(() => setSaveToast(null), 3000);
+      });
     }, 2000);
     // 変更フラグを立てる（クラウド自動保存用）
     isDirtyRef.current = true;

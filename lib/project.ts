@@ -47,6 +47,7 @@ export interface LPProject {
   sectionOrder: { id: string; label: string }[];
   additionalCssByType: Record<string, string>;
   images: SerializedImage[];
+  globalFont?: string;
 }
 
 export interface ProjectSnapshot {
@@ -58,6 +59,7 @@ export interface ProjectSnapshot {
   sectionOrder: { id: string; label: string }[];
   additionalCssByType: Record<string, string>;
   images: SerializedImage[];
+  globalFont?: string;
 }
 
 // ─── Image serialization ──────────────────────────────────────────────────────

@@ -513,11 +513,72 @@ function replaceImgBlockInHtml(html: string, cfg: ImgBlockCfg, uniqueClass?: str
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
   const selector = uniqueClass ? `.${uniqueClass}` : ".lp-imgblock";
-  const section = doc.querySelector(selector);
+  const section = doc.querySelector(selector) as HTMLElement | null;
   if (!section) return html;
-  const newDoc = new DOMParser().parseFromString(buildImgBlockHtml(cfg, uniqueClass), "text/html");
-  const newSection = newDoc.body.firstElementChild;
-  if (newSection) section.replaceWith(newSection);
+
+  const img = section.querySelector("img.lp-imgblock-img") as HTMLImageElement | null;
+  if (!img) return html;
+
+  // セクション style を更新
+  const pt = cfg.paddingTop || "0";
+  const pb = cfg.paddingBottom || "0";
+  const ph = cfg.paddingH || "0";
+  section.setAttribute("style", `padding-top:${pt};padding-bottom:${pb};padding-left:${ph};padding-right:${ph}`);
+
+  // inner div の alignment クラスを更新
+  const alignMod = cfg.alignment === "left" ? "left" : cfg.alignment === "right" ? "right" : "center";
+  const innerEl = section.querySelector('[class*="lp-imgblock-inner"]') as HTMLElement | null;
+  if (innerEl) {
+    innerEl.className = `lp-imgblock-inner lp-imgblock-inner--${alignMod}`;
+  }
+
+  // img の属性を更新
+  const src = cfg.imageUrl || "https://placehold.co/800x450?text=Image";
+  const imgStyleParts = [
+    `width:${cfg.width || "100%"}`,
+    cfg.height && cfg.height !== "auto" ? `height:${cfg.height}` : "",
+    cfg.borderRadius && cfg.borderRadius !== "0" && cfg.borderRadius !== "0px"
+      ? `border-radius:${cfg.borderRadius}`
+      : "",
+  ].filter(Boolean);
+  img.setAttribute("src", src);
+  img.setAttribute("alt", cfg.alt);
+  if (imgStyleParts.length > 0) {
+    img.setAttribute("style", imgStyleParts.join(";"));
+  } else {
+    img.removeAttribute("style");
+  }
+
+  // スマホ用画像の <picture> ラップを更新（同一ドキュメント内で操作）
+  const picturePar = img.closest("picture");
+  if (cfg.mobileImageUrl) {
+    if (picturePar) {
+      // 既存 <picture> の <source> を更新
+      let sourceEl = picturePar.querySelector("source[media]") as HTMLSourceElement | null;
+      if (!sourceEl) {
+        sourceEl = doc.createElement("source") as HTMLSourceElement;
+        sourceEl.setAttribute("media", "(max-width: 640px)");
+        picturePar.insertBefore(sourceEl, img);
+      }
+      sourceEl.setAttribute("srcset", cfg.mobileImageUrl);
+    } else {
+      // <img> を <picture> でラップ
+      const picture = doc.createElement("picture");
+      const sourceEl = doc.createElement("source") as HTMLSourceElement;
+      sourceEl.setAttribute("media", "(max-width: 640px)");
+      sourceEl.setAttribute("srcset", cfg.mobileImageUrl);
+      img.parentNode!.insertBefore(picture, img);
+      picture.appendChild(sourceEl);
+      picture.appendChild(img);
+    }
+  } else {
+    // スマホ用画像なし → <picture> を解除
+    if (picturePar) {
+      picturePar.parentNode!.insertBefore(img, picturePar);
+      picturePar.remove();
+    }
+  }
+
   return doc.body.innerHTML;
 }
 
