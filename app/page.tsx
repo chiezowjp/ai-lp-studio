@@ -666,7 +666,7 @@ export default function Home() {
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null);
   const previewRef = useRef<LPPreviewHandle>(null);
 
-  // refs：useCallback 内で最新値を参照するため（deps に加えない）
+  // refs：useCallback / setTimeout 内で常に最新値を参照するため（deps に加えない）
   const sectionOrderRef = useRef<SortableSection[]>([]);
   sectionOrderRef.current = sectionOrder;
   const visualStylesRef = useRef<VisualStyles>({});
@@ -675,6 +675,56 @@ export default function Home() {
   imagesRef.current = images;
   const resultRef = useRef(result);
   resultRef.current = result;
+  const lastFormDataRef = useRef<LPFormData | null>(null);
+  lastFormDataRef.current = lastFormData;
+  const colorReplacementsRef = useRef<Record<string, string>>({});
+  colorReplacementsRef.current = colorReplacements;
+  const savedProjectRef = useRef<LPProject | null>(null);
+  savedProjectRef.current = savedProject;
+  const remoteProjectIdRef = useRef<string | null>(null);
+  remoteProjectIdRef.current = remoteProjectId;
+
+  // ─── Project: スナップショット単一生成元 ────────────────────────────────────
+  // ⚠️  新しい状態（state）を追加したら「ここだけ」更新すれば全保存パスに反映される  ⚠️
+  // 全て ref 経由で読むため deps は空配列でよく、closure の stale 問題が起きない。
+
+  /** 同期版（localStorage 自動保存・手動ローカル保存用）
+   *  blob:URL はスキップ（Unsplash 等 https:// URL のみ保存） */
+  const buildSnapshotSync = useCallback((): ProjectSnapshot | null => {
+    const res = resultRef.current;
+    const fd = lastFormDataRef.current;
+    if (!res || !fd) return null;
+    return {
+      formData: fd,
+      html: res.html,
+      css: res.css,
+      colorReplacements: colorReplacementsRef.current,
+      visualStyles: visualStylesRef.current,
+      sectionOrder: sectionOrderRef.current,
+      additionalCssByType: additionalCssByTypeRef.current,
+      images: serializeImagesSync(imagesRef.current),
+      globalFont: globalFontRef.current,
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** 非同期版（クラウド保存・JSON ダウンロード用）
+   *  blob:URL を base64 に変換してから保存するため画像が完全に残る */
+  const buildSnapshotAsync = useCallback(async (): Promise<ProjectSnapshot | null> => {
+    const res = resultRef.current;
+    const fd = lastFormDataRef.current;
+    if (!res || !fd) return null;
+    return {
+      formData: fd,
+      html: res.html,
+      css: res.css,
+      colorReplacements: colorReplacementsRef.current,
+      visualStyles: visualStylesRef.current,
+      sectionOrder: sectionOrderRef.current,
+      additionalCssByType: additionalCssByTypeRef.current,
+      images: await serializeImages(imagesRef.current),
+      globalFont: globalFontRef.current,
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 参考LP 吹き出し切り替え ──
   const [refAnalysis, setRefAnalysis] = useState<LPAnalysis | null>(null);
@@ -697,6 +747,8 @@ export default function Home() {
   const [savedPrompts, setSavedPrompts] = useState<SavedImagePrompt[]>([]);
   /** templateId → css （型ごとに1度だけ追加） */
   const [additionalCssByType, setAdditionalCssByType] = useState<Record<string, string>>({});
+  const additionalCssByTypeRef = useRef<Record<string, string>>({});
+  additionalCssByTypeRef.current = additionalCssByType;
 
   // ─── Derived CSS ──────────────────────────────────────────────────────────
 
@@ -1196,29 +1248,26 @@ export default function Home() {
 
   // ─── Project: スナップショットを API ペイロードに変換 ─────────────────────────
 
-  const buildCloudPayload = useCallback(async (opts: { fullBlob?: boolean } = {}) => {
-    if (!result || !lastFormData) return null;
-    const imgs = opts.fullBlob ? await serializeImages(images) : serializeImagesSync(images);
-    const snap: ProjectSnapshot = {
-      formData: lastFormData, html: result.html, css: result.css,
-      colorReplacements, visualStyles, sectionOrder, additionalCssByType,
-      images: imgs,
-      globalFont: globalFontRef.current,
-    };
-    const project = buildProject(snap);
+  const buildCloudPayload = useCallback(async () => {
+    const snap = await buildSnapshotAsync();
+    if (!snap) return null;
+    const project = buildProject(snap, {
+      existingId: savedProjectRef.current?.id,
+      remoteId: remoteProjectIdRef.current ?? undefined,
+    });
     return {
       title: project.name,
       html: project.html,
       css: project.css,
       project_json: project as unknown as Record<string, unknown>,
     };
-  }, [result, lastFormData, images, colorReplacements, visualStyles, sectionOrder, additionalCssByType]);
+  }, [buildSnapshotAsync]);
 
   // ─── Project: クラウド保存（新規作成 or 更新）────────────────────────────────
 
   const handleSaveRemote = useCallback(async () => {
     if (!session) return;
-    const payload = await buildCloudPayload({ fullBlob: true });
+    const payload = await buildCloudPayload();
     if (!payload) return;
     setCloudStatus("saving");
     setIsSaving(true);
@@ -1256,17 +1305,11 @@ export default function Home() {
   // ─── Project: ローカル保存（同期・高速）──────────────────────────────────────
 
   const handleSaveLocal = () => {
-    if (!result || !lastFormData) return;
-    const snap: ProjectSnapshot = {
-      formData: lastFormData,
-      html: result.html, css: result.css,
-      colorReplacements, visualStyles, sectionOrder, additionalCssByType,
-      images: serializeImagesSync(images),
-      globalFont: globalFontRef.current,
-    };
+    const snap = buildSnapshotSync();
+    if (!snap) return;
     const project = buildProject(snap, {
-      existingId: savedProject?.id,
-      remoteId: remoteProjectId ?? undefined,
+      existingId: savedProjectRef.current?.id,
+      remoteId: remoteProjectIdRef.current ?? undefined,
     });
     saveToLocal(project);
     setSavedProject(project);
@@ -1278,21 +1321,14 @@ export default function Home() {
   // ─── Project: JSON ダウンロード（非同期・blob 変換あり）──────────────────────
 
   const handleDownloadJSON = async () => {
-    if (!result || !lastFormData) return;
     setIsSaving(true);
     setSaveMenuOpen(false);
     try {
-      const serializedImages = await serializeImages(images);
-      const snap: ProjectSnapshot = {
-        formData: lastFormData,
-        html: result.html, css: result.css,
-        colorReplacements, visualStyles, sectionOrder, additionalCssByType,
-        images: serializedImages,
-        globalFont: globalFontRef.current,
-      };
+      const snap = await buildSnapshotAsync();
+      if (!snap) return;
       const project = buildProject(snap, {
-        existingId: savedProject?.id,
-        remoteId: remoteProjectId ?? undefined,
+        existingId: savedProjectRef.current?.id,
+        remoteId: remoteProjectIdRef.current ?? undefined,
       });
       saveToLocal(project);
       setSavedProject(project);
@@ -1548,28 +1584,21 @@ export default function Home() {
   const isDirtyRef = useRef(false);
   const sessionRef = useRef(session);
   sessionRef.current = session;
-  const remoteProjectIdRef = useRef(remoteProjectId);
-  remoteProjectIdRef.current = remoteProjectId;
+  // buildCloudPayload は buildSnapshotAsync（deps=[]）に依存するため安定しており ref 不要だが
+  // setInterval コールバック内で参照するため念のため ref を維持する
   const buildCloudPayloadRef = useRef(buildCloudPayload);
   buildCloudPayloadRef.current = buildCloudPayload;
 
   useEffect(() => {
     if (!result || !lastFormData) return;
     // localStorage 2秒デバウンス
+    // snap 構築は buildSnapshotAsync（ref 経由）なので timeout 発火時に常に最新値を読む
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = setTimeout(() => {
-      // blob: URL → base64 変換を含む非同期シリアライズ（ユーザーアップロード画像を正しく保存）
-      void serializeImages(images).then((serializedImages) => {
-        const snap: ProjectSnapshot = {
-          formData: lastFormData,
-          html: result.html, css: result.css,
-          colorReplacements, visualStyles, sectionOrder, additionalCssByType,
-          images: serializedImages,
-          globalFont: globalFontRef.current,
-        };
+      void buildSnapshotAsync().then((snap) => {
+        if (!snap) return;
         const project = buildProject(snap, { remoteId: remoteProjectIdRef.current ?? undefined });
         saveToLocal(project);
-        // savedProject state を更新してタイムスタンプ表示を最新にする
         setSavedProject(project);
       }).catch((e) => {
         console.warn("[autosave] failed:", e);
@@ -1577,9 +1606,10 @@ export default function Home() {
         setTimeout(() => setSaveToast(null), 3000);
       });
     }, 2000);
-    // 変更フラグを立てる（クラウド自動保存用）
     isDirtyRef.current = true;
     return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current); };
+  // result / lastFormData 等を deps に含めることで変更検知トリガーとして機能させる
+  // 実際の値の読み取りは buildSnapshotAsync 内の ref 経由で行う
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, lastFormData, colorReplacements, visualStyles, sectionOrder, additionalCssByType, images]);
 
