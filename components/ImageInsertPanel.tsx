@@ -414,7 +414,7 @@ function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditPro
 
 // ─── imgblock セクション編集 ──────────────────────────────────────────────────
 
-interface ImgBlockCfg {
+export interface ImgBlockCfg {
   imageUrl: string;
   mobileImageUrl: string; // "" = スマホ専用画像なし
   alt: string;
@@ -468,7 +468,7 @@ function buildImgBlockHtml(cfg: ImgBlockCfg, uniqueClass?: string | null): strin
 </section>`;
 }
 
-function parseImgBlockFromHtml(html: string, uniqueClass?: string | null): ImgBlockCfg | null {
+export function parseImgBlockFromHtml(html: string, uniqueClass?: string | null): ImgBlockCfg | null {
   if (typeof window === "undefined") return null;
   const doc = new DOMParser().parseFromString(html, "text/html");
   // 一意クラスがある場合はそれを使って正確なセクションを特定する
@@ -509,7 +509,7 @@ function parseImgBlockFromHtml(html: string, uniqueClass?: string | null): ImgBl
   };
 }
 
-function replaceImgBlockInHtml(html: string, cfg: ImgBlockCfg, uniqueClass?: string | null): string {
+export function replaceImgBlockInHtml(html: string, cfg: ImgBlockCfg, uniqueClass?: string | null): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
   const selector = uniqueClass ? `.${uniqueClass}` : ".lp-imgblock";
@@ -884,7 +884,7 @@ function ImgBlockEditPanel({ html, onUpdate, onDeselect, uniqueClass }: ImgBlock
 // ─── Before/After 画像プレースホルダー編集 ────────────────────────────────────
 
 /** .lp-ba-img プレースホルダーの現在の img src を取得 */
-function getBeforeAfterSrc(html: string, elementId: string): string {
+export function getBeforeAfterSrc(html: string, elementId: string): string {
   if (typeof window === "undefined") return "";
   const doc = new DOMParser().parseFromString(html, "text/html");
   const el = doc.querySelector(`[data-element-id="${elementId}"]`);
@@ -893,7 +893,7 @@ function getBeforeAfterSrc(html: string, elementId: string): string {
 }
 
 /** .lp-ba-img の内容を実際の画像で置き換え（初回 or 差し替え） */
-function replaceBeforeAfterImage(html: string, elementId: string, imageUrl: string): string {
+export function replaceBeforeAfterImage(html: string, elementId: string, imageUrl: string): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
   const el = doc.querySelector(`[data-element-id="${elementId}"]`);
@@ -1002,7 +1002,7 @@ function BeforeAfterImageEditPanel({ elementId, html, onUpdate, onDeselect }: Be
 // ─── ギャラリーアイテム編集 ───────────────────────────────────────────────────
 
 /** data-element-id がギャラリー画像（.lp-gallery-img または .lp-gallery-item）を指すか */
-function isGalleryElement(html: string, elementId: string): boolean {
+export function isGalleryElement(html: string, elementId: string): boolean {
   if (typeof window === "undefined") return false;
   const doc = new DOMParser().parseFromString(html, "text/html");
   const el = doc.querySelector(`[data-element-id="${elementId}"]`);
@@ -1014,7 +1014,7 @@ function isGalleryElement(html: string, elementId: string): boolean {
 }
 
 /** ギャラリーアイテムの img src を更新して HTML を返す */
-function updateGalleryItemImage(
+export function updateGalleryItemImage(
   html: string,
   elementId: string,
   imageUrl: string,
@@ -1033,7 +1033,7 @@ function updateGalleryItemImage(
 }
 
 /** ギャラリーアイテムの現在の img src を取得 */
-function getGalleryItemSrc(html: string, elementId: string): string {
+export function getGalleryItemSrc(html: string, elementId: string): string {
   if (typeof window === "undefined") return "";
   const doc = new DOMParser().parseFromString(html, "text/html");
   const el = doc.querySelector(`[data-element-id="${elementId}"]`);

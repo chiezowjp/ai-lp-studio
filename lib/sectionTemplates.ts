@@ -720,4 +720,163 @@ export const SECTION_TEMPLATES: SectionTemplate[] = [
 .lp-fcta-form { background: #6366f1; }
 body { padding-bottom: 60px; }`,
   },
+
+  /* ── Pricing Plans ──────────────────────────────────────────────────────── */
+  {
+    id: "pricing",
+    label: "料金プラン",
+    icon: "💴",
+    description: "2つのプランを比較カード形式で表示",
+    multipleAllowed: true,
+    inputs: [
+      { key: "title",       label: "セクション見出し",   placeholder: "料金プラン",           defaultValue: "料金プラン" },
+      { key: "subtitle",    label: "サブテキスト",        placeholder: "明確な料金でご提供します", defaultValue: "明確な料金でご提供します" },
+      // ── プラン1（左）
+      { key: "p1name",      label: "プラン1：名前",       placeholder: "ライトプラン" },
+      { key: "p1price",     label: "プラン1：価格",       placeholder: "¥5,000" },
+      { key: "p1pricesub",  label: "プラン1：価格サブ",   placeholder: "/ 回（税込）",         defaultValue: "/ 回（税込）" },
+      { key: "p1desc",      label: "プラン1：説明",       placeholder: "手軽に試したい方向け" },
+      { key: "p1features",  label: "プラン1：内容（改行区切り、使えないものは先頭に「-」）", placeholder: "カウンセリング\n施術60分\n-アフターフォロー\n-次回割引" },
+      { key: "p1cta",       label: "プラン1：ボタン文字", placeholder: "このプランで予約する",   defaultValue: "このプランで予約する" },
+      // ── プラン2（右・おすすめ）
+      { key: "p2name",      label: "プラン2：名前",       placeholder: "スタンダードプラン" },
+      { key: "p2price",     label: "プラン2：価格",       placeholder: "¥9,800" },
+      { key: "p2pricesub",  label: "プラン2：価格サブ",   placeholder: "/ 回（税込）",         defaultValue: "/ 回（税込）" },
+      { key: "p2desc",      label: "プラン2：説明",       placeholder: "しっかりケアしたい方に" },
+      { key: "p2features",  label: "プラン2：内容（改行区切り、使えないものは先頭に「-」）", placeholder: "カウンセリング\n施術90分\nアフターフォロー\n次回割引10%" },
+      { key: "p2cta",       label: "プラン2：ボタン文字", placeholder: "このプランで予約する",   defaultValue: "このプランで予約する" },
+      // ── 共通
+      { key: "ctaLink",     label: "ボタンリンク先URL",   placeholder: "https://example.com/contact", type: "url" },
+      { key: "note",        label: "注記（任意）",        placeholder: "※価格はすべて税込みです。" },
+    ],
+    generateHtml: (values) => {
+      const uid       = Math.random().toString(36).slice(2, 9);
+      const title     = values.title    || "料金プラン";
+      const subtitle  = values.subtitle || "明確な料金でご提供します";
+      const ctaLink   = values.ctaLink  || "#";
+      const note      = values.note     || "";
+
+      const p1name     = values.p1name     || "ライトプラン";
+      const p1price    = values.p1price    || "¥5,000";
+      const p1pricesub = values.p1pricesub || "/ 回（税込）";
+      const p1desc     = values.p1desc     || "手軽に試したい方向け";
+      const p1features = values.p1features || "カウンセリング\n施術60分\n-アフターフォロー\n-次回割引";
+      const p1cta      = values.p1cta      || "このプランで予約する";
+
+      const p2name     = values.p2name     || "スタンダードプラン";
+      const p2price    = values.p2price    || "¥9,800";
+      const p2pricesub = values.p2pricesub || "/ 回（税込）";
+      const p2desc     = values.p2desc     || "しっかりケアしたい方に";
+      const p2features = values.p2features || "カウンセリング\n施術90分\nアフターフォロー\n次回割引10%";
+      const p2cta      = values.p2cta      || "このプランで予約する";
+
+      // 機能リストをパース（"-" 始まりは使えない機能）
+      const renderFeatures = (raw: string) =>
+        raw.split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map((s) => {
+            const disabled = s.startsWith("-");
+            const label = disabled ? s.slice(1).trim() : s;
+            return disabled
+              ? `      <li class="lp-pricing-feat lp-pricing-feat--off">
+          <span class="lp-pricing-check lp-pricing-check--off">—</span>${label}
+        </li>`
+              : `      <li class="lp-pricing-feat">
+          <span class="lp-pricing-check">✓</span>${label}
+        </li>`;
+          })
+          .join("\n");
+
+      return `<section class="lp-pricing_${uid} lp-pricing">
+  <div class="lp-pricing-inner">
+    <h2 class="lp-pricing-title">${title}</h2>
+    <p class="lp-pricing-sub">${subtitle}</p>
+    <div class="lp-pricing-grid">
+
+      <!-- プラン1 -->
+      <div class="lp-pricing-card">
+        <div class="lp-pricing-name">${p1name}</div>
+        <div class="lp-pricing-price">
+          <span class="lp-pricing-amount">${p1price}</span>
+          <span class="lp-pricing-period">${p1pricesub}</span>
+        </div>
+        <p class="lp-pricing-desc">${p1desc}</p>
+        <ul class="lp-pricing-feats">
+${renderFeatures(p1features)}
+        </ul>
+        <a href="${ctaLink}" class="lp-pricing-btn lp-pricing-btn--plain">${p1cta}</a>
+      </div>
+
+      <!-- プラン2（おすすめ） -->
+      <div class="lp-pricing-card lp-pricing-card--featured">
+        <div class="lp-pricing-badge">おすすめ</div>
+        <div class="lp-pricing-name">${p2name}</div>
+        <div class="lp-pricing-price">
+          <span class="lp-pricing-amount">${p2price}</span>
+          <span class="lp-pricing-period">${p2pricesub}</span>
+        </div>
+        <p class="lp-pricing-desc">${p2desc}</p>
+        <ul class="lp-pricing-feats">
+${renderFeatures(p2features)}
+        </ul>
+        <a href="${ctaLink}" class="lp-pricing-btn lp-pricing-btn--primary">${p2cta}</a>
+      </div>
+
+    </div>${note ? `\n    <p class="lp-pricing-note">${note}</p>` : ""}
+  </div>
+</section>`.trim();
+    },
+    generateCss: () => `
+.lp-pricing { padding: 72px 20px; background: #f8fafc; }
+.lp-pricing-inner { max-width: 820px; margin: 0 auto; text-align: center; }
+.lp-pricing-title { font-size: 1.9rem; font-weight: var(--lp-heading-weight, 700); margin: 0 0 .6rem; color: #111; }
+.lp-pricing-sub { color: #6b7280; font-size: .95rem; margin: 0 0 3rem; }
+.lp-pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+/* カード共通 */
+.lp-pricing-card {
+  position: relative; background: #fff; border-radius: 18px;
+  border: 2px solid #e5e7eb; padding: 2rem 1.75rem 1.75rem;
+  display: flex; flex-direction: column; gap: .75rem;
+  box-shadow: 0 2px 12px rgba(0,0,0,.05); text-align: left;
+}
+/* おすすめカード */
+.lp-pricing-card--featured { border-color: var(--lp-accent, #00AFCC); box-shadow: 0 0 0 4px rgba(0,175,204,.1), 0 8px 24px rgba(0,0,0,.08); }
+/* バッジ */
+.lp-pricing-badge {
+  position: absolute; top: -14px; left: 50%; transform: translateX(-50%);
+  background: var(--lp-accent, #00AFCC); color: #fff;
+  font-size: .7rem; font-weight: 800; padding: .25rem .9rem;
+  border-radius: 99px; letter-spacing: .05em; white-space: nowrap;
+}
+/* プラン名 */
+.lp-pricing-name { font-size: 1.05rem; font-weight: 800; color: #1f2937; }
+/* 価格 */
+.lp-pricing-price { display: flex; align-items: baseline; gap: .35rem; margin: .25rem 0; }
+.lp-pricing-amount { font-size: 2.4rem; font-weight: 900; color: #111; line-height: 1; }
+.lp-pricing-period { font-size: .82rem; color: #9ca3af; font-weight: 500; }
+/* 説明 */
+.lp-pricing-desc { font-size: .82rem; color: #6b7280; margin: 0; line-height: 1.6; }
+/* 機能リスト */
+.lp-pricing-feats { list-style: none; margin: .5rem 0 1rem; padding: 0; display: flex; flex-direction: column; gap: .55rem; }
+.lp-pricing-feat { display: flex; align-items: center; gap: .55rem; font-size: .88rem; color: #374151; }
+.lp-pricing-feat--off { color: #d1d5db; }
+.lp-pricing-check { font-size: .8rem; font-weight: 900; color: var(--lp-accent, #00AFCC); width: 1.1em; flex-shrink: 0; }
+.lp-pricing-check--off { color: #d1d5db; }
+/* ボタン */
+.lp-pricing-btn {
+  display: block; text-align: center; width: 100%; padding: .85rem 1rem;
+  border-radius: 12px; font-size: .88rem; font-weight: 800;
+  text-decoration: none; transition: opacity .2s; margin-top: auto;
+}
+.lp-pricing-btn--primary { background: var(--lp-accent, #00AFCC); color: #fff; }
+.lp-pricing-btn--plain { background: #f3f4f6; color: #374151; border: 1.5px solid #e5e7eb; }
+.lp-pricing-btn:hover { opacity: .85; }
+.lp-pricing-note { margin-top: 1.5rem; font-size: .78rem; color: #9ca3af; text-align: center; }
+@media (max-width: 640px) {
+  .lp-pricing-grid { grid-template-columns: 1fr; }
+  .lp-pricing-amount { font-size: 2rem; }
+  .lp-pricing-title { font-size: 1.5rem; }
+}`,
+  },
 ];

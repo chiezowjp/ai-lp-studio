@@ -185,34 +185,48 @@ export interface PlanFeature {
 }
 
 export const PLAN_FEATURES: PlanFeature[] = [
-  // ── AI生成
-  { category: "AI生成・編集", label: "LP生成（月）",      trial: "3回",   pro: "100回",  highlight: true },
-  {                           label: "AI編集・修正（月）", trial: "10回",  pro: "300回"  },
-  {                           label: "参考LP解析（月）",   trial: "3回",   pro: "100回"  },
+  // ── AI生成・編集
+  { category: "AI生成・編集", label: "LP生成（月）",              trial: "3回",   pro: "100回",  highlight: true },
+  {                            label: "AI編集・修正（月）",         trial: "10回",  pro: "300回"  },
+  {                            label: "参考LP解析（月）",           trial: "3回",   pro: "100回"  },
+  {                            label: "AIセクション追加・差し替え", trial: true,    pro: true     },
+  {                            label: "AI CV改善提案",              trial: false,   pro: true,    comingSoon: true },
+  // ── LP編集
+  { category: "LP編集",        label: "セクション追加・並び替え",  trial: true,    pro: true     },
+  {                            label: "カラースキン一括変更",       trial: true,    pro: true     },
+  {                            label: "フォント選択（全体変更）",   trial: true,    pro: true     },
+  {                            label: "カラー・スタイル細部編集",   trial: true,    pro: true     },
+  {                            label: "画像挿入・差し替え",         trial: true,    pro: true     },
+  {                            label: "スマホ用画像個別設定",       trial: true,    pro: true     },
+  {                            label: "ギャラリーセクション",       trial: true,    pro: true     },
+  {                            label: "Before/After比較セクション", trial: true,    pro: true     },
+  {                            label: "自由編集ブロック",           trial: true,    pro: true     },
+  {                            label: "PC/スマホプレビュー切替",    trial: true,    pro: true     },
   // ── エクスポート
-  { category: "エクスポート", label: "HTMLコピー",                trial: false, pro: true, highlight: true },
-  {                           label: "CSSコピー",                 trial: false, pro: true  },
-  {                           label: "JSONダウンロード",           trial: false, pro: true  },
-  {                           label: "ZIPダウンロード",            trial: false, pro: true, comingSoon: true },
+  { category: "エクスポート",  label: "HTMLコピー・WordPress出力", trial: false,   pro: true,    highlight: true },
+  {                            label: "CSSコピー",                  trial: false,   pro: true     },
+  {                            label: "JSONダウンロード",            trial: false,   pro: true     },
+  {                            label: "ZIPダウンロード",             trial: false,   pro: true,    comingSoon: true },
+  {                            label: "LP公開URL",                  trial: false,   pro: true,    comingSoon: true },
   // ── フォーム・リード取得（Phase 6）
-  { category: "フォーム・リード", label: "フォーム設置",        trial: true,  pro: true,  highlight: true },
-  {                               label: "本番フォーム送信",     trial: false, pro: true,  highlight: true },
-  {                               label: "メール通知",           trial: false, pro: true  },
-  {                               label: "リード管理",           trial: false, pro: true  },
-  {                               label: "CSV エクスポート",     trial: false, pro: true  },
-  // ── Analytics・改善（Phase 8）
-  { category: "Analytics・改善", label: "Analytics閲覧",    trial: false, pro: true, highlight: true },
-  {                               label: "Heatmap基盤",      trial: false, pro: true  },
-  {                               label: "Asset Library",    trial: "10件", pro: "無制限", highlight: true },
+  { category: "フォーム・リード", label: "フォーム設置（プレビュー用）", trial: true,  pro: true,  highlight: true },
+  {                               label: "本番フォーム送信",              trial: false, pro: true,  highlight: true },
+  {                               label: "リード管理・一覧",              trial: false, pro: true                  },
+  {                               label: "メール通知",                    trial: false, pro: true                  },
+  {                               label: "CSVエクスポート",               trial: false, pro: true                  },
   // ── 保存・管理
-  { category: "保存・管理",  label: "クラウド保存",   trial: "1件", pro: "10件", highlight: true },
-  {                           label: "LP複製",          trial: false, pro: true  },
-  // ── 基本機能（両プラン共通）
-  { category: "基本機能",    label: "プレビュー（PC/SP）", trial: true,  pro: true  },
-  {                           label: "セクション追加・並び替え", trial: true, pro: true },
-  {                           label: "カラー・フォント編集", trial: true, pro: true },
-  {                           label: "画像挿入・管理",   trial: true,  pro: true  },
-  {                           label: "商用利用",          trial: true,  pro: true  },
+  { category: "保存・管理",    label: "自動保存",                   trial: true,    pro: true     },
+  {                            label: "ローカル保存（JSON/HTML）",   trial: true,    pro: true     },
+  {                            label: "クラウド保存",                trial: "1件",   pro: "10件",  highlight: true },
+  {                            label: "LP複製",                      trial: false,   pro: true     },
+  {                            label: "バージョン履歴・ロールバック",trial: false,   pro: true,    comingSoon: true },
+  {                            label: "Asset Library",               trial: "10件",  pro: "無制限"               },
+  // ── Analytics・改善（Phase 8）
+  { category: "Analytics・改善", label: "Analytics閲覧",            trial: false,   pro: true,    highlight: true },
+  {                               label: "ヒートマップ",             trial: false,   pro: true,    comingSoon: true },
+  // ── 基本
+  { category: "基本",           label: "商用利用",                  trial: true,    pro: true,    highlight: true },
+  {                             label: "サポート",                   trial: false,   pro: true                   },
 ];
 
 /** エクスポート系でロックされている機能のラベル一覧（LockScreen で使用） */

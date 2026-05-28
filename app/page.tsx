@@ -1879,8 +1879,9 @@ export default function Home() {
                     {user.email}
                   </span>
                 </div>
-                {/* ドロップダウン */}
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-50 min-w-[160px] hidden group-hover:block">
+                {/* ドロップダウン：pt-1 で視覚的な隙間を保ちつつ hover 領域を途切れさせない */}
+                <div className="absolute right-0 top-full pt-1 z-50 min-w-[160px] hidden group-hover:block">
+                <div className="bg-white border border-gray-200 rounded-xl shadow-xl py-1">
                   <button
                     onClick={() => router.push("/my-lps")}
                     className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors font-semibold text-gray-700"
@@ -1900,6 +1901,7 @@ export default function Home() {
                   >
                     ログアウト
                   </button>
+                </div>
                 </div>
               </div>
             ) : (
