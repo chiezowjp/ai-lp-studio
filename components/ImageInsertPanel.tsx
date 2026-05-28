@@ -555,8 +555,16 @@ function ImgBlockEditPanel({ html, onUpdate, onDeselect, uniqueClass }: ImgBlock
 
   const handleMobileFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
+    if (!cfg) return;
+    // upd (useCallback) を経由せず onUpdate を直接呼ぶことで closure の stale 問題を回避
+    const currentCfg = cfg;
+    const currentHtml = html;
     const reader = new FileReader();
-    reader.onload = (e) => upd({ mobileImageUrl: e.target?.result as string });
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (!dataUrl) return;
+      onUpdate(replaceImgBlockInHtml(currentHtml, { ...currentCfg, mobileImageUrl: dataUrl }, uniqueClass));
+    };
     reader.readAsDataURL(file);
   };
 
