@@ -13,6 +13,8 @@ export interface FbElement {
   content: string;
   /** href URL for button type */
   link?: string;
+  /** スマホ用画像 URL（image type のみ、640px 以下で切替え） */
+  mobileImageUrl?: string;
 }
 
 // ─── Selector Helpers ─────────────────────────────────────────────────────────
@@ -58,6 +60,12 @@ export function parseFbElements(html: string, uniqueClass: string | null): FbEle
     if (type === "image") {
       const img = el.querySelector("img");
       content = img?.getAttribute("src") ?? "";
+      // <picture><source> があればスマホ用画像を取得
+      const source = el.querySelector("picture > source[media]") as HTMLSourceElement | null;
+      if (source) {
+        els.push({ id, type, content, mobileImageUrl: source.getAttribute("srcset") ?? "" });
+        return;
+      }
     } else {
       content = el.textContent?.trim() ?? "";
     }
@@ -85,11 +93,16 @@ function renderFbEl(el: FbElement): string {
       return `<p class="lp-fb-text" data-lp-fb-el="text" data-lp-fb-el-id="${id}">${el.content || "本文テキストをここに入力してください。"}</p>`;
     case "button":
       return `<a class="lp-fb-btn" href="${el.link || "#"}" data-lp-fb-el="button" data-lp-fb-el-id="${id}">${el.content || "ボタンテキスト"}</a>`;
-    case "image":
-      if (el.content) {
-        return `<div class="lp-fb-img-wrap" data-lp-fb-el="image" data-lp-fb-el-id="${id}"><img src="${el.content}" alt="" style="max-width:100%;height:auto;border-radius:8px;display:block;" /></div>`;
+    case "image": {
+      if (!el.content) {
+        return `<div class="lp-fb-img-wrap" data-lp-fb-el="image" data-lp-fb-el-id="${id}" style="min-height:80px;border:2px dashed #d1d5db;border-radius:8px;"></div>`;
       }
-      return `<div class="lp-fb-img-wrap" data-lp-fb-el="image" data-lp-fb-el-id="${id}" style="min-height:80px;border:2px dashed #d1d5db;border-radius:8px;"></div>`;
+      const imgTag = `<img src="${el.content}" alt="" style="max-width:100%;height:auto;border-radius:8px;display:block;" />`;
+      const inner = el.mobileImageUrl
+        ? `<picture><source media="(max-width: 640px)" srcset="${el.mobileImageUrl}">${imgTag}</picture>`
+        : imgTag;
+      return `<div class="lp-fb-img-wrap" data-lp-fb-el="image" data-lp-fb-el-id="${id}">${inner}</div>`;
+    }
     default:
       return "";
   }
@@ -192,7 +205,7 @@ export function moveFbElement(html: string, elId: string, dir: "up" | "down", un
 export function updateFbElement(
   html: string,
   elId: string,
-  patch: string | Partial<Pick<FbElement, "content" | "link">>,
+  patch: string | Partial<Pick<FbElement, "content" | "link" | "mobileImageUrl">>,
   uniqueClass: string | null,
 ): string {
   const update = typeof patch === "string" ? { content: patch } : patch;
@@ -224,7 +237,9 @@ function ElementRow({ el, idx, total, html, uniqueClass, onUpdate }: ElementRowP
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(el.content);
   const [draftLink, setDraftLink] = useState(el.link ?? "");
+  const [showMobileUpload, setShowMobileUpload] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mobileFileRef = useRef<HTMLInputElement>(null);
   const meta = TYPE_LABELS[el.type];
 
   // リセット: el が外部から変化したときにドラフトを同期
@@ -242,6 +257,16 @@ function ElementRow({ el, idx, total, html, uniqueClass, onUpdate }: ElementRowP
     if (!file.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = (e) => onUpdate(updateFbElement(html, el.id, e.target?.result as string, uniqueClass));
+    reader.readAsDataURL(file);
+  };
+
+  const handleMobileImageFile = (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      onUpdate(updateFbElement(html, el.id, { content: el.content, mobileImageUrl: e.target?.result as string }, uniqueClass));
+      setShowMobileUpload(false);
+    };
     reader.readAsDataURL(file);
   };
 
@@ -310,6 +335,7 @@ function ElementRow({ el, idx, total, html, uniqueClass, onUpdate }: ElementRowP
                   className="w-full h-24 object-contain rounded-lg border border-gray-200 bg-gray-50"
                 />
               )}
+              {/* PC用画像アップロード */}
               <label
                 className="flex flex-col items-center justify-center w-full h-20 border-2 border-dashed border-[#00AFCC] rounded-xl cursor-pointer bg-[#E6F8FC] hover:bg-[#D0F2FA] transition-colors"
                 onDrop={(e) => {
@@ -336,6 +362,66 @@ function ElementRow({ el, idx, total, html, uniqueClass, onUpdate }: ElementRowP
                   }}
                 />
               </label>
+
+              {/* スマホ用画像 */}
+              {showMobileUpload || el.mobileImageUrl ? (
+                <div className="border border-indigo-200 rounded-xl p-2.5 space-y-2 bg-indigo-50/40">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-indigo-600">📱 スマホ用画像</p>
+                    <div className="flex gap-2">
+                      {el.mobileImageUrl && (
+                        <button
+                          onClick={() => {
+                            onUpdate(updateFbElement(html, el.id, { content: el.content, mobileImageUrl: "" }, uniqueClass));
+                          }}
+                          className="text-[10px] text-red-400 hover:text-red-600 transition-colors"
+                        >
+                          削除
+                        </button>
+                      )}
+                      {!el.mobileImageUrl && (
+                        <button
+                          onClick={() => setShowMobileUpload(false)}
+                          className="text-[10px] text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          閉じる
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {el.mobileImageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={el.mobileImageUrl}
+                      alt="スマホ用"
+                      className="w-full h-16 object-contain rounded-lg border border-indigo-200 bg-white"
+                    />
+                  )}
+                  <label className="flex items-center justify-center gap-1.5 w-full py-2 border-2 border-dashed border-indigo-300 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50 transition-colors text-[10px] text-indigo-500">
+                    <span>📁</span>
+                    {el.mobileImageUrl ? "差し替える" : "画像を選択"}
+                    <input
+                      ref={mobileFileRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleMobileImageFile(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <p className="text-[10px] text-indigo-400/80">640px以下で自動切替え</p>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowMobileUpload(true)}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-semibold rounded-xl border border-dashed border-gray-300 text-gray-500 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50/40 transition-colors"
+                >
+                  <span>📱</span> スマホ用画像を追加
+                </button>
+              )}
             </>
           ) : (
             <>
