@@ -54,7 +54,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
+    // scope: 'local' でサーバー側が失敗してもローカルセッションを必ずクリア
+    await supabase.auth.signOut({ scope: "local" });
+    window.location.href = "/";
   }, []);
 
   return (
