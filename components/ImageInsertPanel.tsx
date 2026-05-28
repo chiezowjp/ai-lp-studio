@@ -516,7 +516,8 @@ function replaceImgBlockInHtml(html: string, cfg: ImgBlockCfg, uniqueClass?: str
   const section = doc.querySelector(selector) as HTMLElement | null;
   if (!section) return html;
 
-  const img = section.querySelector("img.lp-imgblock-img") as HTMLImageElement | null;
+  // "img.lp-imgblock-img" → "img" にフォールバック（AI生成のimgblockはクラスなしの場合がある）
+  const img = (section.querySelector("img.lp-imgblock-img") ?? section.querySelector("img")) as HTMLImageElement | null;
   if (!img) return html;
 
   // セクション style を更新
