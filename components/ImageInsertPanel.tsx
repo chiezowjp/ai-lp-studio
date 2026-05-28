@@ -1443,6 +1443,10 @@ export default function ImageInsertPanel({
     if (!selectedElement) return null;
     // img 要素以外は挿入済み画像として扱わない
     if (selectedElement.tagName !== "img") return null;
+    // imgblock の img（lp-imgblock-img クラスまたは親セクションが lp-imgblock）は
+    // 挿入済み画像ではなく ImgBlockEditPanel でハンドリングする
+    if (selectedElement.lpClasses?.some((c) => c.startsWith("lp-imgblock"))) return null;
+    if (selectedElement.parentSectionLpClasses?.some((c) => c.startsWith("lp-imgblock"))) return null;
     const m = selectedElement.selector.match(/\[data-element-id="([^"]+)"\]/);
     return m ? m[1] : null;
   }, [selectedElement]);
