@@ -198,6 +198,116 @@ export async function parseProjectFile(file: File): Promise<LPProject> {
   return p;
 }
 
+// ─── Storage Upload Helpers（クラウド保存用）────────────────────────────────
+
+/** blob: URL → Supabase Storage URL（失敗時は null） */
+async function blobUrlToStorageUrl(
+  blobUrl: string,
+  fileName: string,
+  accessToken: string,
+): Promise<string | null> {
+  try {
+    const fetchRes = await fetch(blobUrl);
+    const blob = await fetchRes.blob();
+    const file = new File([blob], fileName, { type: blob.type });
+    const form = new FormData();
+    form.append("file", file);
+    form.append("usage_type", "lp_image");
+    const uploadRes = await fetch("/api/assets", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    });
+    if (!uploadRes.ok) return null;
+    const asset = await uploadRes.json() as { url: string };
+    return asset.url;
+  } catch {
+    return null;
+  }
+}
+
+/** data: URL → Supabase Storage URL（失敗時は null） */
+async function dataUrlToStorageUrl(
+  dataUrl: string,
+  accessToken: string,
+): Promise<string | null> {
+  try {
+    const [header, b64] = dataUrl.split(",");
+    const mime = header.match(/data:([^;]+)/)?.[1] ?? "image/jpeg";
+    const ext = mime.split("/")[1]?.split("+")[0] ?? "jpg";
+    const byteChars = atob(b64);
+    const byteArr = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([byteArr], { type: mime });
+    const file = new File([blob], `lp_image_${Date.now()}.${ext}`, { type: mime });
+    const form = new FormData();
+    form.append("file", file);
+    form.append("usage_type", "lp_image");
+    const uploadRes = await fetch("/api/assets", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    });
+    if (!uploadRes.ok) return null;
+    const asset = await uploadRes.json() as { url: string };
+    return asset.url;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * クラウド保存用: images 配列の blob:/data: URL を Supabase Storage URL に変換。
+ * アップロード失敗時は base64 にフォールバック。
+ */
+export async function uploadAndSerializeImages(
+  imgs: UploadedImage[],
+  accessToken: string,
+): Promise<SerializedImage[]> {
+  const out: SerializedImage[] = [];
+  for (const img of imgs) {
+    try {
+      let finalUrl = img.url;
+      if (img.url.startsWith("blob:")) {
+        const storageUrl = await blobUrlToStorageUrl(img.url, img.name, accessToken);
+        finalUrl = storageUrl ?? await blobUrlToDataUrl(img.url);
+      }
+      out.push({
+        id: img.id,
+        dataUrl: finalUrl,
+        name: img.name,
+        placement: img.placement,
+        attribution: img.attribution,
+      });
+    } catch {
+      // skip broken images
+    }
+  }
+  return out;
+}
+
+/**
+ * クラウド保存用: HTML 内の data:image URL を Supabase Storage URL に置換。
+ * 同一 data: URL の重複アップロードを防ぐためキャッシュを使用。
+ */
+export async function replaceHtmlDataUrlsWithStorage(
+  html: string,
+  accessToken: string,
+): Promise<string> {
+  const DATA_URL_RE = /data:image\/[^;'"]+;base64,[A-Za-z0-9+/]+=*/g;
+  const unique = [...new Set(html.match(DATA_URL_RE) ?? [])];
+  if (unique.length === 0) return html;
+
+  let result = html;
+  for (const dataUrl of unique) {
+    const storageUrl = await dataUrlToStorageUrl(dataUrl, accessToken);
+    if (storageUrl) {
+      result = result.split(dataUrl).join(storageUrl);
+    }
+  }
+  return result;
+}
+
 // ─── Formatting ───────────────────────────────────────────────────────────────
 
 export function formatSavedAt(isoString: string): string {

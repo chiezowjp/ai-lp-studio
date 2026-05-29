@@ -29,6 +29,7 @@ import {
   buildProject, saveToLocal, loadFromLocal, clearLocal,
   downloadProject, parseProjectFile, formatSavedAt,
   serializeImages, serializeImagesSync, deserializeImages,
+  uploadAndSerializeImages, replaceHtmlDataUrlsWithStorage,
 } from "@/lib/project";
 import { useAuth } from "@/lib/auth-context";
 import { usePlan } from "@/lib/plan-context";
@@ -1246,10 +1247,41 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setRemoteProjectId]);
 
+  // ─── Project: クラウド保存用スナップショット（画像を Storage URL に変換）──────
+  // localStorage 保存と違い、blob:/data: URL を Supabase Storage にアップロードして
+  // URL のみ保存することで DB の Disk IO を大幅に削減する。
+
+  const buildCloudSnapshot = useCallback(async (): Promise<ProjectSnapshot | null> => {
+    const res = resultRef.current;
+    const fd = lastFormDataRef.current;
+    if (!res || !fd) return null;
+
+    const token = sessionRef.current?.access_token;
+
+    const [images, html] = token
+      ? await Promise.all([
+          uploadAndSerializeImages(imagesRef.current, token),
+          replaceHtmlDataUrlsWithStorage(res.html, token),
+        ])
+      : [await serializeImages(imagesRef.current), res.html];
+
+    return {
+      formData: fd,
+      html,
+      css: res.css,
+      colorReplacements: colorReplacementsRef.current,
+      visualStyles: visualStylesRef.current,
+      sectionOrder: sectionOrderRef.current,
+      additionalCssByType: additionalCssByTypeRef.current,
+      images,
+      globalFont: globalFontRef.current,
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ─── Project: スナップショットを API ペイロードに変換 ─────────────────────────
 
   const buildCloudPayload = useCallback(async () => {
-    const snap = await buildSnapshotAsync();
+    const snap = await buildCloudSnapshot();
     if (!snap) return null;
     const project = buildProject(snap, {
       existingId: savedProjectRef.current?.id,
@@ -1261,7 +1293,7 @@ export default function Home() {
       css: project.css,
       project_json: project as unknown as Record<string, unknown>,
     };
-  }, [buildSnapshotAsync]);
+  }, [buildCloudSnapshot]);
 
   // ─── Project: クラウド保存（新規作成 or 更新）────────────────────────────────
 
@@ -1613,7 +1645,7 @@ export default function Home() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result, lastFormData, colorReplacements, visualStyles, sectionOrder, additionalCssByType, images]);
 
-  // ログイン中のみ 30秒ごとにクラウド自動保存
+  // ログイン中のみ 5分ごとにクラウド自動保存（Disk IO 節約のため30秒→5分に変更）
   useEffect(() => {
     if (cloudAutoSaveTimerRef.current) clearInterval(cloudAutoSaveTimerRef.current);
     if (!session) return;
@@ -1639,7 +1671,7 @@ export default function Home() {
         setCloudStatus("error");
         setTimeout(() => setCloudStatus("idle"), 3000);
       }
-    }, 30000);
+    }, 300000);
     return () => { if (cloudAutoSaveTimerRef.current) clearInterval(cloudAutoSaveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
