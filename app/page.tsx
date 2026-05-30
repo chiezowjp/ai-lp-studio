@@ -2005,7 +2005,7 @@ export default function Home() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ═══ LEFT PANEL ═══ */}
-        <aside className="w-72 xl:w-80 shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-y-auto z-10">
+        <aside className={`w-72 xl:w-80 shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-y-auto z-10${!user ? " hidden" : ""}`}>
 
           {!result ? (
             /* ── Before generation: input method tabs + form ── */
