@@ -233,8 +233,16 @@ function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditPro
   };
 
   const handleMobileFile = (file: File) => {
+    // ImgBlockEditPanel と同様に、呼び出し時点で html / imageId をキャプチャして
+    // closure の stale 問題を回避する。
+    const currentHtml = html;
+    const currentImageId = imageId;
     const reader = new FileReader();
-    reader.onload = (e) => upd({ mobileImageUrl: e.target?.result as string });
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (!dataUrl) return;
+      onUpdate(updateInsertedImage(currentHtml, currentImageId, { mobileImageUrl: dataUrl }));
+    };
     reader.readAsDataURL(file);
   };
 

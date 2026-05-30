@@ -262,9 +262,17 @@ function ElementRow({ el, idx, total, html, uniqueClass, onUpdate }: ElementRowP
 
   const handleMobileImageFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
+    // onUpdate / html / el を呼び出し時点でキャプチャして closure の stale 問題を回避。
+    // content は patch に含めず HTML 内の既存値を保持する（el.content が空のときに上書きして
+    // renderFbEl がプレースホルダーを返しスマホ画像が消えるバグを防ぐ）。
+    const currentHtml = html;
+    const currentElId = el.id;
+    const currentUniqueClass = uniqueClass;
     const reader = new FileReader();
     reader.onload = (e) => {
-      onUpdate(updateFbElement(html, el.id, { content: el.content, mobileImageUrl: e.target?.result as string }, uniqueClass));
+      const dataUrl = e.target?.result as string;
+      if (!dataUrl) return;
+      onUpdate(updateFbElement(currentHtml, currentElId, { mobileImageUrl: dataUrl }, currentUniqueClass));
       setShowMobileUpload(false);
     };
     reader.readAsDataURL(file);
