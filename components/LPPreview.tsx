@@ -74,23 +74,54 @@ const STYLE_SELECT_JS = `(function () {
   var activeEl = null;
 
   // カード系要素の判定
-  // CARD_TYPES: lp-X-{キーワード} の末尾パターン
+  // CARD_TYPES: lp-X-{キーワード} の末尾パターン（高速パス用ホワイトリスト）
   var CARD_TYPES = ['card','item','box','panel','block','featured','highlight','special','recommend','popular','main','pickup','plan',
-    'feature','detail','step','col','wrap','entry','unit','tile','cell','row','inner','content','body','desc','info','point','reason',
-    'service','voice','review','merit','faq','gallery','price','badge','tag','icon','thumb','photo','img'];
+    'feature','detail','step','entry','unit','tile','cell','content','body','desc','info','point','reason',
+    'service','voice','review','merit','faq','gallery','price','badge','tag','icon','thumb','photo',
+    'free','basic','standard','normal','trial','pro','premium','lite','light','plus','starter','advanced','business','enterprise'];
+  // レイアウト用ラッパーは構造チェックから除外（セクション全体の選択を優先する）
+  var WRAPPER_SUFFIXES = ['inner','wrapper','container','grid','group','list','row','col','cols','wrap','columns','layout','area','zone'];
   function isCardEl(el) {
     var t = el.tagName;
     if (t !== 'DIV' && t !== 'ARTICLE' && t !== 'LI') return false;
     var classes = el.className && typeof el.className === 'string' ? el.className.split(' ') : [];
-    var lpCls = classes.filter(function(c){ return c.startsWith('lp-'); });
+    var lpCls = classes.filter(function(c){ return c.startsWith('lp-') && !c.startsWith('lp-vs'); });
     if (!lpCls.length) return false;
-    // ① キーワードマッチ: lp-X-{CARD_TYPE} パターン（SECTION_SEL 依存なし）
+    // ① キーワードマッチ: lp-X-{CARD_TYPE} パターン（高速）
     if (lpCls.some(function(c){
       var p = c.split('-');
       return p.length >= 3 && CARD_TYPES.indexOf(p[p.length - 1]) !== -1;
     })) return true;
-    // ② CSS フォールバック: 3パーツ以上のクラスを持ち、見た目がカードらしい要素
-    //    2パーツ (lp-price 等セクション div) は除外
+    // ② 構造チェック: 3パーツ以上のクラスを持ち（ラッパー系を除く）、
+    //    祖先をたどって2パーツのセクション（lp-xxx）が見つかればカードと判定。
+    //    これにより lp-pricing-free・lp-pricing-pro など未知のクラス名も網羅できる。
+    var hasNonWrapper3Part = lpCls.some(function(c){
+      var p = c.split('-');
+      return p.length >= 3 && WRAPPER_SUFFIXES.indexOf(p[p.length - 1]) === -1;
+    });
+    if (hasNonWrapper3Part) {
+      var parent = el.parentElement;
+      var depth = 0;
+      while (parent && parent !== document.body && depth < 5) {
+        if (parent.classList) {
+          var parentIsSection = false;
+          parent.classList.forEach(function(c) {
+            if (/^lp-[a-z][a-z0-9]*$/.test(c)) parentIsSection = true;
+          });
+          if (parentIsSection) return true;
+          // 親が先に非ラッパー3パーツクラスを持つなら、その親がカード → 自分はカードの子なので停止
+          var parentLpCls = [];
+          parent.classList.forEach(function(c){ if (c.startsWith('lp-') && !c.startsWith('lp-vs')) parentLpCls.push(c); });
+          if (parentLpCls.some(function(c){
+            var pp = c.split('-');
+            return pp.length >= 3 && WRAPPER_SUFFIXES.indexOf(pp[pp.length - 1]) === -1;
+          })) break;
+        }
+        parent = parent.parentElement;
+        depth++;
+      }
+    }
+    // ③ CSS フォールバック: 3パーツ以上のクラスを持ち、見た目がカードらしい要素
     if (!lpCls.some(function(c){ return c.split('-').length >= 3; })) return false;
     if (!el.parentElement) return false;
     try {
