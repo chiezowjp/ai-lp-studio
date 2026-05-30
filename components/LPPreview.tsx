@@ -503,6 +503,7 @@ const EDIT_JS = `(function () {
                 MAIN:1,FIGURE:1,UL:1,OL:1,TABLE:1,TBODY:1,THEAD:1,TR:1,FORM:1 };
   var SEL = 'h1,h2,h3,h4,h5,h6,p,button,a,li,span,strong,em,small,label,dt,dd,th,td,blockquote,summary';
   var cur = null;
+  var curLinkEl = null; // cur が <a> またはその子の場合の最近祖 <a> 要素
   var linkEditing = false; // リンクバー入力中フラグ（blur で finish を抑制）
 
   /* ── inject styles ── */
@@ -576,9 +577,11 @@ const EDIT_JS = `(function () {
       if (r) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
     }
     cur = el;
-    // <a> の場合はリンク編集バーを親に表示させる
-    if (el.tagName === 'A') {
-      window.parent.postMessage({ type: 'lp-link-focus', href: el.getAttribute('href') || '' }, '*');
+    // <a> またはその子要素の場合はリンク編集バーを親に表示させる
+    // findTarget は <span> 等の子要素を返すことがあるため、closest('a') で親 <a> も検索する
+    curLinkEl = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
+    if (curLinkEl) {
+      window.parent.postMessage({ type: 'lp-link-focus', href: curLinkEl.getAttribute('href') || '' }, '*');
     }
   }, true);
 
@@ -595,10 +598,11 @@ const EDIT_JS = `(function () {
   /* ── finish & notify parent ── */
   function finish() {
     if (!cur) return;
-    var wasLink = cur.tagName === 'A';
+    var wasLink = !!curLinkEl;
     cur.removeAttribute('contenteditable');
     cur.classList.remove('lp-ea');
     cur = null;
+    curLinkEl = null;
     linkEditing = false;
     var clone = document.body.cloneNode(true);
     clone.querySelectorAll('[data-lp-editor]').forEach(function(el) { el.parentNode.removeChild(el); });
@@ -619,8 +623,9 @@ const EDIT_JS = `(function () {
     if (e.data.type === 'lp-link-bar-blur')  { linkEditing = false; }
     // 親からhref確定通知: href更新後にfinish
     if (e.data.type === 'lp-link-update') {
-      if (cur && cur.tagName === 'A') {
-        cur.setAttribute('href', e.data.href || '');
+      // curLinkEl（最近祖 <a>）に href を反映
+      if (curLinkEl) {
+        curLinkEl.setAttribute('href', e.data.href || '');
       }
       linkEditing = false;
       finish();
@@ -1075,7 +1080,7 @@ ${BUBBLE_GUIDE_CSS}
   return (
     // Outer wrapper: desktop=h-full, mobile=centered bg area (phone frame scrolls internally)
     <div
-      className={isMobile ? "flex justify-center py-6" : "h-full flex flex-col"}
+      className={isMobile ? "flex justify-center py-6" : "h-full"}
       style={isMobile ? { background: "#f3f4f6" } : {}}
     >
       {/* Phone-frame shell — desktop: transparent passthrough, mobile: phone chrome */}
@@ -1129,45 +1134,47 @@ ${BUBBLE_GUIDE_CSS}
             height: iframeHeight,
           }}
         />
-      </div>
 
-      {/* ── Link edit bar ── <a>クリック時に表示するリンク先URL編集バー ── */}
-      {linkBarHref !== null && editable && !isMobile && (
-        <div className="shrink-0 flex items-center gap-2 px-3 py-2 bg-white border-t border-gray-200 shadow-sm">
-          <span className="text-gray-400 shrink-0" title="リンク先URL">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-            </svg>
-          </span>
-          <span className="text-[11px] text-gray-500 shrink-0 font-medium">リンク先</span>
-          <input
-            ref={linkInputRef}
-            type="url"
-            defaultValue={linkBarHref}
-            placeholder="https://..."
-            onFocus={() => iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-bar-focus" }, "*")}
-            onBlur={() => iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-bar-blur" }, "*")}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") { e.preventDefault(); confirmLinkUpdate(); }
-              if (e.key === "Escape") { e.preventDefault(); cancelLinkBar(); }
-            }}
-            className="flex-1 min-w-0 text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#00AFCC] focus:border-transparent"
-          />
-          <button
-            onClick={confirmLinkUpdate}
-            className="shrink-0 bg-[#00AFCC] hover:bg-[#0099b3] text-white text-xs font-bold px-3 py-1.5 rounded-lg transition"
+        {/* ── Link edit bar ── <a>クリック時に表示するリンク先URL編集バー ── */}
+        {linkBarHref !== null && editable && !isMobile && (
+          <div
+            style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 50 }}
+            className="flex items-center gap-2 px-3 py-2.5 bg-white border-t-2 border-[#00AFCC] shadow-lg"
           >
-            確定
-          </button>
-          <button
-            onClick={cancelLinkBar}
-            className="shrink-0 text-gray-400 hover:text-gray-600 text-xs px-2 py-1.5 rounded-lg transition"
-            title="キャンセル"
-          >
-            ✕
-          </button>
-        </div>
-      )}
+            <span className="text-[#00AFCC] shrink-0">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+              </svg>
+            </span>
+            <span className="text-[11px] text-gray-500 shrink-0 font-semibold">リンク先URL</span>
+            <input
+              ref={linkInputRef}
+              type="url"
+              defaultValue={linkBarHref}
+              placeholder="https://..."
+              onFocus={() => iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-bar-focus" }, "*")}
+              onBlur={() => iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-bar-blur" }, "*")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); confirmLinkUpdate(); }
+                if (e.key === "Escape") { e.preventDefault(); cancelLinkBar(); }
+              }}
+              className="flex-1 min-w-0 text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#00AFCC] focus:border-transparent"
+            />
+            <button
+              onClick={confirmLinkUpdate}
+              className="shrink-0 bg-[#00AFCC] hover:bg-[#0099b3] text-white text-xs font-bold px-3 py-1.5 rounded-lg transition"
+            >
+              確定
+            </button>
+            <button
+              onClick={cancelLinkBar}
+              className="shrink-0 text-gray-400 hover:text-gray-600 text-xs px-2 py-1.5 rounded-lg transition"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 });
