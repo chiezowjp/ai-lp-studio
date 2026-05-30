@@ -60,10 +60,16 @@ export function parseFbElements(html: string, uniqueClass: string | null): FbEle
     if (type === "image") {
       const img = el.querySelector("img");
       content = img?.getAttribute("src") ?? "";
-      // <picture><source srcset> があればスマホ用画像を取得。
-      // `picture > source[media]`（子セレクタ+media属性）ではなく
-      // `picture source[srcset]`（子孫+srcset属性）を使うことで
-      // ブラウザ/DOMParserの挙動差異や属性の有無に依存しない堅牢な検索にする。
+      // スマホ用画像URLの取得。
+      // data-lp-fb-mobile-src 属性（plain data属性）を優先して読み取る。
+      // DOMParser は srcset 属性をブラウザが特別に処理する場合があるため、
+      // 同じ値を data-* 属性にも保存しておくことで確実に復元できる。
+      // 旧形式（data属性なし）は <picture source[srcset]> にフォールバック。
+      const mobileAttr = el.getAttribute("data-lp-fb-mobile-src") ?? "";
+      if (mobileAttr) {
+        els.push({ id, type, content, mobileImageUrl: mobileAttr });
+        return;
+      }
       const source = el.querySelector("picture source[srcset]") as HTMLSourceElement | null;
       if (source) {
         const srcset = source.getAttribute("srcset") ?? "";
@@ -107,7 +113,10 @@ function renderFbEl(el: FbElement): string {
       const inner = el.mobileImageUrl
         ? `<picture><source media="(max-width: 640px)" srcset="${el.mobileImageUrl}">${imgTag}</picture>`
         : imgTag;
-      return `<div class="lp-fb-img-wrap" data-lp-fb-el="image" data-lp-fb-el-id="${id}">${inner}</div>`;
+      // data-lp-fb-mobile-src: スマホ用URLを plain data属性にも保存し、
+      // DOMParser による srcset 解釈の差異を回避して確実に復元できるようにする。
+      const mobileAttr = el.mobileImageUrl ? ` data-lp-fb-mobile-src="${el.mobileImageUrl}"` : "";
+      return `<div class="lp-fb-img-wrap" data-lp-fb-el="image" data-lp-fb-el-id="${id}"${mobileAttr}>${inner}</div>`;
     }
     default:
       return "";

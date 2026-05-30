@@ -58,6 +58,8 @@ function buildWrapper(doc: Document, cfg: InsertedImageConfig): HTMLElement {
     picture.appendChild(source);
     picture.appendChild(img);
     div.appendChild(picture);
+    // data属性にも保存: DOMParser が srcset を特別扱いする場合でも確実に復元できる
+    div.setAttribute("data-inserted-mobile-src", cfg.mobileImageUrl);
   } else {
     div.appendChild(img);
   }
@@ -154,9 +156,11 @@ function parseInsertedImageFromDoc(doc: Document, imageId: string): InsertedImag
   const wrapper = img.closest(".lp-inserted-img");
   const ws = wrapper?.getAttribute("style") ?? "";
   const is = img.getAttribute("style") ?? "";
-  // スマホ用画像（<source media="(max-width: 640px)">）を取得
-  const sourceEl = wrapper?.querySelector("picture > source[media]") as HTMLSourceElement | null;
-  const mobileImageUrl = sourceEl?.getAttribute("srcset") ?? "";
+  // スマホ用画像URLの取得: data属性（確実）→ <source srcset>（旧形式フォールバック）
+  const mobileAttr = wrapper?.getAttribute("data-inserted-mobile-src") ?? "";
+  const mobileImageUrl = mobileAttr
+    || (wrapper?.querySelector("picture > source[media]") as HTMLSourceElement | null)?.getAttribute("srcset")
+    || "";
   return {
     id: imageId,
     url: img.src,
@@ -466,10 +470,12 @@ function buildImgBlockHtml(cfg: ImgBlockCfg, uniqueClass?: string | null): strin
   const classAttr = uniqueClass ? `${uniqueClass} lp-imgblock` : "lp-imgblock";
   const imgTag = `<img class="lp-imgblock-img" src="${src}" alt="${cfg.alt}"${imgStyle ? ` style="${imgStyle}"` : ""}>`;
   // スマホ用画像がある場合は <picture> でラップする
+  // data属性にも保存し、DOMParser での srcset 解釈差異を回避して確実に復元できるようにする
   const innerImg = cfg.mobileImageUrl
     ? `<picture>\n      <source media="(max-width: 640px)" srcset="${cfg.mobileImageUrl}">\n      ${imgTag}\n    </picture>`
     : imgTag;
-  return `<section class="${classAttr}" style="${sectionStyle}">
+  const mobileDataAttr = cfg.mobileImageUrl ? ` data-imgblock-mobile-src="${cfg.mobileImageUrl}"` : "";
+  return `<section class="${classAttr}"${mobileDataAttr} style="${sectionStyle}">
   <div class="lp-imgblock-inner lp-imgblock-inner--${alignMod}">
     ${innerImg}
   </div>
@@ -499,9 +505,11 @@ export function parseImgBlockFromHtml(html: string, uniqueClass?: string | null)
   const paddingBottom = ss.match(/padding-bottom:\s*([^;]+)/)?.[1]?.trim() ?? sh?.b ?? "0";
   const paddingH      = ss.match(/padding-left:\s*([^;]+)/)?.[1]?.trim()   ?? sh?.l ?? "0";
 
-  // <picture><source> があればスマホ用画像を取得
-  const sourceEl = section.querySelector("picture > source[media]") as HTMLSourceElement | null;
-  const mobileImageUrl = sourceEl?.getAttribute("srcset") ?? "";
+  // スマホ用画像URLの取得: data属性（確実）→ <source srcset>（旧形式フォールバック）
+  const mobileDataAttr = section.getAttribute("data-imgblock-mobile-src") ?? "";
+  const mobileImageUrl = mobileDataAttr
+    || (section.querySelector("picture > source[media]") as HTMLSourceElement | null)?.getAttribute("srcset")
+    || "";
 
   return {
     imageUrl: img.getAttribute("src") ?? "",
