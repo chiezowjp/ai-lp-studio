@@ -93,7 +93,8 @@ const STYLE_SELECT_JS = `(function () {
     if (!el.parentElement) return false;
     try {
       var cs = window.getComputedStyle(el);
-      if (parseFloat(cs.borderTopWidth) > 0) return true;
+      if (parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0 ||
+          parseFloat(cs.borderLeftWidth) > 0 || parseFloat(cs.borderRightWidth) > 0) return true;
       if (cs.boxShadow && cs.boxShadow !== 'none') return true;
       var bg = cs.backgroundColor;
       if (!bg || bg === 'rgba(0, 0, 0, 0)' || bg === 'transparent') return false;
@@ -304,9 +305,23 @@ const STYLE_SELECT_JS = `(function () {
       paddingBottom: cs.paddingBottom, paddingLeft: cs.paddingLeft,
       boxShadow: cs.boxShadow, maxWidth: cs.maxWidth,
       textShadow: cs.textShadow, width: cs.width, minHeight: cs.minHeight,
-      borderWidth: cs.borderTopWidth,
-      borderColor: cs.borderTopColor,
-      borderStyle: cs.borderTopStyle
+      // 4辺すべてをチェックし、最初に非ゼロ（visible）だった辺の値を代表値として返す
+      // border-bottom だけ定義された要素（FAQ・リストアイテムなど）も正しく取得できる
+      borderWidth: (function() {
+        var sides = [cs.borderTopWidth, cs.borderBottomWidth, cs.borderLeftWidth, cs.borderRightWidth];
+        for (var i = 0; i < sides.length; i++) { if (parseFloat(sides[i]) > 0) return sides[i]; }
+        return cs.borderTopWidth;
+      })(),
+      borderColor: (function() {
+        var pairs = [[cs.borderTopWidth, cs.borderTopColor],[cs.borderBottomWidth, cs.borderBottomColor],[cs.borderLeftWidth, cs.borderLeftColor],[cs.borderRightWidth, cs.borderRightColor]];
+        for (var i = 0; i < pairs.length; i++) { if (parseFloat(pairs[i][0]) > 0) return pairs[i][1]; }
+        return cs.borderTopColor;
+      })(),
+      borderStyle: (function() {
+        var pairs = [[cs.borderTopWidth, cs.borderTopStyle],[cs.borderBottomWidth, cs.borderBottomStyle],[cs.borderLeftWidth, cs.borderLeftStyle],[cs.borderRightWidth, cs.borderRightStyle]];
+        for (var i = 0; i < pairs.length; i++) { if (parseFloat(pairs[i][0]) > 0) return pairs[i][1]; }
+        return cs.borderTopStyle;
+      })()
     };
     if (hadA) el.classList.add('lp-vs-a');
     if (hadH) el.classList.add('lp-vs-h');
