@@ -75,7 +75,9 @@ const STYLE_SELECT_JS = `(function () {
 
   // カード系要素の判定
   // CARD_TYPES: lp-X-{キーワード} の末尾パターン
-  var CARD_TYPES = ['card','item','box','panel','block','featured','highlight','special','recommend','popular','main','pickup','plan'];
+  var CARD_TYPES = ['card','item','box','panel','block','featured','highlight','special','recommend','popular','main','pickup','plan',
+    'feature','detail','step','col','wrap','entry','unit','tile','cell','row','inner','content','body','desc','info','point','reason',
+    'service','voice','review','merit','faq','gallery','price','badge','tag','icon','thumb','photo','img'];
   function isCardEl(el) {
     var t = el.tagName;
     if (t !== 'DIV' && t !== 'ARTICLE' && t !== 'LI') return false;

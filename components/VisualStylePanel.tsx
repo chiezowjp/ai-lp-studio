@@ -597,6 +597,37 @@ function TextPanel({
         onChange={(v) => upd({ textShadow: v })}
       />
 
+      {/* ── 枠線 ── */}
+      <Divider label="枠線" />
+      {(() => {
+        const bw = parseBorderWidth(s.borderWidth || s.borderBottom || s.border || cs.borderWidth);
+        const bc = parseBorderColor(s.borderColor || s.borderBottom || s.border || cs.borderColor);
+        return (
+          <>
+            <SliderInput
+              label="枠線太さ"
+              value={bw}
+              min={0}
+              max={8}
+              onChange={(v) => {
+                if (v === 0) {
+                  upd({ borderWidth: "0px", borderStyle: "none" });
+                } else {
+                  upd({ borderWidth: `${v}px`, borderStyle: "solid", borderColor: bc });
+                }
+              }}
+            />
+            {bw > 0 && (
+              <ColorInput
+                label="枠線色"
+                value={bc}
+                onChange={(v) => upd({ borderColor: v, borderStyle: "solid" })}
+              />
+            )}
+          </>
+        );
+      })()}
+
       {/* ── 文字背景 ── */}
       <Divider label="文字背景" />
       <div>
@@ -1186,13 +1217,11 @@ function CardPanel({
           }
         }}
       />
-      {borderWidth > 0 && (
-        <ColorInput
-          label="枠線色"
-          value={borderColor}
-          onChange={(v) => upd({ borderColor: v, borderStyle: "solid" })}
-        />
-      )}
+      <ColorInput
+        label="枠線色"
+        value={borderColor}
+        onChange={(v) => upd({ borderColor: v, borderStyle: "solid", borderWidth: borderWidth > 0 ? borderWidth + "px" : "1px" })}
+      />
       <SliderInput
         label="角丸"
         value={px(s.borderRadius || cs.borderRadius, 0)}
