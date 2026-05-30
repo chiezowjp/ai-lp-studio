@@ -591,7 +591,8 @@ const EDIT_JS = `(function () {
     // findTarget は <span> 等の子要素を返すことがあるため、closest('a') で親 <a> も検索する
     curLinkEl = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
     if (curLinkEl) {
-      var rawHref = curLinkEl.getAttribute('href') || '';
+      // data-original-href があれば元のhrefを優先（同オリジン無効化で # に書き換えた場合）
+      var rawHref = curLinkEl.getAttribute('data-original-href') || curLinkEl.getAttribute('href') || '';
       // URL として有効な値のみ送信（テキストや # だけの場合は空文字にする）
       var validHref = /^(https?:\/\/|tel:|mailto:|\/|#.+)/.test(rawHref) ? rawHref : '';
       window.parent.postMessage({ type: 'lp-link-focus', href: validHref }, '*');
@@ -600,6 +601,28 @@ const EDIT_JS = `(function () {
 
   /* ── フォーム送信もキャプチャで封鎖 ── */
   document.addEventListener('submit', function(e) { e.preventDefault(); e.stopImmediatePropagation(); }, true);
+
+  /* ── 同オリジン（アプリ自身）のhrefを # に置換してiframe内ナビゲーションを防止 ── */
+  function neutralizeSameOriginLinks() {
+    var origin = window.location.origin;
+    var anchors = document.querySelectorAll('a[href]');
+    for (var i = 0; i < anchors.length; i++) {
+      var a = anchors[i];
+      var href = a.getAttribute('href');
+      if (!href || a.hasAttribute('data-original-href')) continue;
+      // 同オリジン（アプリ自体）への遷移: "/" "/" origin origin+"/" origin+"/..." を無効化
+      var isSameOrigin = href === '/' || href === origin || href === origin + '/' || href.startsWith(origin + '/');
+      if (isSameOrigin) {
+        a.setAttribute('data-original-href', href);
+        a.setAttribute('href', '#');
+      }
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', neutralizeSameOriginLinks);
+  } else {
+    neutralizeSameOriginLinks();
+  }
 
   /* ── keyboard ── */
   document.addEventListener('keydown', function(e) {
