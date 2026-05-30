@@ -222,10 +222,15 @@ function buildImageCss(images: UploadedImage[], html: string = ""): string {
 /** CSSから頻度上位の #xxxxxx カラーを抽出 */
 function extractTopColors(css: string, limit = 6): string[] {
   const freq = new Map<string, number>();
-  const re = /#[0-9a-f]{6}\b/gi;
+  // 6文字・3文字 HEX をどちらも取得。alternation で 6文字を優先マッチ
+  const re = /#([0-9a-f]{6}|[0-9a-f]{3})\b/gi;
   let m;
   while ((m = re.exec(css)) !== null) {
-    const c = m[0].toLowerCase();
+    const raw = m[1].toLowerCase();
+    // 3文字 (#fff) → 6文字 (#ffffff) に正規化して頻度を統一カウント
+    const c = raw.length === 3
+      ? `#${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`
+      : `#${raw}`;
     freq.set(c, (freq.get(c) || 0) + 1);
   }
   return [...freq.entries()]
@@ -243,6 +248,13 @@ function replaceColors(css: string, replacements: Record<string, string>): strin
     // from は extractTopColors が小文字化したもの。CSS は大文字で書かれていても正しく置換される。
     const escaped = from.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
     result = result.replace(new RegExp(escaped, "gi"), to);
+    // extractTopColors が 3文字 (#fff) を 6文字 (#ffffff) に正規化した場合、
+    // CSS 内の元の短縮形も同時に置換する（例: #ffffff → to のとき #fff → to も置換）
+    if (from.length === 7 && from[1] === from[2] && from[3] === from[4] && from[5] === from[6]) {
+      const short = `#${from[1]}${from[3]}${from[5]}`;
+      const escapedShort = short.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+      result = result.replace(new RegExp(escapedShort + "\\b", "gi"), to);
+    }
   }
   return result;
 }

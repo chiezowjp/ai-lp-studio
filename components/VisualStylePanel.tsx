@@ -37,6 +37,26 @@ function px(val: string | undefined, fallback = 0): number {
   return parseFloat(val ?? "") || fallback;
 }
 
+/** border / borderBottom などの shorthand から太さ(px数値)を取得 */
+function parseBorderWidth(v: string | undefined): number {
+  if (!v || v === "none") return 0;
+  const m = v.match(/(\d+(?:\.\d+)?)px/);
+  return m ? parseFloat(m[1]) : 0;
+}
+
+/** border / borderBottom などの shorthand または borderColor から色を取得（6文字HEX） */
+function parseBorderColor(v: string | undefined, fallback = "#e5e7eb"): string {
+  if (!v || v === "none") return fallback;
+  const hex6 = v.match(/#[0-9a-fA-F]{6}/);
+  if (hex6) return hex6[0].toLowerCase();
+  const hex3 = v.match(/#([0-9a-fA-F]{3})\b/);
+  if (hex3) {
+    const r = hex3[1].toLowerCase();
+    return `#${r[0]}${r[0]}${r[1]}${r[1]}${r[2]}${r[2]}`;
+  }
+  return fallback;
+}
+
 // ─── Shared Controls ─────────────────────────────────────────────────────────
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -440,6 +460,35 @@ function HeadingPanel({
         value={s.textShadow || "none"}
         onChange={(v) => upd({ textShadow: v })}
       />
+      <Divider label="装飾ライン（下線）" />
+      {(() => {
+        const bw = parseBorderWidth(s.borderBottom || cs.borderBottom);
+        const bc = parseBorderColor(s.borderBottom || s.borderColor || cs.borderBottom || cs.borderColor, "#333333");
+        return (
+          <>
+            <SliderInput
+              label="下線太さ"
+              value={bw}
+              min={0}
+              max={8}
+              onChange={(v) => {
+                if (v === 0) {
+                  upd({ borderBottom: "none", paddingBottom: "" });
+                } else {
+                  upd({ borderBottom: `${v}px solid ${bc}`, paddingBottom: "8px" });
+                }
+              }}
+            />
+            {bw > 0 && (
+              <ColorInput
+                label="下線色"
+                value={bc}
+                onChange={(v) => upd({ borderBottom: `${bw}px solid ${v}` })}
+              />
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -834,6 +883,35 @@ function SectionPanel({
         max={32}
         onChange={(v) => upd({ borderRadius: v + "px" })}
       />
+      <Divider label="枠線" />
+      {(() => {
+        const bw = parseBorderWidth(s.borderWidth || cs.borderWidth);
+        const bc = parseBorderColor(s.borderColor || cs.borderColor);
+        return (
+          <>
+            <SliderInput
+              label="枠線太さ"
+              value={bw}
+              min={0}
+              max={8}
+              onChange={(v) => {
+                if (v === 0) {
+                  upd({ borderWidth: "0px", borderStyle: "none" });
+                } else {
+                  upd({ borderWidth: `${v}px`, borderStyle: "solid", borderColor: bc });
+                }
+              }}
+            />
+            {bw > 0 && (
+              <ColorInput
+                label="枠線色"
+                value={bc}
+                onChange={(v) => upd({ borderColor: v, borderStyle: "solid" })}
+              />
+            )}
+          </>
+        );
+      })()}
       <Divider label="背景オーバーレイ" />
       <BackgroundOverlayPanel
         overlay={rule.overlay}
@@ -883,17 +961,34 @@ function ImagePanel({
           { value: "fill", label: "引き伸ばし" },
         ]}
       />
-      <SelectInput
-        label="枠線"
-        value={s.outline || "none"}
-        onChange={(v) => upd({ outline: v })}
-        options={[
-          { value: "none", label: "なし" },
-          { value: "2px solid #e5e7eb", label: "細いグレー" },
-          { value: "3px solid #6366f1", label: "インディゴ" },
-          { value: "3px solid #f59e0b", label: "ゴールド" },
-        ]}
-      />
+      {(() => {
+        const bw = parseBorderWidth(s.borderWidth || cs.borderWidth);
+        const bc = parseBorderColor(s.borderColor || cs.borderColor);
+        return (
+          <>
+            <SliderInput
+              label="枠線太さ"
+              value={bw}
+              min={0}
+              max={8}
+              onChange={(v) => {
+                if (v === 0) {
+                  upd({ borderWidth: "0px", borderStyle: "none", outline: "none" });
+                } else {
+                  upd({ borderWidth: `${v}px`, borderStyle: "solid", borderColor: bc, outline: "none" });
+                }
+              }}
+            />
+            {bw > 0 && (
+              <ColorInput
+                label="枠線色"
+                value={bc}
+                onChange={(v) => upd({ borderColor: v, borderStyle: "solid" })}
+              />
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -1243,12 +1338,35 @@ function ButtonPanel({
             onChange={(v) => upd({ boxShadow: v })}
             options={SHADOW_OPTIONS}
           />
-          <SelectInput
-            label="枠線"
-            value={s.border || "none"}
-            onChange={(v) => upd({ border: v })}
-            options={BORDER_OPTIONS}
-          />
+          {/* 枠線: 太さスライダー + カラーピッカー */}
+          {(() => {
+            const bw = parseBorderWidth(s.borderWidth || s.border || cs.borderWidth);
+            const bc = parseBorderColor(s.borderColor || s.border || cs.borderColor);
+            return (
+              <>
+                <SliderInput
+                  label="枠線太さ"
+                  value={bw}
+                  min={0}
+                  max={8}
+                  onChange={(v) => {
+                    if (v === 0) {
+                      upd({ border: "none", borderWidth: "0px", borderStyle: "none", borderColor: "" });
+                    } else {
+                      upd({ border: `${v}px solid ${bc}`, borderWidth: `${v}px`, borderStyle: "solid", borderColor: bc });
+                    }
+                  }}
+                />
+                {bw > 0 && (
+                  <ColorInput
+                    label="枠線色"
+                    value={bc}
+                    onChange={(v) => upd({ border: `${bw}px solid ${v}`, borderWidth: `${bw}px`, borderStyle: "solid", borderColor: v })}
+                  />
+                )}
+              </>
+            );
+          })()}
           <Divider label="ホバー時" />
           <ColorInput
             label="ホバー背景"
