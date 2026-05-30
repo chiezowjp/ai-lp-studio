@@ -9,6 +9,16 @@ RUN npm install
 
 # Copy source and build
 COPY . .
+
+# Receive Railway service variables as build args
+# (NEXT_PUBLIC_* are baked into the bundle at build time)
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_APP_URL
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+
 RUN npm run build
 
 # ── Production stage ──────────────────────────────────────────────────────────
