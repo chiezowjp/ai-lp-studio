@@ -1029,6 +1029,27 @@ ${BUBBLE_GUIDE_CSS}
     }
   }, [buildContent]); // html/editMode は buildContent 経由で推移的に追跡
 
+  // ── LP 内ナビゲーション防止: iframe が srcdoc 以外に遷移したら即リセット ──
+  // LP の JS が window.location を書き換えても、load イベントで検知して srcdoc に戻す
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const handleLoad = () => {
+      try {
+        const href = iframe.contentWindow?.location?.href ?? "";
+        // srcdoc / blank 以外への遷移 = LP 内 JS によるナビゲーション → リセット
+        if (href && href !== "about:srcdoc" && href !== "about:blank" && !href.startsWith("about:")) {
+          iframe.srcdoc = buildContent();
+        }
+      } catch {
+        // クロスオリジンになった場合も遷移が起きたとみなしてリセット
+        iframe.srcdoc = buildContent();
+      }
+    };
+    iframe.addEventListener("load", handleLoad);
+    return () => iframe.removeEventListener("load", handleLoad);
+  }, [buildContent]);
+
   // Re-highlight selected element after iframe reloads (CSS change causes reload)
   useEffect(() => {
     if (editMode !== "style") return;
