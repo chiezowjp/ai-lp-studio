@@ -258,37 +258,39 @@ async function dataUrlToStorageUrl(
 
 /**
  * クラウド保存用: images 配列の blob:/data: URL を Supabase Storage URL に変換。
- * アップロード失敗時は base64 にフォールバック。
+ * アップロード失敗時は base64 にフォールバック。並列アップロードで高速化。
  */
 export async function uploadAndSerializeImages(
   imgs: UploadedImage[],
   accessToken: string,
 ): Promise<SerializedImage[]> {
-  const out: SerializedImage[] = [];
-  for (const img of imgs) {
-    try {
-      let finalUrl = img.url;
-      if (img.url.startsWith("blob:")) {
-        const storageUrl = await blobUrlToStorageUrl(img.url, img.name, accessToken);
-        finalUrl = storageUrl ?? await blobUrlToDataUrl(img.url);
+  const results = await Promise.all(
+    imgs.map(async (img): Promise<SerializedImage | null> => {
+      try {
+        let finalUrl = img.url;
+        if (img.url.startsWith("blob:")) {
+          const storageUrl = await blobUrlToStorageUrl(img.url, img.name, accessToken);
+          finalUrl = storageUrl ?? await blobUrlToDataUrl(img.url);
+        }
+        return {
+          id: img.id,
+          dataUrl: finalUrl,
+          name: img.name,
+          placement: img.placement,
+          attribution: img.attribution,
+        };
+      } catch {
+        return null; // skip broken images
       }
-      out.push({
-        id: img.id,
-        dataUrl: finalUrl,
-        name: img.name,
-        placement: img.placement,
-        attribution: img.attribution,
-      });
-    } catch {
-      // skip broken images
-    }
-  }
-  return out;
+    })
+  );
+  return results.filter((r): r is SerializedImage => r !== null);
 }
 
 /**
  * クラウド保存用: HTML 内の data:image URL を Supabase Storage URL に置換。
  * 同一 data: URL の重複アップロードを防ぐためキャッシュを使用。
+ * 並列アップロードで高速化（複数画像がある場合に効果大）。
  */
 export async function replaceHtmlDataUrlsWithStorage(
   html: string,
@@ -298,9 +300,16 @@ export async function replaceHtmlDataUrlsWithStorage(
   const unique = [...new Set(html.match(DATA_URL_RE) ?? [])];
   if (unique.length === 0) return html;
 
+  // 全 data: URL を並列でアップロード（従来の直列処理から変更）
+  const entries = await Promise.all(
+    unique.map(async (dataUrl) => {
+      const storageUrl = await dataUrlToStorageUrl(dataUrl, accessToken);
+      return { dataUrl, storageUrl } as const;
+    })
+  );
+
   let result = html;
-  for (const dataUrl of unique) {
-    const storageUrl = await dataUrlToStorageUrl(dataUrl, accessToken);
+  for (const { dataUrl, storageUrl } of entries) {
     if (storageUrl) {
       result = result.split(dataUrl).join(storageUrl);
     }
