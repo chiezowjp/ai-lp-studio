@@ -71,10 +71,20 @@ export function parseFbElements(html: string, uniqueClass: string | null): FbEle
         return;
       }
       const source = el.querySelector("picture source[srcset]") as HTMLSourceElement | null;
-      if (source) {
-        const srcset = source.getAttribute("srcset") ?? "";
-        if (srcset) {
-          els.push({ id, type, content, mobileImageUrl: srcset });
+      const srcsetDom = source?.getAttribute("srcset") ?? "";
+      if (srcsetDom) {
+        els.push({ id, type, content, mobileImageUrl: srcsetDom });
+        return;
+      }
+      // Regex fallback: DOMParser が data URL 内のカンマを srcset セパレータとして
+      // 誤処理し srcset 属性を除去する旧形式（data-*属性なし）に対応。
+      // raw HTML 文字列から直接読み取ることで DOMParser の影響を回避する。
+      const idIdx = html.indexOf(`data-lp-fb-el-id="${id}"`);
+      if (idIdx !== -1) {
+        const snippet = html.substring(idIdx, idIdx + 2000);
+        const m = snippet.match(/\bsrcset="([^"]+)"/);
+        if (m?.[1]) {
+          els.push({ id, type, content, mobileImageUrl: m[1] });
           return;
         }
       }

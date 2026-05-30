@@ -156,11 +156,17 @@ function parseInsertedImageFromDoc(doc: Document, imageId: string): InsertedImag
   const wrapper = img.closest(".lp-inserted-img");
   const ws = wrapper?.getAttribute("style") ?? "";
   const is = img.getAttribute("style") ?? "";
-  // スマホ用画像URLの取得: data属性（確実）→ <source srcset>（旧形式フォールバック）
-  const mobileAttr = wrapper?.getAttribute("data-inserted-mobile-src") ?? "";
-  const mobileImageUrl = mobileAttr
-    || (wrapper?.querySelector("picture > source[media]") as HTMLSourceElement | null)?.getAttribute("srcset")
-    || "";
+  // スマホ用画像URLの取得（優先順）:
+  // 1. data-inserted-mobile-src (lp-inserted-img の新形式)
+  // 2. data-lp-fb-mobile-src (lp-fb-img-wrap の FreeBlock 画像)
+  // 3. <source srcset> (旧形式フォールバック、wrapper/picture どちらも試す)
+  const fbWrapper = img.closest("[data-lp-fb-mobile-src]") as HTMLElement | null;
+  const mobileImageUrl =
+    wrapper?.getAttribute("data-inserted-mobile-src") ||
+    fbWrapper?.getAttribute("data-lp-fb-mobile-src") ||
+    (wrapper?.querySelector("picture > source[media]") as HTMLSourceElement | null)?.getAttribute("srcset") ||
+    (img.closest("picture")?.querySelector("source[srcset]") as HTMLSourceElement | null)?.getAttribute("srcset") ||
+    "";
   return {
     id: imageId,
     url: img.src,
@@ -176,7 +182,21 @@ function parseInsertedImageFromDoc(doc: Document, imageId: string): InsertedImag
 export function parseInsertedImage(html: string, imageId: string): InsertedImageConfig | null {
   if (typeof window === "undefined") return null;
   const doc = new DOMParser().parseFromString(html, "text/html");
-  return parseInsertedImageFromDoc(doc, imageId);
+  const cfg = parseInsertedImageFromDoc(doc, imageId);
+  if (!cfg) return null;
+  // Regex fallback: DOMParser が data URL 内のカンマを srcset セパレータとして
+  // 誤処理し srcset 属性を除去する旧形式（data-*属性なし）に対応。
+  // raw HTML 文字列から直接読み取ることで DOMParser の影響を回避する。
+  if (!cfg.mobileImageUrl) {
+    const idIdx = html.indexOf(`data-element-id="${imageId}"`);
+    if (idIdx !== -1) {
+      // <source srcset="..."> は <img> より前に出現する（<picture> 構造）
+      const before = html.substring(Math.max(0, idIdx - 2000), idIdx);
+      const m = before.match(/\bsrcset="([^"]+)"/);
+      if (m?.[1]) cfg.mobileImageUrl = m[1];
+    }
+  }
+  return cfg;
 }
 
 
