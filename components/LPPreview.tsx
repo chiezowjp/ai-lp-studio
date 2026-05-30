@@ -561,6 +561,12 @@ const EDIT_JS = `(function () {
   });
 
   /* ── click to edit ── */
+  /* ── mousedown でも LP 内ハンドラーを封鎖（mousedown で location 書換えをする LP 対策）── */
+  document.addEventListener('mousedown', function(e) {
+    // LP 内スクリプトの mousedown ハンドラーを止める。preventDefault は呼ばない（テキスト選択を壊さない）。
+    e.stopImmediatePropagation();
+  }, true);
+
   document.addEventListener('click', function(e) {
     // キャプチャフェーズで全クリックを補足してデフォルト動作・他リスナーを抑制する。
     // ① preventDefault: <a> リンクナビゲーション・フォーム送信を防ぐ
@@ -614,7 +620,7 @@ const EDIT_JS = `(function () {
       var isSameOrigin = href === '/' || href === origin || href === origin + '/' || href.startsWith(origin + '/');
       if (isSameOrigin) {
         a.setAttribute('data-original-href', href);
-        a.setAttribute('href', 'javascript:void(0)');
+        a.setAttribute('href', '#');
       }
     }
   }
@@ -800,7 +806,7 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
             href.startsWith(origin + "/");
           if (isSameOrigin) {
             a.setAttribute("data-original-href", href);
-            a.setAttribute("href", "javascript:void(0)");
+            a.setAttribute("href", "#");
           }
         });
         effectiveHtml = doc.body.innerHTML;
