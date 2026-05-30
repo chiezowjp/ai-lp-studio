@@ -562,10 +562,13 @@ const EDIT_JS = `(function () {
 
   /* ── click to edit ── */
   document.addEventListener('click', function(e) {
-    // findTarget の結果に関わらず常に preventDefault する。
-    // findTarget が null を返す場合（非リーフ <a> 等）でも e.preventDefault() を
-    // 呼ばないと iframe 内でリンクナビゲーションが発生し LP が消えてしまう。
+    // キャプチャフェーズで全クリックを補足してデフォルト動作・他リスナーを抑制する。
+    // ① preventDefault: <a> リンクナビゲーション・フォーム送信を防ぐ
+    // ② stopImmediatePropagation: LP 内の onclick 属性等でも window.location を
+    //    直接書き換えるハンドラーが残るため、ターゲット・バブルフェーズを全て止める
     e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
     var el = findTarget(e.target);
     if (!el) { if (cur) finish(); return; }
     // <summary> クリック時は親 <details> の開閉もトグル（preventDefault で止まるため手動で）
