@@ -536,7 +536,11 @@ const EDIT_JS = `(function () {
   function findTarget(node) {
     var el = node;
     while (el && el !== document.body) {
-      // 通常の編集対象（h/p/a/button/li/span/small 等）
+      // <a> と <button> はリーフかどうかに関わらず常に対象にする。
+      // AI 生成の CTA ボタンが <a><div>...</div></a> 構造（非リーフ）であっても
+      // リンク編集バーを表示するために必ず検出する。
+      if ((el.tagName === 'A' || el.tagName === 'BUTTON') && !el.getAttribute('data-lp-editor')) return el;
+      // 通常の編集対象（h/p/li/span/small 等）— リーフのみ対象
       if (el.matches && el.matches(SEL) && isLeaf(el) && !el.getAttribute('data-lp-editor')) return el;
       // div もテキスト編集対象に（クラスなし含む）
       // isTextLeaf で「構造子なし＋テキストあり」を判定して安全に絞り込む
