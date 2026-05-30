@@ -791,12 +791,14 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
       });
     } catch { /* ignore */ }
 
-    // 編集モード: 同オリジン（アプリ自身のURL）の <a href> を "#" に置換してiframe内ナビゲーションを防止
+    // 編集モード: ナビゲーション完全封鎖
+    // ① 同オリジン href を "#" に置換  ② <a>/<button> のインラインイベントハンドラを除去
     // React 側の window.location は iframe 外なので origin が正確に取れる
     if (editable && editMode && typeof window !== "undefined") {
       try {
         const origin = window.location.origin;
         const doc = new DOMParser().parseFromString(effectiveHtml, "text/html");
+        // ① href 置換
         doc.querySelectorAll("a[href]").forEach((a) => {
           const href = a.getAttribute("href") ?? "";
           const isSameOrigin =
@@ -808,6 +810,16 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
             a.setAttribute("data-original-href", href);
             a.setAttribute("href", "#");
           }
+        });
+        // ② <a> <button> のインラインナビゲーションハンドラを除去（onclick/onmousedown 等）
+        const navAttrs = ["onclick","onmousedown","onmouseup","onpointerdown","ontouchstart","onpointerup"];
+        doc.querySelectorAll("a, button").forEach((el) => {
+          navAttrs.forEach((attr) => {
+            if (el.hasAttribute(attr)) {
+              el.setAttribute(`data-lp-${attr}`, el.getAttribute(attr) ?? "");
+              el.removeAttribute(attr);
+            }
+          });
         });
         effectiveHtml = doc.body.innerHTML;
       } catch { /* ignore */ }
