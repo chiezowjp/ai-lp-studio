@@ -561,18 +561,6 @@ const EDIT_JS = `(function () {
   });
 
   /* ── click to edit ── */
-  /* ── mousedown: LP内ハンドラー封鎖 + リンクバー表示 ── */
-  // findTarget が <a> を返した時だけリンクバーを表示する。
-  // テキスト要素クリック時は <a> を返さないので text 編集を壊さない。
-  document.addEventListener('mousedown', function(e) {
-    e.stopImmediatePropagation(); // LP 内 mousedown ハンドラーを封鎖
-    var el = findTarget(e.target);
-    if (!el || el.tagName !== 'A') return;
-    var rawHref = el.getAttribute('data-original-href') || el.getAttribute('href') || '';
-    var validHref = /^(https?:\/\/|tel:|mailto:|\/|#.+)/.test(rawHref) ? rawHref : '';
-    window.parent.postMessage({ type: 'lp-link-focus', href: validHref }, '*');
-  }, true);
-
   document.addEventListener('click', function(e) {
     // キャプチャフェーズで全クリックを補足してデフォルト動作・他リスナーを抑制する。
     // ① preventDefault: <a> リンクナビゲーション・フォーム送信を防ぐ
@@ -1006,6 +994,7 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+${editable ? '<base target="_blank" />' : ''}
 ${fontLinkTag}
 <style>
 *, *::before, *::after { box-sizing: border-box; }
