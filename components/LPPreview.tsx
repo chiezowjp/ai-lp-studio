@@ -558,9 +558,12 @@ const EDIT_JS = `(function () {
 
   /* ── click to edit ── */
   document.addEventListener('click', function(e) {
+    // findTarget の結果に関わらず常に preventDefault する。
+    // findTarget が null を返す場合（非リーフ <a> 等）でも e.preventDefault() を
+    // 呼ばないと iframe 内でリンクナビゲーションが発生し LP が消えてしまう。
+    e.preventDefault();
     var el = findTarget(e.target);
     if (!el) { if (cur) finish(); return; }
-    e.preventDefault();
     // <summary> クリック時は親 <details> の開閉もトグル（preventDefault で止まるため手動で）
     if (el.tagName === 'SUMMARY') {
       var det = el.closest && el.closest('details');
