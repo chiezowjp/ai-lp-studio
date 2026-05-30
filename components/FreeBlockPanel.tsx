@@ -46,7 +46,6 @@ export function parseFbElements(html: string, uniqueClass: string | null): FbEle
   if (typeof window === "undefined") return [];
   const doc = new DOMParser().parseFromString(html, "text/html");
   const inner = getFbInner(doc, uniqueClass);
-  console.log("[FBPanel] parseFbElements uniqueClass=", uniqueClass, "inner=", inner ? "found" : "NOT FOUND");
   if (!inner) return [];
 
   const els: FbElement[] = [];
@@ -64,12 +63,9 @@ export function parseFbElements(html: string, uniqueClass: string | null): FbEle
       // <picture><source> があればスマホ用画像を取得
       const source = el.querySelector("picture > source[media]") as HTMLSourceElement | null;
       if (source) {
-        const mob = source.getAttribute("srcset") ?? "";
-        console.log("[FBPanel] parseFbElements image id=", id, "content(30)=", content.slice(0, 30), "mobileUrl(30)=", mob.slice(0, 30));
-        els.push({ id, type, content, mobileImageUrl: mob });
+        els.push({ id, type, content, mobileImageUrl: source.getAttribute("srcset") ?? "" });
         return;
       }
-      console.log("[FBPanel] parseFbElements image id=", id, "content(30)=", content.slice(0, 30), "no mobile");
     } else {
       content = el.textContent?.trim() ?? "";
     }
@@ -79,7 +75,6 @@ export function parseFbElements(html: string, uniqueClass: string | null): FbEle
     }
     els.push({ id, type, content, link });
   });
-  console.log("[FBPanel] parseFbElements result count=", els.length, els.map(e => ({id: e.id, type: e.type, hasMobile: !!e.mobileImageUrl})));
   return els;
 }
 
@@ -214,15 +209,10 @@ export function updateFbElement(
   uniqueClass: string | null,
 ): string {
   const update = typeof patch === "string" ? { content: patch } : patch;
-  console.log("[FBPanel] updateFbElement elId=", elId, "patch keys=", Object.keys(typeof patch === "string" ? {content: patch} : patch), "uniqueClass=", uniqueClass);
-  const parsed = parseFbElements(html, uniqueClass);
-  console.log("[FBPanel] updateFbElement parsed ids=", parsed.map(e => e.id), "match=", parsed.some(e => e.id === elId));
-  const els = parsed.map((e) =>
+  const els = parseFbElements(html, uniqueClass).map((e) =>
     e.id === elId ? { ...e, ...update } : e
   );
-  const result = serializeFbElements(html, els, uniqueClass);
-  console.log("[FBPanel] updateFbElement result changed=", result !== html, "len=", result.length);
-  return result;
+  return serializeFbElements(html, els, uniqueClass);
 }
 
 // ─── Sub-component: Element Row ───────────────────────────────────────────────
@@ -278,15 +268,11 @@ function ElementRow({ el, idx, total, html, uniqueClass, onUpdate }: ElementRowP
     const currentHtml = html;
     const currentElId = el.id;
     const currentUniqueClass = uniqueClass;
-    console.log("[FBPanel] handleMobileImageFile called elId=", currentElId, "uniqueClass=", currentUniqueClass, "htmlLen=", currentHtml.length, "el.content(30)=", el.content.slice(0,30));
     const reader = new FileReader();
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
-      console.log("[FBPanel] FileReader.onload dataUrl(30)=", dataUrl ? dataUrl.slice(0, 30) : "EMPTY");
       if (!dataUrl) return;
-      const newHtml = updateFbElement(currentHtml, currentElId, { mobileImageUrl: dataUrl }, currentUniqueClass);
-      console.log("[FBPanel] calling onUpdate, newHtml changed=", newHtml !== currentHtml);
-      onUpdate(newHtml);
+      onUpdate(updateFbElement(currentHtml, currentElId, { mobileImageUrl: dataUrl }, currentUniqueClass));
       setShowMobileUpload(false);
     };
     reader.readAsDataURL(file);
