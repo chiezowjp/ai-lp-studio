@@ -581,7 +581,10 @@ const EDIT_JS = `(function () {
     // findTarget は <span> 等の子要素を返すことがあるため、closest('a') で親 <a> も検索する
     curLinkEl = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
     if (curLinkEl) {
-      window.parent.postMessage({ type: 'lp-link-focus', href: curLinkEl.getAttribute('href') || '' }, '*');
+      var rawHref = curLinkEl.getAttribute('href') || '';
+      // URL として有効な値のみ送信（テキストや # だけの場合は空文字にする）
+      var validHref = /^(https?:\/\/|tel:|mailto:|\/|#.+)/.test(rawHref) ? rawHref : '';
+      window.parent.postMessage({ type: 'lp-link-focus', href: validHref }, '*');
     }
   }, true);
 
