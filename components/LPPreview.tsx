@@ -1043,7 +1043,10 @@ ${BUBBLE_GUIDE_CSS}
       }
       // リンクバー表示/非表示
       if (e.data?.type === "lp-link-focus" && editModeRef.current !== "style") {
-        setLinkBarHref(e.data.href as string ?? "");
+        const raw = (e.data.href as string) ?? "";
+        // URLとして有効な値のみ表示（AIが誤ってボタンテキストをhrefにした場合などを除外）
+        const validHref = /^(https?:\/\/|tel:|mailto:|\/|#.)/.test(raw) ? raw : "";
+        setLinkBarHref(validHref);
         // 次フレームでinputにフォーカス
         setTimeout(() => linkInputRef.current?.focus(), 50);
       }
@@ -1141,6 +1144,7 @@ ${BUBBLE_GUIDE_CSS}
         {/* ── Link edit bar ── <a>クリック時に表示するリンク先URL編集バー ── */}
         {linkBarHref !== null && editable && !isMobile && (
           <div
+            key={linkBarHref}
             style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 50 }}
             className="flex items-center gap-2 px-3 py-2.5 bg-white border-t-2 border-[#00AFCC] shadow-lg"
           >
