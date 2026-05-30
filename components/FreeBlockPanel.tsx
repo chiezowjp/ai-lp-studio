@@ -60,11 +60,17 @@ export function parseFbElements(html: string, uniqueClass: string | null): FbEle
     if (type === "image") {
       const img = el.querySelector("img");
       content = img?.getAttribute("src") ?? "";
-      // <picture><source> があればスマホ用画像を取得
-      const source = el.querySelector("picture > source[media]") as HTMLSourceElement | null;
+      // <picture><source srcset> があればスマホ用画像を取得。
+      // `picture > source[media]`（子セレクタ+media属性）ではなく
+      // `picture source[srcset]`（子孫+srcset属性）を使うことで
+      // ブラウザ/DOMParserの挙動差異や属性の有無に依存しない堅牢な検索にする。
+      const source = el.querySelector("picture source[srcset]") as HTMLSourceElement | null;
       if (source) {
-        els.push({ id, type, content, mobileImageUrl: source.getAttribute("srcset") ?? "" });
-        return;
+        const srcset = source.getAttribute("srcset") ?? "";
+        if (srcset) {
+          els.push({ id, type, content, mobileImageUrl: srcset });
+          return;
+        }
       }
     } else {
       content = el.textContent?.trim() ?? "";
@@ -329,6 +335,34 @@ function ElementRow({ el, idx, total, html, uniqueClass, onUpdate }: ElementRowP
           </button>
         </div>
       </div>
+
+      {/* 画像タイプ: 登録済みサムネイルを常時表示（✏️ を開かなくても確認できる） */}
+      {el.type === "image" && !editing && (el.content || el.mobileImageUrl) && (
+        <div className="px-3 pb-2 flex items-center gap-2 border-t border-gray-100 pt-1.5">
+          {el.content && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={el.content}
+              alt="PC"
+              className="h-10 w-14 object-cover rounded border border-gray-200 bg-gray-100 shrink-0"
+            />
+          )}
+          {el.mobileImageUrl && (
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="text-[10px] text-indigo-400 leading-none">📱</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={el.mobileImageUrl}
+                alt="スマホ"
+                className="h-10 w-14 object-cover rounded border border-indigo-200 bg-indigo-50"
+              />
+            </div>
+          )}
+          {!el.mobileImageUrl && (
+            <span className="text-[10px] text-gray-400 italic">スマホ用未設定</span>
+          )}
+        </div>
+      )}
 
       {/* Expanded edit area */}
       {editing && (
