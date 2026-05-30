@@ -889,6 +889,11 @@ export default function Home() {
   // ─── Generate ─────────────────────────────────────────────────────────────
 
   const handleGenerate = async (data: LPFormData) => {
+    // 未ログイン → Googleログインへ誘導
+    if (!user) {
+      signInWithGoogle();
+      return;
+    }
     // プランチェック
     if (planType === "expired") {
       openUpgrade("トライアル期間が終了しました。Proプランにアップグレードしてください。");
@@ -2426,13 +2431,114 @@ export default function Home() {
         {/* ═══ RIGHT PANEL ═══ */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
           {!result ? (
-            /* ── Before generation: placeholder ── */
-            <div className="flex-1 flex items-center justify-center text-gray-300">
-              <div className="text-center space-y-3">
-                <div className="text-6xl">🖥️</div>
-                <p className="text-sm">左のフォームを入力してLPを生成してください</p>
+            /* ── Before generation: welcome / placeholder ── */
+            !user ? (
+              /* 未ログイン：ウェルカム画面 */
+              <div className="flex-1 overflow-y-auto">
+                <div className="max-w-xl mx-auto px-6 py-10 space-y-8">
+
+                  {/* Hero */}
+                  <div className="text-center space-y-3">
+                    <p className="inline-block bg-[#E6F8FC] text-[#00AFCC] text-xs font-bold px-3 py-1 rounded-full">無料ではじめられます</p>
+                    <h2 className="text-2xl font-black text-gray-900 leading-snug">
+                      情報を入力するだけで<br />
+                      <span className="text-[#00AFCC]">AIがプロ品質のLPを自動生成</span>
+                    </h2>
+                    <p className="text-sm text-gray-500">
+                      整骨院・美容サロン・飲食店など、小規模店舗のLP制作を<br className="hidden sm:block" />
+                      AIが30秒でサポートします。
+                    </p>
+                  </div>
+
+                  {/* Google login CTA */}
+                  <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center space-y-3">
+                    <p className="text-sm font-semibold text-gray-700">Googleアカウントで今すぐ無料スタート</p>
+                    <button
+                      onClick={signInWithGoogle}
+                      className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 rounded-xl px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition shadow-sm"
+                    >
+                      <svg className="w-5 h-5 shrink-0" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.2l6.8-6.8C35.8 2.5 30.2 0 24 0 14.6 0 6.6 5.5 2.6 13.5l7.9 6.1C12.4 13.3 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17z"/><path fill="#FBBC05" d="M10.5 28.4A14.7 14.7 0 0 1 9.5 24c0-1.5.3-3 .7-4.4l-7.9-6.1A23.9 23.9 0 0 0 0 24c0 3.8.9 7.4 2.5 10.6l8-6.2z"/><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.2-5.5l-7.5-5.8c-2 1.4-4.6 2.2-7.7 2.2-6.3 0-11.6-3.8-13.5-9.1l-8 6.2C6.5 42.5 14.6 48 24 48z"/></svg>
+                      Googleでログイン / 新規登録
+                    </button>
+                    <p className="text-xs text-gray-400">クレジットカード不要 · LP生成3回まで無料</p>
+                  </div>
+
+                  {/* 3 steps */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">使い方 3ステップ</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { step: "01", icon: "📝", label: "フォーム入力", desc: "業種・強み・CTAなど\n必要事項を入力" },
+                        { step: "02", icon: "✨", label: "AI自動生成", desc: "約30秒でプロ品質の\nLPが完成" },
+                        { step: "03", icon: "📋", label: "編集・出力", desc: "色・画像を調整して\nWordPressに貼付" },
+                      ].map(({ step, icon, label, desc }) => (
+                        <div key={step} className="bg-white rounded-xl border border-gray-100 p-3 text-center space-y-1.5 shadow-sm">
+                          <div className="text-[10px] font-black text-[#00AFCC]">STEP {step}</div>
+                          <div className="text-2xl">{icon}</div>
+                          <div className="text-xs font-bold text-gray-800">{label}</div>
+                          <div className="text-[10px] text-gray-400 leading-relaxed whitespace-pre-line">{desc}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Sample LP image */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest text-center">生成サンプル</p>
+                    <div className="rounded-2xl overflow-hidden border border-gray-200 shadow-sm">
+                      {/* public/sample-lp.png を配置すると表示されます */}
+                      <img
+                        src="/sample-lp.png"
+                        alt="生成サンプルLP"
+                        className="w-full object-cover object-top max-h-[420px]"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Plan summary */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1">
+                      <p className="text-xs font-black text-amber-700">トライアル（無料）</p>
+                      <ul className="text-xs text-amber-800 space-y-0.5">
+                        <li>✓ LP生成 3回/月</li>
+                        <li>✓ AI編集 10回/月</li>
+                        <li>✓ セクション追加・編集</li>
+                        <li>✓ 画像挿入</li>
+                        <li className="text-amber-400">✗ HTML/CSSエクスポート</li>
+                      </ul>
+                    </div>
+                    <div className="bg-[#E6F8FC] border border-[#b3e8f4] rounded-xl p-4 space-y-1">
+                      <p className="text-xs font-black text-[#00AFCC]">Pro <span className="font-normal text-gray-500">¥2,980/月</span></p>
+                      <ul className="text-xs text-gray-700 space-y-0.5">
+                        <li>✓ LP生成 100回/月</li>
+                        <li>✓ AI編集 300回/月</li>
+                        <li>✓ HTML/CSSエクスポート</li>
+                        <li>✓ プロジェクト10件保存</li>
+                        <li>✓ LP公開URL</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Bottom CTA */}
+                  <button
+                    onClick={signInWithGoogle}
+                    className="w-full bg-[#00AFCC] hover:bg-[#0099b3] text-white font-bold rounded-xl py-3.5 text-sm transition shadow"
+                  >
+                    無料ではじめる
+                  </button>
+
+                </div>
               </div>
-            </div>
+            ) : (
+              /* ログイン済み：通常のプレースホルダー */
+              <div className="flex-1 flex items-center justify-center text-gray-300">
+                <div className="text-center space-y-3">
+                  <div className="text-6xl">🖥️</div>
+                  <p className="text-sm">左のフォームを入力してLPを生成してください</p>
+                </div>
+              </div>
+            )
           ) : (
             /* ── After generation: tabs + preview ── */
             <>
