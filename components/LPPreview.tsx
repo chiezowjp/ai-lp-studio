@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef } from "react";
+import { useEffect, useRef, useCallback, useImperativeHandle, forwardRef, useState } from "react";
 import { UploadedImage, PreviewMode, SelectedElement, ButtonImageConfig } from "@/types";
 
 function placementToSelector(placement: string): string {
@@ -503,6 +503,7 @@ const EDIT_JS = `(function () {
                 MAIN:1,FIGURE:1,UL:1,OL:1,TABLE:1,TBODY:1,THEAD:1,TR:1,FORM:1 };
   var SEL = 'h1,h2,h3,h4,h5,h6,p,button,a,li,span,strong,em,small,label,dt,dd,th,td,blockquote,summary';
   var cur = null;
+  var linkEditing = false; // リンクバー入力中フラグ（blur で finish を抑制）
 
   /* ── inject styles ── */
   var st = document.createElement('style');
@@ -575,6 +576,10 @@ const EDIT_JS = `(function () {
       if (r) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
     }
     cur = el;
+    // <a> の場合はリンク編集バーを親に表示させる
+    if (el.tagName === 'A') {
+      window.parent.postMessage({ type: 'lp-link-focus', href: el.getAttribute('href') || '' }, '*');
+    }
   }, true);
 
   /* ── keyboard ── */
@@ -585,21 +590,42 @@ const EDIT_JS = `(function () {
       e.preventDefault(); finish();
     }
   });
-  document.addEventListener('blur', function(e) { if (e.target === cur) finish(); }, true);
+  document.addEventListener('blur', function(e) { if (e.target === cur && !linkEditing) finish(); }, true);
 
   /* ── finish & notify parent ── */
   function finish() {
     if (!cur) return;
+    var wasLink = cur.tagName === 'A';
     cur.removeAttribute('contenteditable');
     cur.classList.remove('lp-ea');
     cur = null;
+    linkEditing = false;
     var clone = document.body.cloneNode(true);
     clone.querySelectorAll('[data-lp-editor]').forEach(function(el) { el.parentNode.removeChild(el); });
     clone.querySelectorAll('[contenteditable]').forEach(function(el) { el.removeAttribute('contenteditable'); });
     // <details open> を保存しない（開いた状態をHTMLに残さない）
     clone.querySelectorAll('details[open]').forEach(function(d) { d.removeAttribute('open'); });
     window.parent.postMessage({ type: 'lp-html-update', html: clone.innerHTML }, '*');
+    if (wasLink) {
+      window.parent.postMessage({ type: 'lp-link-blur' }, '*');
+    }
   }
+
+  /* ── link bar messages from parent ── */
+  window.addEventListener('message', function(e) {
+    if (!e.data) return;
+    // リンクバー入力フォーカス中：blur で finish しない
+    if (e.data.type === 'lp-link-bar-focus') { linkEditing = true; }
+    if (e.data.type === 'lp-link-bar-blur')  { linkEditing = false; }
+    // 親からhref確定通知: href更新後にfinish
+    if (e.data.type === 'lp-link-update') {
+      if (cur && cur.tagName === 'A') {
+        cur.setAttribute('href', e.data.href || '');
+      }
+      linkEditing = false;
+      finish();
+    }
+  });
 })();`;
 
 export interface ButtonImageOverride {
@@ -661,6 +687,11 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
   fontFamily,
 }: Props, ref) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // ─── Link bar state ───────────────────────────────────────────────────────
+  // <a> クリック時にフローティングバーを表示し、リンク先URLを編集できるようにする
+  const [linkBarHref, setLinkBarHref] = useState<string | null>(null);
+  const linkInputRef = useRef<HTMLInputElement>(null);
 
   const skipNextRef = useRef(false);
   const selectedSelectorRef = useRef<string | null>(selectedSelector ?? null);
@@ -1002,6 +1033,19 @@ ${BUBBLE_GUIDE_CSS}
       if (e.data?.type === "lp-vs-deselect") {
         onElementSelectRef.current?.(null);
       }
+      // リンクバー表示/非表示
+      if (e.data?.type === "lp-link-focus" && editModeRef.current !== "style") {
+        setLinkBarHref(e.data.href as string ?? "");
+        // 次フレームでinputにフォーカス
+        setTimeout(() => linkInputRef.current?.focus(), 50);
+      }
+      if (e.data?.type === "lp-link-blur") {
+        setLinkBarHref(null);
+      }
+      // lp-html-update が来たらリンクバーも閉じる（finish済み）
+      if (e.data?.type === "lp-html-update") {
+        setLinkBarHref(null);
+      }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
@@ -1015,10 +1059,23 @@ ${BUBBLE_GUIDE_CSS}
   // outer structure and only changing styles based on mode.
   const isMobile = mode === "mobile";
 
+  // ─── link bar helpers ─────────────────────────────────────────────────────
+  const confirmLinkUpdate = useCallback(() => {
+    const href = linkInputRef.current?.value ?? "";
+    iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-update", href }, "*");
+    setLinkBarHref(null);
+  }, []);
+
+  const cancelLinkBar = useCallback(() => {
+    // hrefを変えずにfinishさせる（テキスト編集だけ確定）
+    iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-update", href: linkBarHref ?? "" }, "*");
+    setLinkBarHref(null);
+  }, [linkBarHref]);
+
   return (
     // Outer wrapper: desktop=h-full, mobile=centered bg area (phone frame scrolls internally)
     <div
-      className={isMobile ? "flex justify-center py-6" : "h-full"}
+      className={isMobile ? "flex justify-center py-6" : "h-full flex flex-col"}
       style={isMobile ? { background: "#f3f4f6" } : {}}
     >
       {/* Phone-frame shell — desktop: transparent passthrough, mobile: phone chrome */}
@@ -1073,6 +1130,44 @@ ${BUBBLE_GUIDE_CSS}
           }}
         />
       </div>
+
+      {/* ── Link edit bar ── <a>クリック時に表示するリンク先URL編集バー ── */}
+      {linkBarHref !== null && editable && !isMobile && (
+        <div className="shrink-0 flex items-center gap-2 px-3 py-2 bg-white border-t border-gray-200 shadow-sm">
+          <span className="text-gray-400 shrink-0" title="リンク先URL">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          </span>
+          <span className="text-[11px] text-gray-500 shrink-0 font-medium">リンク先</span>
+          <input
+            ref={linkInputRef}
+            type="url"
+            defaultValue={linkBarHref}
+            placeholder="https://..."
+            onFocus={() => iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-bar-focus" }, "*")}
+            onBlur={() => iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-bar-blur" }, "*")}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { e.preventDefault(); confirmLinkUpdate(); }
+              if (e.key === "Escape") { e.preventDefault(); cancelLinkBar(); }
+            }}
+            className="flex-1 min-w-0 text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#00AFCC] focus:border-transparent"
+          />
+          <button
+            onClick={confirmLinkUpdate}
+            className="shrink-0 bg-[#00AFCC] hover:bg-[#0099b3] text-white text-xs font-bold px-3 py-1.5 rounded-lg transition"
+          >
+            確定
+          </button>
+          <button
+            onClick={cancelLinkBar}
+            className="shrink-0 text-gray-400 hover:text-gray-600 text-xs px-2 py-1.5 rounded-lg transition"
+            title="キャンセル"
+          >
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   );
 });
