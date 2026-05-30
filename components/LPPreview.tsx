@@ -561,20 +561,14 @@ const EDIT_JS = `(function () {
   });
 
   /* ── click to edit ── */
-  /* ── mousedown: LP内ハンドラー封鎖 + リンク要素のリンクバーをmousedownで表示 ── */
-  // javascript:void(0) はブラウザによって click イベントを阻害することがあるため
-  // mousedown でリンク検出→リンクバー表示する（click より確実に発火する）
+  /* ── mousedown: LP内ハンドラー封鎖 + リンクバー表示 ── */
+  // findTarget が <a> を返した時だけリンクバーを表示する。
+  // テキスト要素クリック時は <a> を返さないので text 編集を壊さない。
   document.addEventListener('mousedown', function(e) {
     e.stopImmediatePropagation(); // LP 内 mousedown ハンドラーを封鎖
-    // <a> 要素（またはその子）を mousedown した場合にリンクバー表示
-    var el = e.target;
-    var linkEl = null;
-    while (el && el !== document.body) {
-      if (el.tagName === 'A') { linkEl = el; break; }
-      el = el.parentElement;
-    }
-    if (!linkEl) return;
-    var rawHref = linkEl.getAttribute('data-original-href') || linkEl.getAttribute('href') || '';
+    var el = findTarget(e.target);
+    if (!el || el.tagName !== 'A') return;
+    var rawHref = el.getAttribute('data-original-href') || el.getAttribute('href') || '';
     var validHref = /^(https?:\/\/|tel:|mailto:|\/|#.+)/.test(rawHref) ? rawHref : '';
     window.parent.postMessage({ type: 'lp-link-focus', href: validHref }, '*');
   }, true);
