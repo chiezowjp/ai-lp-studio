@@ -598,6 +598,9 @@ const EDIT_JS = `(function () {
     }
   }, true);
 
+  /* ── フォーム送信もキャプチャで封鎖 ── */
+  document.addEventListener('submit', function(e) { e.preventDefault(); e.stopImmediatePropagation(); }, true);
+
   /* ── keyboard ── */
   document.addEventListener('keydown', function(e) {
     if (!cur) return;
@@ -944,7 +947,7 @@ ${imageCss}
 ${BUBBLE_GUIDE_CSS}
 </style>
 </head>
-<body>${effectiveHtml}${scrollBlock}${cssVarBlock}${editBlock}${buttonImgBlock}${bubbleGuideBlock}${fontOverrideBlock}
+<body>${editBlock}${effectiveHtml}${scrollBlock}${cssVarBlock}${buttonImgBlock}${bubbleGuideBlock}${fontOverrideBlock}
 </body>
 </html>`;
   }, [html, css, imageOverrides, editable, editMode, buttonImageOverrides, fontGoogleUrl, fontFamily]);
