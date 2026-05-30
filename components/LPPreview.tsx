@@ -100,25 +100,18 @@ const STYLE_SELECT_JS = `(function () {
       return p.length >= 3 && WRAPPER_SUFFIXES.indexOf(p[p.length - 1]) === -1;
     });
     if (hasNonWrapper3Part) {
-      var parent = el.parentElement;
-      var depth = 0;
-      while (parent && parent !== document.body && depth < 5) {
-        if (parent.classList) {
-          var parentIsSection = false;
-          parent.classList.forEach(function(c) {
-            if (/^lp-[a-z][a-z0-9]*$/.test(c)) parentIsSection = true;
+      // 祖先を上に辿り、2パーツの lp-* セクションクラス（lp-pricing 等）が見つかれば
+      // この要素はセクション直下のカード要素と確定する。中間ラッパーは無視して通過する。
+      var ancestor = el.parentElement;
+      while (ancestor && ancestor !== document.body) {
+        if (ancestor.classList) {
+          var foundSection = false;
+          ancestor.classList.forEach(function(c) {
+            if (/^lp-[a-z][a-z0-9]*$/.test(c)) foundSection = true;
           });
-          if (parentIsSection) return true;
-          // 親が先に非ラッパー3パーツクラスを持つなら、その親がカード → 自分はカードの子なので停止
-          var parentLpCls = [];
-          parent.classList.forEach(function(c){ if (c.startsWith('lp-') && !c.startsWith('lp-vs')) parentLpCls.push(c); });
-          if (parentLpCls.some(function(c){
-            var pp = c.split('-');
-            return pp.length >= 3 && WRAPPER_SUFFIXES.indexOf(pp[pp.length - 1]) === -1;
-          })) break;
+          if (foundSection) return true;
         }
-        parent = parent.parentElement;
-        depth++;
+        ancestor = ancestor.parentElement;
       }
     }
     // ③ CSS フォールバック: 3パーツ以上のクラスを持ち、見た目がカードらしい要素
