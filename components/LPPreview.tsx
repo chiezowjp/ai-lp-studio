@@ -614,7 +614,7 @@ const EDIT_JS = `(function () {
       var isSameOrigin = href === '/' || href === origin || href === origin + '/' || href.startsWith(origin + '/');
       if (isSameOrigin) {
         a.setAttribute('data-original-href', href);
-        a.setAttribute('href', '#');
+        a.setAttribute('href', 'javascript:void(0)');
       }
     }
   }
@@ -800,7 +800,7 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
             href.startsWith(origin + "/");
           if (isSameOrigin) {
             a.setAttribute("data-original-href", href);
-            a.setAttribute("href", "#");
+            a.setAttribute("href", "javascript:void(0)");
           }
         });
         effectiveHtml = doc.body.innerHTML;
