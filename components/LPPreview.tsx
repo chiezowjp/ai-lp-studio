@@ -785,6 +785,28 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
       });
     } catch { /* ignore */ }
 
+    // 編集モード: 同オリジン（アプリ自身のURL）の <a href> を "#" に置換してiframe内ナビゲーションを防止
+    // React 側の window.location は iframe 外なので origin が正確に取れる
+    if (editable && editMode && typeof window !== "undefined") {
+      try {
+        const origin = window.location.origin;
+        const doc = new DOMParser().parseFromString(effectiveHtml, "text/html");
+        doc.querySelectorAll("a[href]").forEach((a) => {
+          const href = a.getAttribute("href") ?? "";
+          const isSameOrigin =
+            href === "/" ||
+            href === origin ||
+            href === origin + "/" ||
+            href.startsWith(origin + "/");
+          if (isSameOrigin) {
+            a.setAttribute("data-original-href", href);
+            a.setAttribute("href", "#");
+          }
+        });
+        effectiveHtml = doc.body.innerHTML;
+      } catch { /* ignore */ }
+    }
+
     const imageCss = imageOverrides
       .map((img) => {
         const sel = placementToSelector(img.placement);
