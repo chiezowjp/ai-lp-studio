@@ -2774,6 +2774,22 @@ export default function Home() {
           !selectedElement.lpClasses?.includes("lp-freeblock") &&
           !selectedElement.lpClasses?.includes("lp-customhtml") && (
           <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+            {/* FAQ セクション選択時: 質問追加ボタン */}
+            {selectedElement.lpClasses?.some((c) => c.startsWith("lp-faqblock")) && (
+              <div className="px-4 py-3 border-b border-gray-100 shrink-0">
+                <p className="text-[11px] text-gray-400 mb-2">FAQ セクション</p>
+                <button
+                  onClick={() => {
+                    const faqClass = selectedElement.lpClasses?.find((c) => c.startsWith("lp-faqblock_"));
+                    const faqId = faqClass ? faqClass.slice(3) : null; // "lp-faqblock_xxx" → "faqblock_xxx"
+                    if (faqId) handleAddFaqItem(faqId);
+                  }}
+                  className="w-full py-2 bg-[#00AFCC] hover:bg-[#0099b3] text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  ＋ 質問を追加
+                </button>
+              </div>
+            )}
             <VisualStylePanel
               element={selectedElement}
               currentRule={visualStyles[selectedElement.selector] ?? { styles: {} }}
