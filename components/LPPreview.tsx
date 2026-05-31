@@ -1099,6 +1099,26 @@ ${BUBBLE_GUIDE_CSS}
     return () => iframe.removeEventListener("load", handleLoad);
   }, [buildContent]);
 
+  // iframe をコンテンツの高さに自動拡張（内部スクロールバーを除去）
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+    const onLoad = () => {
+      try {
+        const doc = iframe.contentDocument;
+        if (!doc) return;
+        const h = Math.max(
+          doc.body.scrollHeight,
+          doc.documentElement.scrollHeight,
+          iframeHeight,
+        );
+        iframe.style.height = h + "px";
+      } catch { /* cross-origin: ignore */ }
+    };
+    iframe.addEventListener("load", onLoad);
+    return () => iframe.removeEventListener("load", onLoad);
+  }, [iframeHeight]);
+
   // Re-highlight selected element after iframe reloads (CSS change causes reload)
   useEffect(() => {
     if (editMode !== "style") return;

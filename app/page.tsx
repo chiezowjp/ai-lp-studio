@@ -2626,7 +2626,7 @@ export default function Home() {
               </div>
 
               {/* Tab content */}
-              <div className="flex-1 overflow-y-auto">
+              <div className={`flex-1 ${activeTab === "preview" ? "overflow-hidden" : "overflow-y-auto"}`}>
                 {activeTab === "preview" && (
                   <div className="h-full flex flex-col">
                     <div className="px-3 py-1.5 flex items-center gap-1.5 bg-white border-b border-gray-100 flex-shrink-0">
