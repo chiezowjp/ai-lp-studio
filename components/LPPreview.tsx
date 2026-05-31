@@ -994,7 +994,6 @@ if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded'
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-${editable ? '<base target="_blank" />' : ''}
 ${fontLinkTag}
 <style>
 *, *::before, *::after { box-sizing: border-box; }
