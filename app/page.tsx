@@ -363,28 +363,94 @@ function deleteElementFromHtml(html: string, elementId?: string, selector?: stri
   return doc.body.innerHTML;
 }
 
-/** FAQ セクションに新しい質問・回答項目を追加する */
+/**
+ * 選択要素が属する FAQ セクションの sectionId を返す。
+ * テンプレート FAQ（lp-faqblock_*）と AI 生成 FAQ（<details> 含む or 見出しに FAQ キーワード）を検出。
+ * FAQ でなければ null を返す。
+ */
+function detectFaqSectionId(html: string, lpClasses: string[]): string | null {
+  if (typeof window === "undefined") return null;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const wrapper = doc.querySelector(".lp-wrapper") ?? doc.body;
+  const sectionClass = /^lp-([a-z][a-z0-9_]*)$/;
+
+  for (const child of Array.from(wrapper.children)) {
+    for (const cls of Array.from(child.classList)) {
+      if (!lpClasses.includes(cls)) continue;
+      const m = cls.match(sectionClass);
+      if (!m) continue;
+      const sectionId = m[1];
+
+      // テンプレート FAQ
+      if (sectionId.startsWith("faqblock")) return sectionId;
+
+      // AI 生成: <details> タグを含む
+      if (child.querySelector("details")) return sectionId;
+
+      // AI 生成: 見出しに FAQ キーワードを含む
+      const heading = child.querySelector("h1,h2,h3,h4");
+      const text = heading?.textContent?.toLowerCase() ?? "";
+      if (text.includes("faq") || text.includes("よくある") || text.includes("質問")) {
+        return sectionId;
+      }
+
+      return null; // このセクションはマッチしたが FAQ ではない
+    }
+  }
+  return null;
+}
+
+/**
+ * FAQ セクションに新しい質問・回答項目を追加する。
+ * テンプレート FAQ（.lp-faqb-list）と AI 生成 FAQ（<details> クローン）の両方に対応。
+ */
 function addFaqItemToHtml(html: string, sectionId: string): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
   const section = doc.querySelector(`.lp-${sectionId}`);
   if (!section) return html;
+
+  // ── テンプレート FAQ（.lp-faqb-list を持つ）──
   const list = section.querySelector(".lp-faqb-list");
-  if (!list) return html;
+  if (list) {
+    const item = doc.createElement("details");
+    item.className = "lp-faqb-item";
+    const summary = doc.createElement("summary");
+    summary.className = "lp-faqb-q";
+    summary.textContent = "Q. 質問を入力してください";
+    const answer = doc.createElement("div");
+    answer.className = "lp-faqb-a";
+    answer.textContent = "A. 回答を入力してください";
+    item.appendChild(summary);
+    item.appendChild(answer);
+    list.appendChild(item);
+    return doc.body.innerHTML;
+  }
 
-  const item = doc.createElement("details");
-  item.className = "lp-faqb-item";
-  const summary = doc.createElement("summary");
-  summary.className = "lp-faqb-q";
-  summary.textContent = "Q. 質問を入力してください";
-  const answer = doc.createElement("div");
-  answer.className = "lp-faqb-a";
-  answer.textContent = "A. 回答を入力してください";
-  item.appendChild(summary);
-  item.appendChild(answer);
-  list.appendChild(item);
+  // ── AI 生成 FAQ（<details> を含む）── 最後の項目をクローンしてテキストをリセット
+  const allDetails = Array.from(section.querySelectorAll("details"));
+  if (allDetails.length > 0) {
+    const last = allDetails[allDetails.length - 1];
+    const clone = last.cloneNode(true) as Element;
+    clone.removeAttribute("open");
 
-  return doc.body.innerHTML;
+    // summary（質問）のテキストをリセット
+    const summary = clone.querySelector("summary");
+    if (summary) summary.textContent = "Q. 質問を入力してください";
+
+    // summary 以外の最初の子要素（回答）のテキストをリセット
+    for (const child of Array.from(clone.children)) {
+      if (child.tagName.toLowerCase() !== "summary") {
+        child.textContent = "A. 回答を入力してください";
+        break;
+      }
+    }
+
+    last.parentElement?.appendChild(clone);
+    return doc.body.innerHTML;
+  }
+
+  return html;
 }
 
 function removeSectionFromHtml(html: string, sectionId: string): string {
@@ -1115,6 +1181,15 @@ export default function Home() {
     const newHtml = addFaqItemToHtml(result.html, sectionId);
     applyHtml(newHtml, true);
   }, [result, applyHtml, pushUndo]);
+
+  /**
+   * 現在選択中の要素が FAQ セクション内かを判定し、そのセクション ID を返す。
+   * テンプレート FAQ・AI 生成 FAQ の両方を検出する。
+   */
+  const selectedFaqSectionId = useMemo<string | null>(() => {
+    if (!selectedElement || !result) return null;
+    return detectFaqSectionId(result.html, selectedElement.lpClasses ?? []);
+  }, [selectedElement, result]);
 
   // ─── Section delete ───────────────────────────────────────────────────────
 
@@ -2773,16 +2848,12 @@ export default function Home() {
           !selectedElement.lpClasses?.includes("lp-freeblock") &&
           !selectedElement.lpClasses?.includes("lp-customhtml") && (
           <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
-            {/* FAQ セクション選択時: 質問追加ボタン */}
-            {selectedElement.lpClasses?.some((c) => c.startsWith("lp-faqblock")) && (
+            {/* FAQ セクション選択時: 質問追加ボタン（テンプレート・AI生成 両対応） */}
+            {selectedFaqSectionId && (
               <div className="px-4 py-3 border-b border-gray-100 shrink-0">
                 <p className="text-[11px] text-gray-400 mb-2">FAQ セクション</p>
                 <button
-                  onClick={() => {
-                    const faqClass = selectedElement.lpClasses?.find((c) => c.startsWith("lp-faqblock_"));
-                    const faqId = faqClass ? faqClass.slice(3) : null; // "lp-faqblock_xxx" → "faqblock_xxx"
-                    if (faqId) handleAddFaqItem(faqId);
-                  }}
+                  onClick={() => handleAddFaqItem(selectedFaqSectionId)}
                   className="w-full py-2 bg-[#00AFCC] hover:bg-[#0099b3] text-white text-sm font-semibold rounded-lg transition-colors"
                 >
                   ＋ 質問を追加
