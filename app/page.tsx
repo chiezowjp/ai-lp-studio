@@ -1725,6 +1725,15 @@ export default function Home() {
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
           body: JSON.stringify(payload),
         });
+        // PUT が 404 の場合（DB上に存在しない古いID） → 新規として POST にフォールバック
+        if (res.status === 404) {
+          setRemoteProjectId(null);
+          res = await fetch("/api/projects", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify(payload),
+          });
+        }
       } else {
         res = await fetch("/api/projects", {
           method: "POST",
