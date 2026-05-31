@@ -400,9 +400,67 @@ function detectFaqSectionId(html: string, lpClasses: string[]): string | null {
   return null;
 }
 
+// ── FAQ ユーティリティ ─────────────────────────────────────────────────────────
+
+const RE_FAQ_Q = /^Q[\.．]/;
+const RE_FAQ_A = /^A[\.．]/;
+
+/**
+ * Q. テキストを持つ「最内側」の要素を返す。
+ * 自分の子孫に同じQ要素を含まないもの（葉に近いもの）だけを対象とする。
+ */
+function findInnermostQEls(root: Element): Element[] {
+  return Array.from(root.querySelectorAll("*")).filter(
+    (el) =>
+      RE_FAQ_Q.test((el.textContent ?? "").trim()) &&
+      !Array.from(el.querySelectorAll("*")).some((c) =>
+        RE_FAQ_Q.test((c.textContent ?? "").trim())
+      )
+  );
+}
+
+/**
+ * qEl から遡り、section の直接の子に当たる祖先要素を返す。
+ */
+function getFaqItemRoot(section: Element, qEl: Element): Element {
+  let cur: Element = qEl;
+  while (cur.parentElement && cur.parentElement !== section) {
+    cur = cur.parentElement;
+  }
+  return cur;
+}
+
+/**
+ * clone 内の Q./A. テキストをプレースホルダーにリセットする。
+ */
+function resetQAText(clone: Element) {
+  // 最内側のQ要素
+  findInnermostQEls(clone).forEach((el) => {
+    el.textContent = "Q. 質問を入力してください";
+  });
+  // 最内側のA要素
+  Array.from(clone.querySelectorAll("*"))
+    .filter(
+      (el) =>
+        RE_FAQ_A.test((el.textContent ?? "").trim()) &&
+        !Array.from(el.querySelectorAll("*")).some((c) =>
+          RE_FAQ_A.test((c.textContent ?? "").trim())
+        )
+    )
+    .forEach((el) => {
+      el.textContent = "A. 回答を入力してください";
+    });
+  // clone 自体が Q or A の場合
+  if (RE_FAQ_Q.test((clone.textContent ?? "").trim())) {
+    clone.textContent = "Q. 質問を入力してください";
+  } else if (RE_FAQ_A.test((clone.textContent ?? "").trim())) {
+    clone.textContent = "A. 回答を入力してください";
+  }
+}
+
 /**
  * FAQ セクションに新しい質問・回答項目を追加する。
- * テンプレート FAQ（.lp-faqb-list）と AI 生成 FAQ（<details> クローン）の両方に対応。
+ * テンプレート FAQ / <details> / 汎用 Q./A. の3パターンに対応。
  */
 function addFaqItemToHtml(html: string, sectionId: string): string {
   if (typeof window === "undefined") return html;
@@ -427,26 +485,57 @@ function addFaqItemToHtml(html: string, sectionId: string): string {
     return doc.body.innerHTML;
   }
 
-  // ── AI 生成 FAQ（<details> を含む）── 最後の項目をクローンしてテキストをリセット
+  // ── AI 生成 FAQ（<details> を含む）──
   const allDetails = Array.from(section.querySelectorAll("details"));
   if (allDetails.length > 0) {
     const last = allDetails[allDetails.length - 1];
     const clone = last.cloneNode(true) as Element;
     clone.removeAttribute("open");
-
-    // summary（質問）のテキストをリセット
     const summary = clone.querySelector("summary");
     if (summary) summary.textContent = "Q. 質問を入力してください";
-
-    // summary 以外の最初の子要素（回答）のテキストをリセット
     for (const child of Array.from(clone.children)) {
       if (child.tagName.toLowerCase() !== "summary") {
         child.textContent = "A. 回答を入力してください";
         break;
       }
     }
-
     last.parentElement?.appendChild(clone);
+    return doc.body.innerHTML;
+  }
+
+  // ── 汎用 Q./A. テキストパターン ──
+  const qEls = findInnermostQEls(section);
+  if (qEls.length > 0) {
+    const lastQ = qEls[qEls.length - 1];
+    const itemRoot = getFaqItemRoot(section, lastQ);
+
+    // wrapper パターン: itemRoot 内に A テキストも含まれる（＝1要素でQ+Aが揃う）
+    const itemHasA = RE_FAQ_A.test((itemRoot.textContent ?? "").trim());
+    if (itemHasA && itemRoot !== lastQ) {
+      const clone = itemRoot.cloneNode(true) as Element;
+      resetQAText(clone);
+      itemRoot.parentElement?.appendChild(clone);
+      return doc.body.innerHTML;
+    }
+
+    // sibling パターン: Q の後に A 要素が兄弟として続く
+    const unit: Element[] = [itemRoot];
+    let sib = itemRoot.nextElementSibling;
+    while (sib) {
+      const sibHasQ =
+        RE_FAQ_Q.test((sib.textContent ?? "").trim()) ||
+        Array.from(sib.querySelectorAll("*")).some((c) =>
+          RE_FAQ_Q.test((c.textContent ?? "").trim())
+        );
+      if (sibHasQ) break;
+      unit.push(sib);
+      sib = sib.nextElementSibling;
+    }
+    unit.forEach((orig) => {
+      const clone = orig.cloneNode(true) as Element;
+      resetQAText(clone);
+      section.appendChild(clone);
+    });
     return doc.body.innerHTML;
   }
 
@@ -466,10 +555,14 @@ function getFaqItems(html: string, sectionId: string): string[] {
     return Array.from(templateItems).map((el) => el.textContent?.trim() ?? "");
   }
 
-  // AI 生成 FAQ
-  return Array.from(section.querySelectorAll("details summary")).map(
-    (el) => el.textContent?.trim() ?? ""
-  );
+  // AI 生成 FAQ（<details>）
+  const detailsSummaries = section.querySelectorAll("details summary");
+  if (detailsSummaries.length > 0) {
+    return Array.from(detailsSummaries).map((el) => el.textContent?.trim() ?? "");
+  }
+
+  // 汎用 Q./A. パターン
+  return findInnermostQEls(section).map((el) => (el.textContent ?? "").trim());
 }
 
 /** FAQ セクションの指定インデックスの項目を削除する */
@@ -487,14 +580,41 @@ function removeFaqItemFromHtml(html: string, sectionId: string, index: number): 
     return doc.body.innerHTML;
   }
 
-  // AI 生成 FAQ
+  // AI 生成 FAQ（<details>）
   const allDetails = Array.from(section.querySelectorAll("details"));
-  if (allDetails[index]) {
-    allDetails[index].parentElement?.removeChild(allDetails[index]);
+  if (allDetails.length > 0) {
+    if (allDetails[index]) allDetails[index].parentElement?.removeChild(allDetails[index]);
     return doc.body.innerHTML;
   }
 
-  return html;
+  // 汎用 Q./A. パターン
+  const qEls = findInnermostQEls(section);
+  if (index < 0 || index >= qEls.length) return html;
+  const targetQ = qEls[index];
+  const itemRoot = getFaqItemRoot(section, targetQ);
+
+  // wrapper パターン
+  const itemHasA = RE_FAQ_A.test((itemRoot.textContent ?? "").trim());
+  if (itemHasA && itemRoot !== targetQ) {
+    itemRoot.parentElement?.removeChild(itemRoot);
+    return doc.body.innerHTML;
+  }
+
+  // sibling パターン: Q + 後続 A 要素をまとめて削除
+  const toRemove: Element[] = [itemRoot];
+  let sib = itemRoot.nextElementSibling;
+  while (sib) {
+    const sibHasQ =
+      RE_FAQ_Q.test((sib.textContent ?? "").trim()) ||
+      Array.from(sib.querySelectorAll("*")).some((c) =>
+        RE_FAQ_Q.test((c.textContent ?? "").trim())
+      );
+    if (sibHasQ) break;
+    toRemove.push(sib);
+    sib = sib.nextElementSibling;
+  }
+  toRemove.forEach((el) => el.parentElement?.removeChild(el));
+  return doc.body.innerHTML;
 }
 
 // ─── Gallery helpers ──────────────────────────────────────────────────────────
