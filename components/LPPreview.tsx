@@ -826,6 +826,10 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
             }
           });
         });
+        // ③ native <form action="..."> を無効化（意図しない外部 POST を防止）
+        doc.querySelectorAll("form[action]").forEach((form) => {
+          form.setAttribute("action", "javascript:void(0)");
+        });
         effectiveHtml = doc.body.innerHTML;
       } catch { /* ignore */ }
     }

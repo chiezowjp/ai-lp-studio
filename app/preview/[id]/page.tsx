@@ -49,7 +49,11 @@ export default async function PreviewPage({ params }: Props) {
                      ?? (project.css as string)
                      ?? "";
   const customCss     = (project.custom_css as string | null) || "";
-  const html          = (project.html as string) || "";
+  // LP 内の native <form action="..."> を無効化（FormWidget を使うため）
+  const html          = ((project.html as string) || "").replace(
+    /(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi,
+    '$1 action="javascript:void(0)"',
+  );
   const customHeadHtml = (project.custom_head_html as string | null) || "";
   const isPublished   = project.is_published as boolean;
   const slug          = project.slug as string | null;
