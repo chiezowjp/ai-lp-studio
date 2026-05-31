@@ -753,6 +753,8 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
   // スクロール保持：前回の html / editMode を記憶し CSS だけ変わった場合を検出
   const prevHtmlRef = useRef(html);
   const prevEditModeRef = useRef(editMode);
+  // メッセージハンドラ内で最新 html を参照するための ref（関数クロージャの stale 回避）
+  const currentHtmlRef = useRef(html);
   const editable = !!onHtmlChange;
 
   // ─── message handler を安定させるための refs ───────────────────────────────
@@ -769,6 +771,7 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
   useEffect(() => { onHtmlChangeRef.current = onHtmlChange; });
   useEffect(() => { onHtmlSilentUpdateRef.current = onHtmlSilentUpdate; });
   useEffect(() => { onElementSelectRef.current = onElementSelect; });
+  useEffect(() => { currentHtmlRef.current = html; });
 
   useEffect(() => {
     selectedSelectorRef.current = selectedSelector ?? null;
@@ -1150,7 +1153,13 @@ ${BUBBLE_GUIDE_CSS}
         // data-element-id が付与された HTML を Undo なしで result.html に同期する。
         // これにより insertImageAdjacentToElement が data-element-id で正確な要素を特定できる。
         if (e.data.updatedHtml && onHtmlSilentUpdateRef.current) {
-          skipNextRef.current = true; // iframe を再ロードさせない
+          // HTML が実際に変わる場合のみ skipNext をセット。
+          // 変わらない場合（既に data-element-id 付き挿入済み画像を再クリックなど）は
+          // buildContent が更新されず effect が走らないため skipNext がリセットされず、
+          // 直後の削除など正規の HTML 更新がスキップされてしまうのを防ぐ。
+          if ((e.data.updatedHtml as string) !== currentHtmlRef.current) {
+            skipNextRef.current = true; // iframe を再ロードさせない
+          }
           onHtmlSilentUpdateRef.current(e.data.updatedHtml as string);
         }
         onElementSelectRef.current?.({
