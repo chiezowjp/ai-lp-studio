@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient, getUserFromRequest } from "@/lib/supabase-admin";
+import { cancelSubscription } from "@/lib/square";
 
 /**
  * POST /api/billing/cancel
@@ -43,12 +44,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "すでに解約済みです" }, { status: 400 });
   }
 
-  // TODO: Square Subscriptions API を本番実装する場合はここで呼び出す
-  // if (profile.square_subscription_id) {
-  //   await squareFetch(`/v2/subscriptions/${profile.square_subscription_id}`, {
-  //     method: "DELETE",
-  //   });
-  // }
+  // Square Subscriptions API でサブスクリプションをキャンセル
+  if (profile.square_subscription_id) {
+    try {
+      await cancelSubscription(profile.square_subscription_id as string);
+      console.log(`[cancel] Square subscription canceled: ${profile.square_subscription_id}`);
+    } catch (err) {
+      console.error("[cancel] Square cancelSubscription error:", err);
+      return NextResponse.json(
+        { error: "Square でのキャンセル処理に失敗しました。しばらく後に再試行してください。" },
+        { status: 500 },
+      );
+    }
+  }
 
   // DB を更新（plan_type は current_period_end まで pro のまま）
   const { error: updateErr } = await admin

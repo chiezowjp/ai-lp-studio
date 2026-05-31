@@ -5,10 +5,11 @@
  * SQUARE_ENV=production           → 本番環境
  *
  * 必要な環境変数:
- *   SQUARE_ACCESS_TOKEN           — Square アクセストークン
- *   SQUARE_LOCATION_ID            — Square ロケーション ID
- *   SQUARE_WEBHOOK_SIGNATURE_KEY  — Webhook 署名キー
- *   NEXT_PUBLIC_APP_URL           — アプリの公開 URL（リダイレクト先）
+ *   SQUARE_ACCESS_TOKEN                    — Square アクセストークン
+ *   SQUARE_LOCATION_ID                     — Square ロケーション ID
+ *   SQUARE_WEBHOOK_SIGNATURE_KEY           — Webhook 署名キー
+ *   SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID  — サブスクリプションプランバリエーション ID
+ *   NEXT_PUBLIC_APP_URL                    — アプリの公開 URL（リダイレクト先）
  */
 
 const IS_PRODUCTION = process.env.SQUARE_ENV === "production";
@@ -55,7 +56,7 @@ export async function squareFetch<T>(
   return json as T;
 }
 
-// ─── Payment Link 作成 ────────────────────────────────────────────────────────
+// ─── サブスクリプション Payment Link 作成 ─────────────────────────────────────
 
 interface CreatePaymentLinkResponse {
   payment_link: {
@@ -66,14 +67,45 @@ interface CreatePaymentLinkResponse {
 }
 
 /**
- * Square Payment Link を作成して URL を返す。
- * order.reference_id に Supabase user.id をセットすることで
- * Webhook ハンドラーでユーザーを特定できるようにする。
+ * Square サブスクリプション Payment Link を作成して URL を返す。
+ *
+ * SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID に設定したプランバリエーション ID を使用。
+ * 購入者がチェックアウトを完了すると Square が自動的にサブスクリプションを作成し、
+ * subscription.created / payment.created Webhook が発火する。
+ *
+ * ユーザー識別:
+ *   subscription.created → customer_id → Square Customer の reference_id = userId
+ *   （createCheckoutLink 実行時に Square Customer を事前作成して reference_id を埋め込む）
  */
 export async function createCheckoutLink(userId: string): Promise<string> {
-  // 同一ユーザーが短期間に複数リクエストしても安全なよう、
-  // タイムスタンプを含めた冪等キーを使用する
   const idempotencyKey = `checkout-${userId}-${Date.now()}`;
+
+  // ── Step 1: Square Customer を作成（冪等キーで重複防止） ──────────────────
+  // reference_id に Supabase userId を埋め込む。
+  // subscription.created Webhook でこの値を使ってユーザーを特定する。
+  let squareCustomerId: string | undefined;
+  try {
+    const customerRes = await squareFetch<{ customer: { id: string } }>(
+      "/v2/customers",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          idempotency_key: `customer-${userId}`,
+          reference_id: userId,
+        }),
+      },
+    );
+    squareCustomerId = customerRes.customer.id;
+  } catch (err) {
+    // Customer 作成失敗は致命的ではない（Webhook 側でメール照合にフォールバック）
+    console.warn("[square] createCustomer failed, continuing without customer_id:", err);
+  }
+
+  // ── Step 2: サブスクリプション Payment Link を作成 ───────────────────────
+  const planVariationId = process.env.SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID;
+  if (!planVariationId) {
+    throw new Error("SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID が設定されていません");
+  }
 
   const data = await squareFetch<CreatePaymentLinkResponse>(
     "/v2/online-checkout/payment-links",
@@ -81,25 +113,14 @@ export async function createCheckoutLink(userId: string): Promise<string> {
       method: "POST",
       body: JSON.stringify({
         idempotency_key: idempotencyKey,
-        order: {
-          location_id: process.env.SQUARE_LOCATION_ID,
-          reference_id: userId,
-          line_items: [
-            {
-              name: "AI LP STUDIO Pro プラン",
-              quantity: "1",
-              item_type: "ITEM",
-              base_price_money: {
-                amount: 2980,
-                currency: "JPY",
-              },
-            },
-          ],
-        },
+        subscription_plan_id: planVariationId,
         checkout_options: {
           redirect_url: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/billing/success`,
           ask_for_shipping_address: false,
         },
+        ...(squareCustomerId
+          ? { pre_populated_data: { buyer_reference_id: squareCustomerId } }
+          : {}),
       }),
     },
   );
@@ -127,4 +148,38 @@ export async function getOrder(orderId: string): Promise<{ reference_id?: string
     reference_id: data.order.reference_id,
     state: data.order.state,
   };
+}
+
+// ─── Customer 取得 ────────────────────────────────────────────────────────────
+
+interface GetCustomerResponse {
+  customer: {
+    id: string;
+    reference_id?: string;
+    email_address?: string;
+  };
+}
+
+/**
+ * Square Customer を取得する。
+ * subscription.created Webhook で customer_id → reference_id (= userId) を取得するために使用する。
+ */
+export async function getCustomer(customerId: string): Promise<{ reference_id?: string; email_address?: string }> {
+  const data = await squareFetch<GetCustomerResponse>(`/v2/customers/${customerId}`);
+  return {
+    reference_id: data.customer.reference_id,
+    email_address: data.customer.email_address,
+  };
+}
+
+// ─── サブスクリプションキャンセル ─────────────────────────────────────────────
+
+/**
+ * Square サブスクリプションをキャンセルする。
+ * キャンセル後も current billing period の終了まで有効。
+ */
+export async function cancelSubscription(subscriptionId: string): Promise<void> {
+  await squareFetch(`/v2/subscriptions/${subscriptionId}/cancel`, {
+    method: "POST",
+  });
 }

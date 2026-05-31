@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getOrder } from "@/lib/square";
+import { getOrder, getCustomer } from "@/lib/square";
 import { GRACE_PERIOD_DAYS, SQUARE_PRO_MONTHLY_PRICE } from "@/lib/plans";
 
 // ─── Signature Verification ───────────────────────────────────────────────────
@@ -166,6 +166,78 @@ async function handlePaymentEvent(
 }
 
 /**
+ * subscription.created
+ * - サブスクリプション新規作成時に customer_id / subscription_id を profiles に保存し Pro に昇格。
+ * - customer.reference_id (= userId) を優先。取得できなければ email でユーザーを照合。
+ */
+async function handleSubscriptionCreated(
+  event: Record<string, unknown>,
+  admin: AdminClient,
+): Promise<void> {
+  const data = event.data as Record<string, unknown> | undefined;
+  const obj  = data?.object as Record<string, unknown> | undefined;
+  const sub  = obj?.subscription as Record<string, unknown> | undefined;
+
+  if (!sub) return;
+
+  const customerId = sub.customer_id as string | undefined;
+  const subId      = sub.id as string | undefined;
+
+  if (!customerId) {
+    console.warn("[webhook] subscription.created: missing customer_id");
+    return;
+  }
+
+  // Square Customer から reference_id (= userId) または email を取得
+  let userId: string | null = null;
+  try {
+    const customer = await getCustomer(customerId);
+
+    if (customer.reference_id) {
+      // createCheckoutLink で埋め込んだ userId
+      userId = customer.reference_id;
+    } else if (customer.email_address) {
+      // フォールバック: メールアドレスで profiles を検索
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("id")
+        .eq("email", customer.email_address)
+        .maybeSingle();
+      userId = profile?.id ?? null;
+    }
+  } catch (err) {
+    console.error("[webhook] getCustomer failed:", err);
+    return;
+  }
+
+  if (!userId) {
+    console.warn("[webhook] subscription.created: could not resolve userId from customer", customerId);
+    return;
+  }
+
+  // customer_id / subscription_id を保存 + Pro 昇格
+  const now = new Date().toISOString();
+  const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error } = await admin.from("profiles").update({
+    plan_type: "pro",
+    billing_status: "active",
+    square_customer_id: customerId,
+    square_subscription_id: subId,
+    current_period_end: periodEnd,
+    plan_started_at: now,
+    usage_reset_at: now,
+    grace_period_ends_at: null,
+  }).eq("id", userId);
+
+  if (error) {
+    console.error("[webhook] subscription.created update error:", error);
+  } else {
+    console.log(`[webhook] subscription created userId=${userId} customerId=${customerId} subId=${subId}`);
+  }
+}
+
+/**
  * subscription.updated
  * - status=ACTIVE → billing_status=active（回収成功・更新）
  * - status=PAUSED / DEACTIVATED → billing_status=past_due + Grace Period
@@ -311,6 +383,8 @@ export async function POST(req: NextRequest) {
   try {
     if (eventType === "payment.created" || eventType === "payment.updated") {
       await handlePaymentEvent(event, eventId, admin);
+    } else if (eventType === "subscription.created") {
+      await handleSubscriptionCreated(event, admin);
     } else if (eventType === "subscription.updated") {
       await handleSubscriptionUpdated(event, admin);
     } else if (
