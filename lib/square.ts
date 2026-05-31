@@ -24,10 +24,13 @@ const SQUARE_VERSION = "2024-07-17";
 // ─── 共通ヘッダー ──────────────────────────────────────────────────────────────
 
 function squareHeaders(): Record<string, string> {
+  const token = IS_PRODUCTION
+    ? process.env.SQUARE_ACCESS_TOKEN
+    : (process.env.SQUARE_SANDBOX_ACCESS_TOKEN ?? process.env.SQUARE_ACCESS_TOKEN);
   return {
     "Square-Version": SQUARE_VERSION,
     "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env.SQUARE_ACCESS_TOKEN ?? ""}`,
+    Authorization: `Bearer ${token ?? ""}`,
   };
 }
 
@@ -102,9 +105,15 @@ export async function createCheckoutLink(userId: string): Promise<string> {
   }
 
   // ── Step 2: サブスクリプション Payment Link を作成 ───────────────────────
-  const planVariationId = process.env.SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID;
+  const planVariationId = IS_PRODUCTION
+    ? process.env.SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID
+    : process.env.SQUARE_SANDBOX_PLAN_VARIATION_ID;
   if (!planVariationId) {
-    throw new Error("SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID が設定されていません");
+    throw new Error(
+      IS_PRODUCTION
+        ? "SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID が設定されていません"
+        : "SQUARE_SANDBOX_PLAN_VARIATION_ID が設定されていません",
+    );
   }
 
   const data = await squareFetch<CreatePaymentLinkResponse>(
@@ -121,7 +130,9 @@ export async function createCheckoutLink(userId: string): Promise<string> {
             amount: 2980,
             currency: "JPY",
           },
-          location_id: process.env.SQUARE_LOCATION_ID,
+          location_id: IS_PRODUCTION
+            ? process.env.SQUARE_LOCATION_ID
+            : process.env.SQUARE_SANDBOX_LOCATION_ID,
         },
         subscription_plan_id: planVariationId,
         checkout_options: {
@@ -177,6 +188,53 @@ export async function getCustomer(customerId: string): Promise<{ reference_id?: 
     reference_id: data.customer.reference_id,
     email_address: data.customer.email_address,
   };
+}
+
+// ─── サブスクリプション作成 ───────────────────────────────────────────────────
+
+/**
+ * Square Subscriptions API でサブスクリプションを作成する。
+ * payment.created で初回決済が完了した後に呼び出し、月次自動更新を設定する。
+ *
+ * @param customerId  Square の customer_id
+ * @param cardId      決済に使われたカード ID（card_details.card.id）
+ * @param startDate   サブスク開始日（YYYY-MM-DD）— 二重請求を避けるため翌月初を推奨
+ */
+export async function createSubscription(
+  customerId: string,
+  cardId: string,
+  startDate: string,
+): Promise<{ subscriptionId: string }> {
+  const planVariationId = IS_PRODUCTION
+    ? process.env.SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID
+    : process.env.SQUARE_SANDBOX_PLAN_VARIATION_ID;
+
+  const locationId = IS_PRODUCTION
+    ? process.env.SQUARE_LOCATION_ID
+    : process.env.SQUARE_SANDBOX_LOCATION_ID;
+
+  if (!planVariationId || !locationId) {
+    throw new Error("SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID または SQUARE_LOCATION_ID が未設定");
+  }
+
+  const idempotencyKey = `sub-${customerId}-${Date.now()}`;
+
+  const data = await squareFetch<{ subscription: { id: string } }>(
+    "/v2/subscriptions",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        idempotency_key: idempotencyKey,
+        location_id: locationId,
+        plan_variation_id: planVariationId,
+        customer_id: customerId,
+        card_id: cardId,
+        start_date: startDate,
+      }),
+    },
+  );
+
+  return { subscriptionId: data.subscription.id };
 }
 
 // ─── サブスクリプションキャンセル ─────────────────────────────────────────────

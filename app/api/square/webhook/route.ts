@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getOrder, getCustomer } from "@/lib/square";
+import { getOrder, getCustomer, createSubscription } from "@/lib/square";
 import { GRACE_PERIOD_DAYS, SQUARE_PRO_MONTHLY_PRICE } from "@/lib/plans";
 
 // ─── Signature Verification ───────────────────────────────────────────────────
@@ -109,8 +109,14 @@ async function handlePaymentEvent(
 
   if (!payment) return;
 
-  const status  = payment.status as string | undefined;
-  const orderId = payment.order_id as string | undefined;
+  const status     = payment.status as string | undefined;
+  const orderId    = payment.order_id as string | undefined;
+  const customerId = payment.customer_id as string | undefined;
+
+  // カード ID（サブスク作成に必要）
+  const cardDetails = payment.card_details as Record<string, unknown> | undefined;
+  const card        = cardDetails?.card as Record<string, unknown> | undefined;
+  const cardId      = card?.id as string | undefined;
 
   // 金額情報
   const amountMoney = payment.amount_money as Record<string, unknown> | undefined;
@@ -136,7 +142,37 @@ async function handlePaymentEvent(
       amount: amount ?? SQUARE_PRO_MONTHLY_PRICE,
       currency: currency ?? "JPY",
     });
+
+    // Pro に昇格（即時アクセス付与）
     await upgradeToPro(admin, userId);
+
+    // customer_id を profiles に保存
+    if (customerId) {
+      await admin.from("profiles")
+        .update({ square_customer_id: customerId })
+        .eq("id", userId);
+    }
+
+    // サブスクリプションを作成（翌月から自動更新）
+    if (customerId && cardId) {
+      try {
+        const nextMonth = new Date();
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        const startDate = nextMonth.toISOString().slice(0, 10); // YYYY-MM-DD
+
+        const { subscriptionId } = await createSubscription(customerId, cardId, startDate);
+        await admin.from("profiles")
+          .update({ square_subscription_id: subscriptionId })
+          .eq("id", userId);
+        console.log(`[webhook] subscription created: ${subscriptionId} for userId=${userId}`);
+      } catch (subErr) {
+        // サブスク作成失敗は Pro 昇格を取り消さない（次回更新時に手動対応）
+        console.error("[webhook] createSubscription failed:", subErr);
+      }
+    } else {
+      console.warn("[webhook] cannot create subscription: missing customerId or cardId");
+    }
+
     return;
   }
 
