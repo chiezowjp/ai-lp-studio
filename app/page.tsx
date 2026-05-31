@@ -1259,6 +1259,11 @@ export default function Home() {
     setServiceName(data.serviceName);
     setLastFormData(data);
     setUnsplashResult(null);
+    // 新規生成なので前のプロジェクト ID・公開状態をリセット（残ったまま PUT すると Not found になる）
+    setRemoteProjectId(null);
+    setPublishedSlug(null);
+    setSavedProject(null);
+    clearLocal();
     try {
       const generated = await generateWithRetry(data, (msg) => setRetryMessage(msg), session?.access_token);
       setResult(generated);
