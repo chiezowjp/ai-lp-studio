@@ -29,7 +29,7 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
   const { user } = guard;
 
   const { id } = await ctx.params;
-  const body = await req.json() as { action?: string };
+  const body = await req.json() as { action?: string; css?: string };
   const action = body.action;
 
   if (action !== "publish" && action !== "unpublish") {
@@ -108,8 +108,9 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
         last_published_at: nowIso,
         slug,
         // Phase 8: draft を published にコピー
+        // body.css が存在する場合はクライアントの effectiveCss（画像・ビジュアルスタイル含む）を優先
         published_html:    project.html,
-        published_css:     project.css,
+        published_css:     body.css ?? project.css,
         updated_at:        nowIso,
       })
       .eq("id", id)

@@ -1725,6 +1725,7 @@ export default function Home() {
         projectId={remoteProjectId}
         projectTitle={serviceName || "無題LP"}
         session={session}
+        effectiveCss={effectiveCss}
         onPublishChange={(published, slug) => {
           setPublishedSlug(published ? slug : null);
         }}

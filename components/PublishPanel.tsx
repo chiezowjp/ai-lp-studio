@@ -30,6 +30,12 @@ interface Props {
   session: Session | null;
   /** 公開状態変化時に親へ通知 */
   onPublishChange?: (published: boolean, slug: string | null) => void;
+  /**
+   * 画像・ビジュアルスタイル・フォント等を含む最終的な有効 CSS。
+   * 公開時にこの CSS を published_css として保存することで
+   * 公開ページにも背景画像・スタイルが正しく反映される。
+   */
+  effectiveCss?: string;
 }
 
 // ─── 公開前チェックリスト ──────────────────────────────────────────────────────
@@ -87,6 +93,7 @@ function PrePublishChecklist({ settings, title }: { settings: PublishSettings; t
 export default function PublishPanel({
   open,
   onClose,
+  effectiveCss,
   projectId,
   projectTitle,
   session,
@@ -223,7 +230,7 @@ export default function PublishPanel({
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, ...(effectiveCss ? { css: effectiveCss } : {}) }),
       });
       const json = await res.json() as PublishSettings & { error?: string; code?: string };
       if (!res.ok) {
