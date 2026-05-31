@@ -32,10 +32,11 @@ export async function PUT(req: NextRequest, ctx: RouteCtx) {
 
   const { id } = await ctx.params;
   const body = await req.json();
-  const { title, html, css, project_json } = body as {
+  const { title, html, css, effective_css, project_json } = body as {
     title: string;
     html: string;
     css: string;
+    effective_css?: string;
     project_json: Record<string, unknown>;
   };
 
@@ -51,9 +52,15 @@ export async function PUT(req: NextRequest, ctx: RouteCtx) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // effective_css（画像・ビジュアルスタイル・フォント込みの最終 CSS）を
+  // project_json に含めて保存。プレビューページがこれを参照する。
+  const mergedProjectJson = effective_css
+    ? { ...project_json, effective_css }
+    : project_json;
+
   const { data, error } = await admin
     .from("projects")
-    .update({ title, html, css, project_json, updated_at: new Date().toISOString() })
+    .update({ title, html, css, project_json: mergedProjectJson, updated_at: new Date().toISOString() })
     .eq("id", id)
     .select()
     .single();

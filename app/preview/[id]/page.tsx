@@ -13,7 +13,7 @@ async function getProjectForPreview(id: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from("projects")
-    .select("id, title, html, css, custom_css, custom_head_html, slug, is_published")
+    .select("id, title, html, css, published_css, project_json, custom_css, custom_head_html, slug, is_published")
     .eq("id", id)
     .maybeSingle();
   return data;
@@ -39,7 +39,15 @@ export default async function PreviewPage({ params }: Props) {
 
   if (!project) notFound();
 
-  const css           = (project.css as string) || "";
+  // CSS の優先順位:
+  // 1. project_json.effective_css（保存時に含めた画像・ビジュアル込み最終 CSS）
+  // 2. published_css（公開時に保存した effectiveCss）
+  // 3. css（AI 生成の基本 CSS — フォールバック）
+  const projectJson   = project.project_json as Record<string, unknown> | null;
+  const css           = (projectJson?.effective_css as string | null)
+                     ?? (project.published_css as string | null)
+                     ?? (project.css as string)
+                     ?? "";
   const customCss     = (project.custom_css as string | null) || "";
   const html          = (project.html as string) || "";
   const customHeadHtml = (project.custom_head_html as string | null) || "";

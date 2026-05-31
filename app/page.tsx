@@ -792,6 +792,10 @@ export default function Home() {
     return css;
   }, [result, colorReplacements, additionalCss, images, visualStyles, globalFont]);
 
+  // effectiveCss を ref に保持（buildCloudPayload などの useCallback 内から参照できるよう）
+  const effectiveCssRef = useRef<string>("");
+  effectiveCssRef.current = effectiveCss;
+
   /** HTML/Netlify出力用：ボタン画像差し替えを適用したHTML */
   const buttonProcessedHtml = useMemo(() => {
     if (!result?.html) return "";
@@ -1308,6 +1312,7 @@ export default function Home() {
       title: project.name,
       html: project.html,
       css: project.css,
+      effective_css: effectiveCssRef.current,
       project_json: project as unknown as Record<string, unknown>,
     };
   }, [buildCloudSnapshot]);
