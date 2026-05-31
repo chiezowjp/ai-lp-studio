@@ -108,7 +108,9 @@ export default function PublishPanel({
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [toast, setToast]           = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced]       = useState(false);
+  /** 初回公開の確認ステップを表示中か */
+  const [confirmingPublish, setConfirmingPublish] = useState(false);
 
   // スラッグ編集用
   const [slugInput, setSlugInput]   = useState("");
@@ -582,29 +584,64 @@ export default function PublishPanel({
 
         {/* Footer */}
         {projectId && canPublish && settings && !fetching && (
-          <div className="flex gap-2.5 px-5 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
-            <button
-              onClick={handleSaveSeo}
-              disabled={saving}
-              className="flex-1 py-2.5 text-sm font-semibold border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 disabled:opacity-60 transition-colors"
-            >
-              {saving ? "保存中..." : "設定を保存"}
-            </button>
-            <button
-              onClick={handleTogglePublish}
-              disabled={publishing}
-              className={`flex-1 py-2.5 text-sm font-black rounded-xl transition-colors disabled:opacity-60
-                ${settings.is_published
-                  ? "border border-red-200 text-red-500 hover:bg-red-50"
-                  : "bg-[#00AFCC] hover:bg-[#0099b3] text-white shadow-sm"
-                }`}
-            >
-              {publishing
-                ? "処理中..."
-                : settings.is_published
-                ? "非公開にする"
-                : "🚀 公開する"}
-            </button>
+          <div className="px-5 py-4 border-t border-gray-100 sticky bottom-0 bg-white space-y-2.5">
+            {/* 初回公開 確認ステップ */}
+            {confirmingPublish && !settings.is_published && (
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 space-y-2">
+                <p className="text-xs font-black text-amber-700">本当に公開しますか？</p>
+                <p className="text-[11px] text-amber-600 leading-relaxed">
+                  公開URLが発行され、インターネット上で誰でも閲覧できるようになります。
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmingPublish(false)}
+                    className="flex-1 py-2 text-xs font-semibold border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={() => { setConfirmingPublish(false); void handleTogglePublish(); }}
+                    disabled={publishing}
+                    className="flex-1 py-2 text-xs font-black text-white bg-[#00AFCC] hover:bg-[#0099b3] rounded-lg transition-colors disabled:opacity-60"
+                  >
+                    {publishing ? "処理中..." : "公開する"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-2.5">
+              <button
+                onClick={handleSaveSeo}
+                disabled={saving}
+                className="flex-1 py-2.5 text-sm font-semibold border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-50 disabled:opacity-60 transition-colors"
+              >
+                {saving ? "保存中..." : "設定を保存"}
+              </button>
+              <button
+                onClick={() => {
+                  if (!settings.is_published) {
+                    // 初回公開は確認ステップを挟む
+                    setConfirmingPublish(true);
+                  } else {
+                    // 非公開化はワンクリックでOK
+                    void handleTogglePublish();
+                  }
+                }}
+                disabled={publishing}
+                className={`flex-1 py-2.5 text-sm font-black rounded-xl transition-colors disabled:opacity-60
+                  ${settings.is_published
+                    ? "border border-red-200 text-red-500 hover:bg-red-50"
+                    : "bg-[#00AFCC] hover:bg-[#0099b3] text-white shadow-sm"
+                  }`}
+              >
+                {publishing
+                  ? "処理中..."
+                  : settings.is_published
+                  ? "非公開にする"
+                  : "🚀 公開する"}
+              </button>
+            </div>
           </div>
         )}
       </div>
