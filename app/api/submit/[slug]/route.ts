@@ -15,7 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase-admin";
 import type { FormConfig, FormField, WebhookPayload } from "@/lib/form-schema";
-import { sendMail, buildLeadNotificationHtml } from "@/lib/mailer";
+import { sendMail, buildLeadNotificationHtml, buildAutoReplyHtml } from "@/lib/mailer";
 import { appendToGoogleSheets, extractSpreadsheetId } from "@/lib/google-sheets";
 
 type RouteCtx = { params: Promise<{ slug: string }> };
@@ -271,6 +271,45 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
           });
         } catch (e) {
           console.error("[submit] Mail error:", e);
+        }
+      })()
+    );
+  }
+
+  // 自動返信メール（問い合わせ者へ）
+  if (formConfig.autoReply?.enabled) {
+    afterTasks.push(
+      (async () => {
+        try {
+          // email フィールドを探す
+          const emailField = formConfig.fields.find((f) => f.type === "email");
+          const replyTo = emailField ? String(payload[emailField.name] ?? "") : "";
+          if (!replyTo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) return;
+
+          const fieldLabels = formConfig.fields.map((f) => ({
+            label: f.label,
+            value: String(payload[f.name] ?? ""),
+          }));
+
+          const autoReplyHtml = buildAutoReplyHtml({
+            lpTitle:     project.title as string,
+            submittedAt: new Date((lead as { submitted_at: string }).submitted_at).toLocaleString("ja-JP"),
+            fields:      fieldLabels,
+            footer:      formConfig.autoReply.footer ?? "",
+          });
+
+          const subject = formConfig.autoReply.subject?.trim()
+            || `【${project.title as string}】お問い合わせを受け付けました`;
+
+          await sendMail({
+            to:       replyTo,
+            fromName: project.title as string,
+            subject,
+            html:     autoReplyHtml,
+            text:     `お問い合わせありがとうございます。以下の内容で受け付けました。\n\n${fieldLabels.map((f) => `${f.label}: ${f.value}`).join("\n")}`,
+          });
+        } catch (e) {
+          console.error("[submit] Auto-reply error:", e);
         }
       })()
     );

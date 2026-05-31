@@ -114,6 +114,56 @@ export function buildLeadNotificationHtml(params: {
 </html>`;
 }
 
+/**
+ * 問い合わせ者への自動返信メール HTML を生成する。
+ */
+export function buildAutoReplyHtml(params: {
+  lpTitle: string;
+  submittedAt: string;
+  fields: { label: string; value: string }[];
+  footer: string;
+}): string {
+  const rows = params.fields
+    .map(
+      (f) => `
+      <tr>
+        <td style="padding:8px 12px;font-size:13px;color:#555;font-weight:bold;width:30%;border-bottom:1px solid #f0f0f0;">${escapeHtml(f.label)}</td>
+        <td style="padding:8px 12px;font-size:13px;color:#333;border-bottom:1px solid #f0f0f0;">${escapeHtml(f.value)}</td>
+      </tr>`
+    )
+    .join("");
+
+  const footerHtml = params.footer
+    ? `<p style="margin:24px 0 0;font-size:13px;color:#444;white-space:pre-line;">${escapeHtml(params.footer)}</p>`
+    : "";
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head><meta charset="UTF-8"><title>お問い合わせ受付確認</title></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+    <div style="background:#00AFCC;padding:24px 32px;">
+      <p style="margin:0;color:#fff;font-size:12px;font-weight:bold;letter-spacing:.05em;">${escapeHtml(params.lpTitle)}</p>
+      <h1 style="margin:8px 0 0;color:#fff;font-size:20px;">✅ お問い合わせを受け付けました</h1>
+    </div>
+    <div style="padding:24px 32px;">
+      <p style="margin:0 0 16px;font-size:14px;color:#555;">
+        この度はお問い合わせいただき、ありがとうございます。<br>
+        以下の内容で受け付けました。担当者よりご連絡いたします。
+      </p>
+      <table style="width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;border:1px solid #f0f0f0;">
+        ${rows}
+      </table>
+      <p style="margin:16px 0 0;font-size:12px;color:#aaa;">
+        送信日時: ${params.submittedAt}
+      </p>
+      ${footerHtml}
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")

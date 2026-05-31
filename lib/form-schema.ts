@@ -34,6 +34,15 @@ export interface EmailNotificationConfig {
   toEmail: string | null;
 }
 
+export interface AutoReplyConfig {
+  /** 自動返信メールを送信するか */
+  enabled: boolean;
+  /** 件名（省略時はデフォルト） */
+  subject: string;
+  /** 本文の締め言葉（署名・補足など） */
+  footer: string;
+}
+
 export interface GoogleSheetsConfig {
   enabled: boolean;
   /** スプレッドシートID（URL の /d/{id}/ 部分） */
@@ -63,6 +72,8 @@ export interface FormConfig {
   redirectUrl: string | null;
   /** メール通知設定 */
   emailNotification: EmailNotificationConfig;
+  /** 問い合わせ者への自動返信設定 */
+  autoReply: AutoReplyConfig;
   /** Google Sheets 連携設定 */
   googleSheets: GoogleSheetsConfig;
   /** Webhook 送信設定 */
@@ -119,6 +130,11 @@ export const DEFAULT_FORM_CONFIG: FormConfig = {
   emailNotification: {
     enabled: true,
     toEmail: null,
+  },
+  autoReply: {
+    enabled: false,
+    subject: "",
+    footer: "",
   },
   googleSheets: {
     enabled: false,

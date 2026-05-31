@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import type { FormConfig, FormField, FieldType } from "@/lib/form-schema";
+import type { FormConfig, FormField, FieldType, AutoReplyConfig } from "@/lib/form-schema";
 import { DEFAULT_FORM_CONFIG } from "@/lib/form-schema";
 import { useAuth } from "@/lib/auth-context";
 
@@ -393,6 +393,77 @@ export default function FormConfigPanel({ projectId, projectSlug, isPublished }:
           {/* ─ 通知設定 ─ */}
           {activeSection === "notifications" && (
             <div className="space-y-4">
+              {/* 自動返信メール */}
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50">
+                  <div>
+                    <p className="text-xs font-bold text-gray-700">↩️ 自動返信メール</p>
+                    <p className="text-[10px] text-gray-400">問い合わせ者に受付確認を送信</p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setConfig((c) => ({
+                        ...c,
+                        autoReply: {
+                          ...(c.autoReply ?? { subject: "", footer: "" }),
+                          enabled: !(c.autoReply?.enabled ?? false),
+                        } as AutoReplyConfig,
+                      }))
+                    }
+                    className={`w-9 h-5 rounded-full transition-colors relative overflow-hidden ${
+                      config.autoReply?.enabled ? "bg-[#00AFCC]" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        config.autoReply?.enabled ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+                {config.autoReply?.enabled && (
+                  <div className="px-3 py-3 space-y-2.5">
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">
+                        件名
+                        <span className="font-normal text-gray-400 ml-1">（空 = 「【LP名】お問い合わせを受け付けました」）</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="お問い合わせを受け付けました"
+                        value={config.autoReply.subject ?? ""}
+                        onChange={(e) =>
+                          setConfig((c) => ({
+                            ...c,
+                            autoReply: { ...(c.autoReply as AutoReplyConfig), subject: e.target.value },
+                          }))
+                        }
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[#00AFCC]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-gray-600 block mb-1">
+                        署名・締め言葉
+                        <span className="font-normal text-gray-400 ml-1">（メール末尾に追加）</span>
+                      </label>
+                      <textarea
+                        placeholder={"〇〇サロン\nTEL: 000-0000-0000\n営業時間: 10:00〜18:00"}
+                        value={config.autoReply.footer ?? ""}
+                        onChange={(e) =>
+                          setConfig((c) => ({
+                            ...c,
+                            autoReply: { ...(c.autoReply as AutoReplyConfig), footer: e.target.value },
+                          }))
+                        }
+                        rows={3}
+                        className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[#00AFCC] resize-none"
+                      />
+                    </div>
+                    <p className="text-[10px] text-gray-400">※ フォームの「メールアドレス」フィールドに入力されたアドレス宛に送信されます</p>
+                  </div>
+                )}
+              </div>
+
               {/* メール通知 */}
               <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50">
