@@ -166,6 +166,28 @@ export async function getCustomer(customerId: string): Promise<{ reference_id?: 
   };
 }
 
+// ─── Customer のカード一覧取得 ─────────────────────────────────────────────────
+
+interface ListCardsResponse {
+  cards?: Array<{ id: string; card_brand?: string; last_4?: string }>;
+}
+
+/**
+ * Square Customer に紐づくカード一覧を取得し、最初のカード ID を返す。
+ * Payment Link チェックアウト後はカードが自動的に保存されるため、
+ * cardId が payment オブジェクトから取れない場合のフォールバックとして使用する。
+ */
+export async function getFirstCardId(customerId: string): Promise<string | null> {
+  try {
+    const data = await squareFetch<ListCardsResponse>(
+      `/v2/cards?customer_id=${customerId}`,
+    );
+    return data.cards?.[0]?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── サブスクリプション作成 ───────────────────────────────────────────────────
 
 /**

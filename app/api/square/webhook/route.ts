@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getOrder, getCustomer, createSubscription } from "@/lib/square";
+import { getOrder, getCustomer, createSubscription, getFirstCardId } from "@/lib/square";
 import { GRACE_PERIOD_DAYS, SQUARE_PRO_MONTHLY_PRICE } from "@/lib/plans";
 
 // ─── Signature Verification ───────────────────────────────────────────────────
@@ -154,23 +154,29 @@ async function handlePaymentEvent(
     }
 
     // サブスクリプションを作成（翌月から自動更新）
-    if (customerId && cardId) {
+    if (customerId) {
       try {
-        const nextMonth = new Date();
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
-        const startDate = nextMonth.toISOString().slice(0, 10); // YYYY-MM-DD
+        // cardId が payment オブジェクトになければ Customer のカード一覧から取得
+        const resolvedCardId = cardId ?? await getFirstCardId(customerId);
+        if (!resolvedCardId) {
+          console.warn("[webhook] cannot create subscription: no card found for customerId", customerId);
+        } else {
+          const nextMonth = new Date();
+          nextMonth.setMonth(nextMonth.getMonth() + 1);
+          const startDate = nextMonth.toISOString().slice(0, 10); // YYYY-MM-DD
 
-        const { subscriptionId } = await createSubscription(customerId, cardId, startDate);
-        await admin.from("profiles")
-          .update({ square_subscription_id: subscriptionId })
-          .eq("id", userId);
-        console.log(`[webhook] subscription created: ${subscriptionId} for userId=${userId}`);
+          const { subscriptionId } = await createSubscription(customerId, resolvedCardId, startDate);
+          await admin.from("profiles")
+            .update({ square_subscription_id: subscriptionId })
+            .eq("id", userId);
+          console.log(`[webhook] subscription created: ${subscriptionId} for userId=${userId}`);
+        }
       } catch (subErr) {
         // サブスク作成失敗は Pro 昇格を取り消さない（次回更新時に手動対応）
         console.error("[webhook] createSubscription failed:", subErr);
       }
     } else {
-      console.warn("[webhook] cannot create subscription: missing customerId or cardId");
+      console.warn("[webhook] cannot create subscription: missing customerId");
     }
 
     return;
