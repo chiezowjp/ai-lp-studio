@@ -263,10 +263,11 @@ export async function POST(req: NextRequest, ctx: RouteCtx) {
           });
 
           await sendMail({
-            to:      toEmail,
-            subject: `【新着】${project.title as string} にお問い合わせが届きました`,
+            to:       toEmail,
+            fromName: project.title as string,
+            subject:  `【新着】${project.title as string} にお問い合わせが届きました`,
             html,
-            text:    fieldLabels.map((f) => `${f.label}: ${f.value}`).join("\n"),
+            text:     fieldLabels.map((f) => `${f.label}: ${f.value}`).join("\n"),
           });
         } catch (e) {
           console.error("[submit] Mail error:", e);

@@ -16,6 +16,8 @@ export interface MailOptions {
   subject: string;
   html: string;
   text?: string;
+  /** 送信者の表示名。省略時は FROM_EMAIL の設定値をそのまま使用 */
+  fromName?: string;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -31,7 +33,16 @@ export async function sendMail(options: MailOptions): Promise<void> {
     return;
   }
 
-  const from = process.env.FROM_EMAIL ?? "onboarding@resend.dev";
+  // FROM_EMAIL は "Name <addr@example.com>" 形式または "addr@example.com" 形式
+  // fromName が指定された場合はアドレス部分だけ取り出して表示名を差し替える
+  const fromEnv = process.env.FROM_EMAIL ?? "onboarding@resend.dev";
+  let from = fromEnv;
+  if (options.fromName) {
+    // "Name <addr>" → addr 抽出、または fromEnv をそのままアドレスとして使用
+    const addrMatch = fromEnv.match(/<([^>]+)>/);
+    const addr = addrMatch ? addrMatch[1] : fromEnv;
+    from = `${options.fromName} <${addr}>`;
+  }
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
