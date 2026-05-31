@@ -577,7 +577,7 @@ const EDIT_JS = `(function () {
     if (directA && !directA.getAttribute('data-lp-editor')) {
       curLinkEl = directA;
       var rawHrefA = directA.getAttribute('data-original-href') || directA.getAttribute('href') || '';
-      var validHrefA = /^(https?:\/\/|tel:|mailto:|\/|#.+)/.test(rawHrefA) ? rawHrefA : '';
+      var validHrefA = /^(https?:\\/\\/|tel:|mailto:|\\/|#.+)/.test(rawHrefA) ? rawHrefA : '';
       window.parent.postMessage({ type: 'lp-link-focus', href: validHrefA }, '*');
     }
 
@@ -604,7 +604,7 @@ const EDIT_JS = `(function () {
       curLinkEl = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
       if (curLinkEl) {
         var rawHref = curLinkEl.getAttribute('data-original-href') || curLinkEl.getAttribute('href') || '';
-        var validHref = /^(https?:\/\/|tel:|mailto:|\/|#.+)/.test(rawHref) ? rawHref : '';
+        var validHref = /^(https?:\\/\\/|tel:|mailto:|\\/|#.+)/.test(rawHref) ? rawHref : '';
         window.parent.postMessage({ type: 'lp-link-focus', href: validHref }, '*');
       }
     }
