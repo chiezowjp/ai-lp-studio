@@ -83,58 +83,34 @@ interface CreatePaymentLinkResponse {
 export async function createCheckoutLink(userId: string): Promise<string> {
   const idempotencyKey = `checkout-${userId}-${Date.now()}`;
 
-  // ── Step 1: Square Customer を作成（冪等キーで重複防止） ──────────────────
-  // reference_id に Supabase userId を埋め込む。
-  // subscription.created Webhook でこの値を使ってユーザーを特定する。
-  let squareCustomerId: string | undefined;
-  try {
-    const customerRes = await squareFetch<{ customer: { id: string } }>(
-      "/v2/customers",
-      {
-        method: "POST",
-        body: JSON.stringify({
-          idempotency_key: `customer-${userId}`,
-          reference_id: userId,
-        }),
-      },
-    );
-    squareCustomerId = customerRes.customer.id;
-  } catch (err) {
-    // Customer 作成失敗は致命的ではない（Webhook 側でメール照合にフォールバック）
-    console.warn("[square] createCustomer failed, continuing without customer_id:", err);
-  }
+  const locationId = IS_PRODUCTION
+    ? process.env.SQUARE_LOCATION_ID
+    : process.env.SQUARE_SANDBOX_LOCATION_ID;
 
-  // ── Step 2: サブスクリプション Payment Link を作成 ───────────────────────
-  const planVariationId = IS_PRODUCTION
-    ? process.env.SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID
-    : process.env.SQUARE_SANDBOX_PLAN_VARIATION_ID;
-  if (!planVariationId) {
-    throw new Error(
-      IS_PRODUCTION
-        ? "SQUARE_SUBSCRIPTION_PLAN_VARIATION_ID が設定されていません"
-        : "SQUARE_SANDBOX_PLAN_VARIATION_ID が設定されていません",
-    );
-  }
-
+  // order.reference_id に userId を埋め込む。
+  // payment.created Webhook で order を取得し userId を特定するために使用する。
+  // 決済完了後、Webhook 側で Subscriptions API を呼び出してサブスクを作成する。
   const data = await squareFetch<CreatePaymentLinkResponse>(
     "/v2/online-checkout/payment-links",
     {
       method: "POST",
       body: JSON.stringify({
         idempotency_key: idempotencyKey,
-        // quick_pay は必須（商品名・価格・ロケーション）
-        // subscription_plan_id と組み合わせることでサブスクリプション決済になる
-        quick_pay: {
-          name: "AI LP STUDIO Pro プラン（月額）",
-          price_money: {
-            amount: 2980,
-            currency: "JPY",
-          },
-          location_id: IS_PRODUCTION
-            ? process.env.SQUARE_LOCATION_ID
-            : process.env.SQUARE_SANDBOX_LOCATION_ID,
+        order: {
+          location_id: locationId,
+          reference_id: userId,
+          line_items: [
+            {
+              name: "AI LP STUDIO Pro プラン（月額）",
+              quantity: "1",
+              item_type: "ITEM",
+              base_price_money: {
+                amount: 2980,
+                currency: "JPY",
+              },
+            },
+          ],
         },
-        subscription_plan_id: planVariationId,
         checkout_options: {
           redirect_url: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/billing/success`,
           ask_for_shipping_address: false,
