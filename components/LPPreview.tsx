@@ -569,6 +569,18 @@ const EDIT_JS = `(function () {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
+
+    // ── リンクバー: findTarget の結果に関わらず <a> を直接検索 ──
+    // findTarget が null を返して早期 return しても、<a> クリック時は必ずリンクバーを表示する。
+    // Pro LP の CTA が <div> 等の非リーフ構造でも確実に検出できるようにする。
+    var directA = e.target && e.target.closest ? e.target.closest('a') : null;
+    if (directA && !directA.getAttribute('data-lp-editor')) {
+      curLinkEl = directA;
+      var rawHrefA = directA.getAttribute('data-original-href') || directA.getAttribute('href') || '';
+      var validHrefA = /^(https?:\/\/|tel:|mailto:|\/|#.+)/.test(rawHrefA) ? rawHrefA : '';
+      window.parent.postMessage({ type: 'lp-link-focus', href: validHrefA }, '*');
+    }
+
     var el = findTarget(e.target);
     if (!el) { if (cur) finish(); return; }
     // <summary> クリック時は親 <details> の開閉もトグル（preventDefault で止まるため手動で）
@@ -587,15 +599,14 @@ const EDIT_JS = `(function () {
       if (r) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
     }
     cur = el;
-    // <a> またはその子要素の場合はリンク編集バーを親に表示させる
-    // findTarget は <span> 等の子要素を返すことがあるため、closest('a') で親 <a> も検索する
-    curLinkEl = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
-    if (curLinkEl) {
-      // data-original-href があれば元のhrefを優先（同オリジン無効化で # に書き換えた場合）
-      var rawHref = curLinkEl.getAttribute('data-original-href') || curLinkEl.getAttribute('href') || '';
-      // URL として有効な値のみ送信（テキストや # だけの場合は空文字にする）
-      var validHref = /^(https?:\/\/|tel:|mailto:|\/|#.+)/.test(rawHref) ? rawHref : '';
-      window.parent.postMessage({ type: 'lp-link-focus', href: validHref }, '*');
+    // findTarget が <a> でない要素を返した場合は closest('a') で再チェック（directA で検出済みの場合は上書き不要）
+    if (!directA) {
+      curLinkEl = el.tagName === 'A' ? el : (el.closest ? el.closest('a') : null);
+      if (curLinkEl) {
+        var rawHref = curLinkEl.getAttribute('data-original-href') || curLinkEl.getAttribute('href') || '';
+        var validHref = /^(https?:\/\/|tel:|mailto:|\/|#.+)/.test(rawHref) ? rawHref : '';
+        window.parent.postMessage({ type: 'lp-link-focus', href: validHref }, '*');
+      }
     }
   }, true);
 
