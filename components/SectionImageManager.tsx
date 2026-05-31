@@ -449,7 +449,7 @@ export default function SectionImageManager({
       {/* セクション選択（プルダウン） */}
       <div>
         <label className="text-[10px] font-semibold text-gray-500 block mb-1.5">
-          改善するセクション
+          背景画像を設定するセクション
         </label>
         <select
           value={selectedId}
@@ -470,7 +470,7 @@ export default function SectionImageManager({
       {/* セクション見出し */}
       <div className="rounded-xl bg-[#E6F8FC] border border-[#D8D8D2] px-3 py-2.5">
         <p className="text-xs font-bold text-[#222222]">
-          「{selectedSection?.label ?? "セクション"}」の画像を改善
+          「{selectedSection?.label ?? "セクション"}」の背景画像を設定
         </p>
         <p className="text-[10px] text-[#00AFCC] mt-0.5">
           {TABS.find((t) => t.id === activeTab)?.title}
