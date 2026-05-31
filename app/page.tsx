@@ -973,6 +973,9 @@ export default function Home() {
   const [showRestoreBanner, setShowRestoreBanner] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveToast, setSaveToast] = useState<string | null>(null);
+  const [saveToastIsError, setSaveToastIsError] = useState(false);
+  /** 最後に発生した保存エラーのメッセージ（ホバー tooltip 用） */
+  const [lastSaveError, setLastSaveError] = useState<string | null>(null);
   const [saveMenuOpen, setSaveMenuOpen] = useState(false);
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadFileRef = useRef<HTMLInputElement>(null);
@@ -1732,12 +1735,17 @@ export default function Home() {
       const toastMsg = json.is_published
         ? "クラウドに保存しました ☁（公開URLも更新されました）"
         : "クラウドに保存しました ☁";
+      setSaveToastIsError(false);
       setSaveToast(toastMsg);
       setTimeout(() => { setSaveToast(null); setCloudStatus("idle"); }, 3000);
     } catch (e) {
+      const errMsg = e instanceof Error ? e.message : "クラウド保存に失敗しました";
       setCloudStatus("error");
-      setSaveToast(e instanceof Error ? e.message : "クラウド保存に失敗しました");
-      setTimeout(() => { setSaveToast(null); setCloudStatus("idle"); }, 3000);
+      setLastSaveError(errMsg);
+      setSaveToastIsError(true);
+      setSaveToast(errMsg);
+      // エラートーストは8秒表示（すぐ消えて読めない問題を防ぐ）
+      setTimeout(() => { setSaveToast(null); setCloudStatus("idle"); }, 8000);
     } finally {
       setIsSaving(false);
     }
@@ -2267,7 +2275,13 @@ export default function Home() {
               <div className="hidden sm:flex items-center gap-1 text-[10px]">
                 {cloudStatus === "saving" && <><div className="w-2.5 h-2.5 border border-gray-400 border-t-transparent rounded-full animate-spin" /><span className="text-gray-400">保存中</span></>}
                 {cloudStatus === "saved"  && <><span className="text-green-500">✓</span><span className="text-gray-400">保存済み</span></>}
-                {cloudStatus === "error"  && <><span className="text-red-400">✗</span><span className="text-red-400">保存失敗</span></>}
+                {cloudStatus === "error"  && (
+                  <span className="flex items-center gap-1 cursor-help" title={lastSaveError ?? "保存に失敗しました"}>
+                    <span className="text-red-400">✗</span>
+                    <span className="text-red-400">保存失敗</span>
+                    {lastSaveError && <span className="text-[9px] text-red-300 max-w-[120px] truncate">（{lastSaveError}）</span>}
+                  </span>
+                )}
               </div>
             )}
 
@@ -2368,9 +2382,9 @@ export default function Home() {
 
       {/* ── 保存トースト ── */}
       {saveToast && (
-        <div className="fixed bottom-5 right-5 z-50 bg-gray-900 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-in">
-          <span className="text-green-400">✓</span>
-          {saveToast}
+        <div className={`fixed bottom-5 right-5 z-50 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 animate-in max-w-xs ${saveToastIsError ? "bg-red-600" : "bg-gray-900"}`}>
+          <span>{saveToastIsError ? "✗" : "✓"}</span>
+          <span className="break-words">{saveToast}</span>
         </div>
       )}
 
