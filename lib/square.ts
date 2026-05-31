@@ -113,14 +113,21 @@ export async function createCheckoutLink(userId: string): Promise<string> {
       method: "POST",
       body: JSON.stringify({
         idempotency_key: idempotencyKey,
+        // quick_pay は必須（商品名・価格・ロケーション）
+        // subscription_plan_id と組み合わせることでサブスクリプション決済になる
+        quick_pay: {
+          name: "AI LP STUDIO Pro プラン（月額）",
+          price_money: {
+            amount: 2980,
+            currency: "JPY",
+          },
+          location_id: process.env.SQUARE_LOCATION_ID,
+        },
         subscription_plan_id: planVariationId,
         checkout_options: {
           redirect_url: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/billing/success`,
           ask_for_shipping_address: false,
         },
-        ...(squareCustomerId
-          ? { pre_populated_data: { buyer_reference_id: squareCustomerId } }
-          : {}),
       }),
     },
   );
