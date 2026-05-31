@@ -2582,26 +2582,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 画像生成プロンプト */}
-              <div className="px-4 py-3 border-b border-gray-100">
-                <Tooltip text="LP内容に合った画像生成プロンプトを作成" position="bottom" className="w-full">
-                  <button
-                    onClick={() => setPromptAssistantOpen(true)}
-                    className="w-full flex items-center justify-between py-2.5 px-4 bg-[#00AFCC] hover:bg-[#0099B3] text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>🎨</span>
-                      <span>AI画像プロンプト生成</span>
-                    </span>
-                    {savedPrompts.length > 0 && (
-                      <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        {savedPrompts.length}件保存
-                      </span>
-                    )}
-                  </button>
-                </Tooltip>
-              </div>
-
               {/* カラーテーマ */}
               <Accordion
                 title="カラーテーマ"
@@ -2747,6 +2727,26 @@ export default function Home() {
 
               {/* 画像管理 */}
               <Accordion title="🖼 画像" defaultOpen>
+                {/* AI画像プロンプト生成 */}
+                <div className="mb-3">
+                  <Tooltip text="LP内容に合った画像生成プロンプトを作成" position="bottom" className="w-full">
+                    <button
+                      onClick={() => setPromptAssistantOpen(true)}
+                      className="w-full flex items-center justify-between py-2.5 px-4 bg-[#00AFCC] hover:bg-[#0099B3] text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>🎨</span>
+                        <span>AI画像プロンプト生成</span>
+                      </span>
+                      {savedPrompts.length > 0 && (
+                        <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {savedPrompts.length}件保存
+                        </span>
+                      )}
+                    </button>
+                  </Tooltip>
+                </div>
+
                 {/* テンプレ画像ギャラリー */}
                 <div className="mb-3">
                   <Tooltip text="業種別テンプレ画像から選んで挿入" position="bottom" className="w-full">
