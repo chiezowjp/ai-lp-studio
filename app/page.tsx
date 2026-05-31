@@ -453,6 +453,50 @@ function addFaqItemToHtml(html: string, sectionId: string): string {
   return html;
 }
 
+/** FAQ セクションの項目一覧を返す（質問テキストの配列） */
+function getFaqItems(html: string, sectionId: string): string[] {
+  if (typeof window === "undefined") return [];
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const section = doc.querySelector(`.lp-${sectionId}`);
+  if (!section) return [];
+
+  // テンプレート FAQ
+  const templateItems = section.querySelectorAll(".lp-faqb-q");
+  if (templateItems.length > 0) {
+    return Array.from(templateItems).map((el) => el.textContent?.trim() ?? "");
+  }
+
+  // AI 生成 FAQ
+  return Array.from(section.querySelectorAll("details summary")).map(
+    (el) => el.textContent?.trim() ?? ""
+  );
+}
+
+/** FAQ セクションの指定インデックスの項目を削除する */
+function removeFaqItemFromHtml(html: string, sectionId: string, index: number): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const section = doc.querySelector(`.lp-${sectionId}`);
+  if (!section) return html;
+
+  // テンプレート FAQ
+  const list = section.querySelector(".lp-faqb-list");
+  if (list) {
+    const items = list.querySelectorAll(".lp-faqb-item");
+    if (items[index]) list.removeChild(items[index]);
+    return doc.body.innerHTML;
+  }
+
+  // AI 生成 FAQ
+  const allDetails = Array.from(section.querySelectorAll("details"));
+  if (allDetails[index]) {
+    allDetails[index].parentElement?.removeChild(allDetails[index]);
+    return doc.body.innerHTML;
+  }
+
+  return html;
+}
+
 function removeSectionFromHtml(html: string, sectionId: string): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -1179,6 +1223,13 @@ export default function Home() {
     if (!result) return;
     pushUndo();
     const newHtml = addFaqItemToHtml(result.html, sectionId);
+    applyHtml(newHtml, true);
+  }, [result, applyHtml, pushUndo]);
+
+  const handleRemoveFaqItem = useCallback((sectionId: string, index: number) => {
+    if (!result) return;
+    pushUndo();
+    const newHtml = removeFaqItemFromHtml(result.html, sectionId, index);
     applyHtml(newHtml, true);
   }, [result, applyHtml, pushUndo]);
 
@@ -2848,13 +2899,32 @@ export default function Home() {
           !selectedElement.lpClasses?.includes("lp-freeblock") &&
           !selectedElement.lpClasses?.includes("lp-customhtml") && (
           <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
-            {/* FAQ セクション選択時: 質問追加ボタン（テンプレート・AI生成 両対応） */}
+            {/* FAQ セクション選択時: 質問追加・削除（テンプレート・AI生成 両対応） */}
             {selectedFaqSectionId && (
-              <div className="px-4 py-3 border-b border-gray-100 shrink-0">
-                <p className="text-[11px] text-gray-400 mb-2">FAQ セクション</p>
+              <div className="px-4 py-3 border-b border-gray-100 shrink-0 space-y-2">
+                <p className="text-[11px] text-gray-400">FAQ セクション</p>
+                {/* 項目一覧 + 削除ボタン */}
+                {getFaqItems(result.html, selectedFaqSectionId).map((q, i) => (
+                  <div key={i} className="flex items-center gap-2 group">
+                    <span className="flex-1 text-[11px] text-gray-600 truncate">{q}</span>
+                    <button
+                      onClick={() => handleRemoveFaqItem(selectedFaqSectionId, i)}
+                      className="shrink-0 p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                      title="この質問を削除"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                {/* 追加ボタン */}
                 <button
                   onClick={() => handleAddFaqItem(selectedFaqSectionId)}
-                  className="w-full py-2 bg-[#00AFCC] hover:bg-[#0099b3] text-white text-sm font-semibold rounded-lg transition-colors"
+                  className="w-full py-1.5 bg-[#00AFCC] hover:bg-[#0099b3] text-white text-xs font-semibold rounded-lg transition-colors"
                 >
                   ＋ 質問を追加
                 </button>
