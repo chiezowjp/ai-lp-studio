@@ -1724,11 +1724,15 @@ export default function Home() {
           body: JSON.stringify(payload),
         });
       }
-      const json = await res.json();
+      const json = await res.json() as { id?: string; is_published?: boolean; error?: string };
       if (!res.ok) throw new Error(json.error ?? "保存失敗");
-      if (!remoteProjectId) setRemoteProjectId(json.id);
+      if (!remoteProjectId) setRemoteProjectId(json.id ?? null);
       setCloudStatus("saved");
-      setSaveToast("クラウドに保存しました ☁");
+      // 公開済みプロジェクトを保存した場合は公開URLも同時更新されることをユーザーに伝える
+      const toastMsg = json.is_published
+        ? "クラウドに保存しました ☁（公開URLも更新されました）"
+        : "クラウドに保存しました ☁";
+      setSaveToast(toastMsg);
       setTimeout(() => { setSaveToast(null); setCloudStatus("idle"); }, 3000);
     } catch (e) {
       setCloudStatus("error");
@@ -2001,11 +2005,13 @@ export default function Home() {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (!res.ok) return;
-        const row = await res.json();
-        const project = row.project_json as LPProject;
+        const row = await res.json() as { project_json: LPProject; is_published?: boolean; slug?: string | null };
+        const project = row.project_json;
         if (!project?.html) { setProjectLoading(false); return; }
         applyProject(project);
         setRemoteProjectId(pid);
+        // 公開状態を復元（読み込み直後から「公開中」を正しく表示するため）
+        if (row.is_published && row.slug) setPublishedSlug(row.slug);
         // URL パラメータを消す
         router.replace("/");
       } catch { /* ignore */ } finally { setProjectLoading(false); }
