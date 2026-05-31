@@ -129,6 +129,7 @@ interface GetOrderResponse {
     id: string;
     reference_id?: string;
     state?: string;
+    customer_id?: string;
   };
 }
 
@@ -136,11 +137,12 @@ interface GetOrderResponse {
  * Square Order を取得する。
  * Webhook イベントの payment.order_id から reference_id (= userId) を取得するために使用する。
  */
-export async function getOrder(orderId: string): Promise<{ reference_id?: string; state?: string }> {
+export async function getOrder(orderId: string): Promise<{ reference_id?: string; state?: string; customer_id?: string }> {
   const data = await squareFetch<GetOrderResponse>(`/v2/orders/${orderId}`);
   return {
     reference_id: data.order.reference_id,
     state: data.order.state,
+    customer_id: data.order.customer_id,
   };
 }
 

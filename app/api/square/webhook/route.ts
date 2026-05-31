@@ -128,7 +128,18 @@ async function handlePaymentEvent(
     return;
   }
 
-  const userId = await getUserIdFromOrderId(orderId);
+  // order から userId と customer_id を両方取得
+  let orderCustomerId: string | undefined;
+  let userId: string | null = null;
+  try {
+    const order = await getOrder(orderId);
+    userId = order.reference_id ?? null;
+    orderCustomerId = order.customer_id;
+  } catch (err) {
+    console.error("[webhook] getOrder failed:", err);
+    return;
+  }
+
   if (!userId) {
     console.warn("[webhook] order has no reference_id, orderId:", orderId);
     return;
@@ -146,26 +157,27 @@ async function handlePaymentEvent(
     // Pro に昇格（即時アクセス付与）
     await upgradeToPro(admin, userId);
 
-    // customer_id を profiles に保存
-    if (customerId) {
+    // customer_id を profiles に保存（payment または order から取得）
+    const resolvedCustomerId = customerId ?? orderCustomerId;
+    if (resolvedCustomerId) {
       await admin.from("profiles")
-        .update({ square_customer_id: customerId })
+        .update({ square_customer_id: resolvedCustomerId })
         .eq("id", userId);
     }
 
     // サブスクリプションを作成（翌月から自動更新）
-    if (customerId) {
+    if (resolvedCustomerId) {
       try {
         // cardId が payment オブジェクトになければ Customer のカード一覧から取得
-        const resolvedCardId = cardId ?? await getFirstCardId(customerId);
+        const resolvedCardId = cardId ?? await getFirstCardId(resolvedCustomerId);
         if (!resolvedCardId) {
-          console.warn("[webhook] cannot create subscription: no card found for customerId", customerId);
+          console.warn("[webhook] cannot create subscription: no card found for customerId", resolvedCustomerId);
         } else {
           const nextMonth = new Date();
           nextMonth.setMonth(nextMonth.getMonth() + 1);
           const startDate = nextMonth.toISOString().slice(0, 10); // YYYY-MM-DD
 
-          const { subscriptionId } = await createSubscription(customerId, resolvedCardId, startDate);
+          const { subscriptionId } = await createSubscription(resolvedCustomerId, resolvedCardId, startDate);
           await admin.from("profiles")
             .update({ square_subscription_id: subscriptionId })
             .eq("id", userId);
