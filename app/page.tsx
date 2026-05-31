@@ -169,11 +169,16 @@ function buildImageCss(images: UploadedImage[], html: string = ""): string {
   // 吹き出しセクション ID を同時に検出
   const positionMap = new Map<string, number>();
   const bubbleIds = new Set<string>();
+  // .lp-wrapper が HTML に存在するかどうか（存在しない場合はクラスセレクタにフォールバック）
+  let wrapperSel: string | null = null;
 
   if (typeof window !== "undefined" && html) {
     try {
       const doc = new DOMParser().parseFromString(html, "text/html");
-      const wrapper = doc.querySelector(".lp-wrapper") ?? doc.body;
+      const wrapperEl = doc.querySelector(".lp-wrapper");
+      const wrapper = wrapperEl ?? doc.body;
+      // HTML に .lp-wrapper があるときだけ nth-child セレクタを使う
+      wrapperSel = wrapperEl ? ".lp-wrapper" : null;
       const sectionClass = /^lp-([a-z][a-z0-9_]*)$/;
       const seen = new Set<string>();
       let childIndex = 1; // nth-child は 1 始まり
@@ -205,10 +210,13 @@ function buildImageCss(images: UploadedImage[], html: string = ""): string {
         sel = ".lp-wrapper";
       } else {
         const pos = positionMap.get(img.placement);
-        // 位置が分かればピンポイント nth-child、分からなければクラス名にフォールバック
-        sel = pos !== undefined
-          ? `.lp-wrapper > :nth-child(${pos})`
-          : `.lp-${img.placement}`;
+        if (wrapperSel && pos !== undefined) {
+          // .lp-wrapper が存在する場合：nth-child でピンポイント指定
+          sel = `${wrapperSel} > :nth-child(${pos})`;
+        } else {
+          // .lp-wrapper がない場合（大多数）：クラスセレクタを使用（エディターと同じ方式）
+          sel = `.lp-${img.placement}`;
+        }
       }
       if (img.placement !== "other" && bubbleIds.has(img.placement)) {
         // 吹き出しセクション：人物画像を背景に contain で表示
