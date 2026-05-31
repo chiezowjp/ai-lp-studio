@@ -19,8 +19,6 @@ interface Props {
   onSectionDelete?: (id: string, label: string) => void;
   /** 削除不可のセクション ID セット */
   protectedIds?: Set<string>;
-  /** FAQ セクションへの項目追加コールバック */
-  onAddFaqItem?: (id: string) => void;
 }
 
 /** ドラッグ data-transfer key */
@@ -33,7 +31,6 @@ export default function SectionSorter({
   activeSectionId,
   onSectionDelete,
   protectedIds,
-  onAddFaqItem,
 }: Props) {
   // 視覚フィードバック用 state のみ（並び替えロジックは親に委譲）
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
@@ -158,22 +155,6 @@ export default function SectionSorter({
                 )}
                 {sec.label}
               </button>
-
-              {/* FAQ 項目追加ボタン（FAQ セクションのみ表示） */}
-              {onAddFaqItem && sec.id.startsWith("faqblock") && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAddFaqItem(sec.id);
-                  }}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded transition-all
-                    text-gray-300 hover:text-[#00AFCC] hover:bg-[#E6F8FC] shrink-0 font-bold text-sm leading-none"
-                  title="FAQ項目を追加"
-                >
-                  ＋
-                </button>
-              )}
 
               {/* 削除ボタン（hover 時のみ表示・保護セクションは非表示） */}
               {canDelete && (

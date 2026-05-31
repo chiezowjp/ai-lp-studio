@@ -2335,7 +2335,6 @@ export default function Home() {
                     activeSectionId={activeSectionId}
                     onSectionDelete={handleDeleteRequest}
                     protectedIds={protectedSectionIds}
-                    onAddFaqItem={handleAddFaqItem}
                   />
 
                   {/* 固定要素（insertAtEnd / position:fixed など） */}
