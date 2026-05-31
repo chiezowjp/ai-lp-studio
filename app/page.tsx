@@ -497,6 +497,77 @@ function removeFaqItemFromHtml(html: string, sectionId: string, index: number): 
   return html;
 }
 
+// ─── Gallery helpers ──────────────────────────────────────────────────────────
+
+/** 選択要素がギャラリーセクション内かを判定し sectionId を返す */
+function detectGallerySectionId(html: string, lpClasses: string[]): string | null {
+  if (typeof window === "undefined") return null;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const wrapper = doc.querySelector(".lp-wrapper") ?? doc.body;
+  const sectionClass = /^lp-([a-z][a-z0-9_]*)$/;
+
+  for (const child of Array.from(wrapper.children)) {
+    for (const cls of Array.from(child.classList)) {
+      if (!lpClasses.includes(cls)) continue;
+      const m = cls.match(sectionClass);
+      if (!m) continue;
+      const sectionId = m[1];
+      // テンプレートギャラリー
+      if (sectionId.startsWith("gallery")) return sectionId;
+      // .lp-gallery-grid を持つ
+      if (child.querySelector(".lp-gallery-grid")) return sectionId;
+      return null;
+    }
+  }
+  return null;
+}
+
+/** ギャラリー項目の img src 一覧を返す */
+function getGalleryItems(html: string, sectionId: string): string[] {
+  if (typeof window === "undefined") return [];
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const section = doc.querySelector(`.lp-${sectionId}`);
+  if (!section) return [];
+  return Array.from(section.querySelectorAll(".lp-gallery-item img")).map(
+    (img) => (img as HTMLImageElement).src ?? ""
+  );
+}
+
+/** ギャラリーに新しい写真枠を追加する */
+function addGalleryItemToHtml(html: string, sectionId: string): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const section = doc.querySelector(`.lp-${sectionId}`);
+  if (!section) return html;
+  const grid = section.querySelector(".lp-gallery-grid");
+  if (!grid) return html;
+
+  const count = grid.querySelectorAll(".lp-gallery-item").length + 1;
+  const item = doc.createElement("div");
+  item.className = "lp-gallery-item";
+  const img = doc.createElement("img");
+  img.className = "lp-gallery-img";
+  img.src = `https://placehold.co/400x300?text=${count}`;
+  img.alt = "";
+  item.appendChild(img);
+  grid.appendChild(item);
+
+  return doc.body.innerHTML;
+}
+
+/** ギャラリーの指定インデックスの写真枠を削除する */
+function removeGalleryItemFromHtml(html: string, sectionId: string, index: number): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const section = doc.querySelector(`.lp-${sectionId}`);
+  if (!section) return html;
+  const grid = section.querySelector(".lp-gallery-grid");
+  if (!grid) return html;
+  const items = grid.querySelectorAll(".lp-gallery-item");
+  if (items[index]) grid.removeChild(items[index]);
+  return doc.body.innerHTML;
+}
+
 function removeSectionFromHtml(html: string, sectionId: string): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -1240,6 +1311,30 @@ export default function Home() {
   const selectedFaqSectionId = useMemo<string | null>(() => {
     if (!selectedElement || !result) return null;
     return detectFaqSectionId(result.html, selectedElement.lpClasses ?? []);
+  }, [selectedElement, result]);
+
+  // ─── Gallery item add / remove ────────────────────────────────────────────
+
+  const handleAddGalleryItem = useCallback((sectionId: string) => {
+    if (!result) return;
+    pushUndo();
+    const newHtml = addGalleryItemToHtml(result.html, sectionId);
+    applyHtml(newHtml, true);
+  }, [result, applyHtml, pushUndo]);
+
+  const handleRemoveGalleryItem = useCallback((sectionId: string, index: number) => {
+    if (!result) return;
+    pushUndo();
+    const newHtml = removeGalleryItemFromHtml(result.html, sectionId, index);
+    applyHtml(newHtml, true);
+  }, [result, applyHtml, pushUndo]);
+
+  /**
+   * 現在選択中の要素がギャラリーセクション内かを判定し、そのセクション ID を返す。
+   */
+  const selectedGallerySectionId = useMemo<string | null>(() => {
+    if (!selectedElement || !result) return null;
+    return detectGallerySectionId(result.html, selectedElement.lpClasses ?? []);
   }, [selectedElement, result]);
 
   // ─── Section delete ───────────────────────────────────────────────────────
@@ -2927,6 +3022,38 @@ export default function Home() {
                   className="w-full py-1.5 bg-[#00AFCC] hover:bg-[#0099b3] text-white text-xs font-semibold rounded-lg transition-colors"
                 >
                   ＋ 質問を追加
+                </button>
+              </div>
+            )}
+            {/* ギャラリーセクション選択時: 写真追加・削除 */}
+            {selectedGallerySectionId && (
+              <div className="px-4 py-3 border-b border-gray-100 shrink-0 space-y-2">
+                <p className="text-[11px] text-gray-400">ギャラリーセクション</p>
+                {/* サムネイル一覧 + 削除ボタン */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {getGalleryItems(result.html, selectedGallerySectionId).map((src, i) => (
+                    <div key={i} className="relative group aspect-square rounded overflow-hidden border border-gray-100">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <button
+                        onClick={() => handleRemoveGalleryItem(selectedGallerySectionId, i)}
+                        className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="この写真を削除"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {/* 追加ボタン */}
+                <button
+                  onClick={() => handleAddGalleryItem(selectedGallerySectionId)}
+                  className="w-full py-1.5 bg-[#00AFCC] hover:bg-[#0099b3] text-white text-xs font-semibold rounded-lg transition-colors"
+                >
+                  ＋ 写真を追加
                 </button>
               </div>
             )}
