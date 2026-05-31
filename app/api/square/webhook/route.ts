@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase-admin";
-import { getOrder, getCustomer, createSubscription, getFirstCardId } from "@/lib/square";
+import { getOrder, getCustomer, createSubscription, getFirstCardId, createCardOnFile } from "@/lib/square";
 import { GRACE_PERIOD_DAYS, SQUARE_PRO_MONTHLY_PRICE } from "@/lib/plans";
 
 // ─── Signature Verification ───────────────────────────────────────────────────
@@ -109,6 +109,7 @@ async function handlePaymentEvent(
 
   if (!payment) return;
 
+  const paymentId  = payment.id as string | undefined;
   const status     = payment.status as string | undefined;
   const orderId    = payment.order_id as string | undefined;
   const customerId = payment.customer_id as string | undefined;
@@ -168,8 +169,14 @@ async function handlePaymentEvent(
     // サブスクリプションを作成（翌月から自動更新）
     if (resolvedCustomerId) {
       try {
-        // cardId が payment オブジェクトになければ Customer のカード一覧から取得
-        const resolvedCardId = cardId ?? await getFirstCardId(resolvedCustomerId);
+        // カード ID を解決: payment → カードオンファイル作成 → 既存カード一覧の順で試みる
+        let resolvedCardId = cardId;
+        if (!resolvedCardId && paymentId) {
+          resolvedCardId = await createCardOnFile(resolvedCustomerId, paymentId) ?? undefined;
+        }
+        if (!resolvedCardId) {
+          resolvedCardId = await getFirstCardId(resolvedCustomerId) ?? undefined;
+        }
         if (!resolvedCardId) {
           console.warn("[webhook] cannot create subscription: no card found for customerId", resolvedCustomerId);
         } else {

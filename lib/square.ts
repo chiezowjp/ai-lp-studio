@@ -176,8 +176,6 @@ interface ListCardsResponse {
 
 /**
  * Square Customer に紐づくカード一覧を取得し、最初のカード ID を返す。
- * Payment Link チェックアウト後はカードが自動的に保存されるため、
- * cardId が payment オブジェクトから取れない場合のフォールバックとして使用する。
  */
 export async function getFirstCardId(customerId: string): Promise<string | null> {
   try {
@@ -186,6 +184,39 @@ export async function getFirstCardId(customerId: string): Promise<string | null>
     );
     return data.cards?.[0]?.id ?? null;
   } catch {
+    return null;
+  }
+}
+
+// ─── 決済からカードオンファイルを作成 ─────────────────────────────────────────
+
+/**
+ * 決済 ID を使って Customer にカードオンファイルを作成する。
+ * Payment Link チェックアウトではカードが自動保存されないため、
+ * payment.created webhook の payment.id から明示的にカードを保存する。
+ */
+export async function createCardOnFile(
+  customerId: string,
+  paymentId: string,
+): Promise<string | null> {
+  try {
+    const idempotencyKey = `card-${customerId}-${paymentId}`;
+    const data = await squareFetch<{ card: { id: string } }>(
+      "/v2/cards",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          idempotency_key: idempotencyKey,
+          source_id: paymentId,
+          card: {
+            customer_id: customerId,
+          },
+        }),
+      },
+    );
+    return data.card.id;
+  } catch (err) {
+    console.error("[square] createCardOnFile failed:", err);
     return null;
   }
 }
