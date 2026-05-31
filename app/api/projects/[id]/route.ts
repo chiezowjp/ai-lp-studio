@@ -42,10 +42,10 @@ export async function PUT(req: NextRequest, ctx: RouteCtx) {
 
   const admin = createAdminClient();
 
-  // 所有者確認
+  // 所有者確認 + 公開状態チェック
   const { data: existing } = await admin
     .from("projects")
-    .select("user_id")
+    .select("user_id, is_published")
     .eq("id", id)
     .single();
   if (!existing || existing.user_id !== user.id) {
@@ -58,9 +58,25 @@ export async function PUT(req: NextRequest, ctx: RouteCtx) {
     ? { ...project_json, effective_css }
     : project_json;
 
+  // 公開済みプロジェクトは保存と同時に published_html / published_css も更新する。
+  // これにより「保存したのに公開URLが古い」という問題を防ぐ。
+  const publishedFields = existing.is_published
+    ? {
+        published_html: html,
+        published_css:  effective_css ?? css,
+      }
+    : {};
+
   const { data, error } = await admin
     .from("projects")
-    .update({ title, html, css, project_json: mergedProjectJson, updated_at: new Date().toISOString() })
+    .update({
+      title,
+      html,
+      css,
+      project_json: mergedProjectJson,
+      updated_at: new Date().toISOString(),
+      ...publishedFields,
+    })
     .eq("id", id)
     .select()
     .single();

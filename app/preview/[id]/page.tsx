@@ -58,7 +58,8 @@ export default async function PreviewPage({ params }: Props) {
   const isPublished   = project.is_published as boolean;
   const slug          = project.slug as string | null;
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+  // 公開URLは相対パスを使用（NEXT_PUBLIC_APP_URL が未設定でも動作する）
+  const publicUrl = slug ? `/p/${slug}` : null;
 
   return (
     <div className="w-full">
@@ -83,9 +84,9 @@ export default async function PreviewPage({ params }: Props) {
           <span className="text-gray-500 truncate max-w-[200px]">{project.title as string}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {isPublished && slug && (
+          {isPublished && publicUrl && (
             <a
-              href={`${appUrl}/p/${slug}`}
+              href={publicUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="px-2.5 py-1 bg-[#00AFCC] hover:bg-[#0099b3] rounded-lg font-semibold transition-colors"
