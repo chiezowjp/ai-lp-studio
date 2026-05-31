@@ -363,6 +363,30 @@ function deleteElementFromHtml(html: string, elementId?: string, selector?: stri
   return doc.body.innerHTML;
 }
 
+/** FAQ セクションに新しい質問・回答項目を追加する */
+function addFaqItemToHtml(html: string, sectionId: string): string {
+  if (typeof window === "undefined") return html;
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const section = doc.querySelector(`.lp-${sectionId}`);
+  if (!section) return html;
+  const list = section.querySelector(".lp-faqb-list");
+  if (!list) return html;
+
+  const item = doc.createElement("details");
+  item.className = "lp-faqb-item";
+  const summary = doc.createElement("summary");
+  summary.className = "lp-faqb-q";
+  summary.textContent = "Q. 質問を入力してください";
+  const answer = doc.createElement("div");
+  answer.className = "lp-faqb-a";
+  answer.textContent = "A. 回答を入力してください";
+  item.appendChild(summary);
+  item.appendChild(answer);
+  list.appendChild(item);
+
+  return doc.body.innerHTML;
+}
+
 function removeSectionFromHtml(html: string, sectionId: string): string {
   if (typeof window === "undefined") return html;
   const doc = new DOMParser().parseFromString(html, "text/html");
@@ -1081,6 +1105,16 @@ export default function Home() {
       setSectionOrder(parseSectionOrder(newHtml));
     }
   };
+
+  // ─── FAQ item add ────────────────────────────────────────────────────────
+
+  /** FAQ セクションに新しい質問・回答項目を追加する */
+  const handleAddFaqItem = useCallback((sectionId: string) => {
+    if (!result) return;
+    pushUndo();
+    const newHtml = addFaqItemToHtml(result.html, sectionId);
+    applyHtml(newHtml, true);
+  }, [result, applyHtml, pushUndo]);
 
   // ─── Section delete ───────────────────────────────────────────────────────
 
@@ -2301,6 +2335,7 @@ export default function Home() {
                     activeSectionId={activeSectionId}
                     onSectionDelete={handleDeleteRequest}
                     protectedIds={protectedSectionIds}
+                    onAddFaqItem={handleAddFaqItem}
                   />
 
                   {/* 固定要素（insertAtEnd / position:fixed など） */}
