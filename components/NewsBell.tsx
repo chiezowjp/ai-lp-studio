@@ -31,11 +31,11 @@ export function NewsDropdownItem() {
   return (
     <button
       onClick={() => router.push("/news")}
-      className="relative w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+      className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors font-semibold text-gray-700 flex items-center gap-1.5"
     >
       🔔 お知らせ
       {hasUnread && (
-        <span className="absolute top-2 left-[3.5rem] w-2 h-2 bg-red-500 rounded-full" />
+        <span className="w-2 h-2 bg-red-500 rounded-full shrink-0" />
       )}
     </button>
   );
