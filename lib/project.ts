@@ -209,6 +209,7 @@ async function blobUrlToStorageUrl(
   try {
     const fetchRes = await fetch(blobUrl);
     const blob = await fetchRes.blob();
+    // 同一ファイル名でアップロードして重複を防ぐ（fileName は呼び出し元で安定した値を使う）
     const file = new File([blob], fileName, { type: blob.type });
     const form = new FormData();
     form.append("file", file);
@@ -226,6 +227,14 @@ async function blobUrlToStorageUrl(
   }
 }
 
+/** base64 文字列から簡易ハッシュ（先頭+末尾+長さ）を生成 */
+function quickHash(b64: string): string {
+  const len = b64.length;
+  const head = b64.slice(0, 32);
+  const tail = b64.slice(-32);
+  return `${len}_${head}${tail}`.replace(/[^A-Za-z0-9]/g, "").slice(0, 64);
+}
+
 /** data: URL → Supabase Storage URL（失敗時は null） */
 async function dataUrlToStorageUrl(
   dataUrl: string,
@@ -239,7 +248,9 @@ async function dataUrlToStorageUrl(
     const byteArr = new Uint8Array(byteChars.length);
     for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
     const blob = new Blob([byteArr], { type: mime });
-    const file = new File([blob], `lp_image_${Date.now()}.${ext}`, { type: mime });
+    // 同じ画像は同じファイル名にして重複アップロードを防ぐ
+    const hash = quickHash(b64);
+    const file = new File([blob], `lp_img_${hash}.${ext}`, { type: mime });
     const form = new FormData();
     form.append("file", file);
     form.append("usage_type", "lp_image");
