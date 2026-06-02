@@ -42,31 +42,13 @@ export async function PUT(req: NextRequest, ctx: RouteCtx) {
 
   const admin = createAdminClient();
 
-  // 所有者確認 + 公開状態チェック
-  const { data: existing } = await admin
-    .from("projects")
-    .select("user_id, is_published")
-    .eq("id", id)
-    .single();
-  if (!existing || existing.user_id !== user.id) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  // effective_css（画像・ビジュアルスタイル・フォント込みの最終 CSS）を
-  // project_json に含めて保存。プレビューページがこれを参照する。
+  // effective_css を project_json に含める
   const mergedProjectJson = effective_css
     ? { ...project_json, effective_css }
     : project_json;
 
-  // 公開済みプロジェクトは保存と同時に published_html / published_css も更新する。
-  // これにより「保存したのに公開URLが古い」という問題を防ぐ。
-  const publishedFields = existing.is_published
-    ? {
-        published_html: html,
-        published_css:  effective_css ?? css,
-      }
-    : {};
-
+  // 所有者確認と更新を1クエリに統合（user_id 条件を WHERE に含める）。
+  // 公開済みかどうかは返却データで判定し、必要なら published_html/css を追加更新。
   const { data, error } = await admin
     .from("projects")
     .update({
@@ -75,13 +57,26 @@ export async function PUT(req: NextRequest, ctx: RouteCtx) {
       css,
       project_json: mergedProjectJson,
       updated_at: new Date().toISOString(),
-      ...publishedFields,
     })
     .eq("id", id)
-    .select()
+    .eq("user_id", user.id)
+    .select("id, title, is_published, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data)  return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // 公開済みなら published_html/css も更新（別クエリだが軽量）
+  if (data.is_published) {
+    await admin
+      .from("projects")
+      .update({
+        published_html: html,
+        published_css:  effective_css ?? css,
+      })
+      .eq("id", id);
+  }
+
   return NextResponse.json(data);
 }
 
