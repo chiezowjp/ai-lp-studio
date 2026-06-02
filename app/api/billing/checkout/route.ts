@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/supabase-admin";
-import { createCheckoutLink } from "@/lib/square";
+import { createSubscription } from "@/lib/paypal";
 
 /**
  * POST /api/billing/checkout
- * Square Payment Link を作成して URL を返す。
- * フロントエンドはこの URL にリダイレクトしてユーザーを Square の決済ページへ誘導する。
+ * PayPal サブスクリプションを作成して承認 URL を返す。
+ * フロントエンドはこの URL にリダイレクトしてユーザーを PayPal の承認画面へ誘導する。
  */
 export async function POST(req: NextRequest) {
   const user = await getUserFromRequest(req);
@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const url = await createCheckoutLink(user.id);
-    return NextResponse.json({ url });
+    const { approvalUrl } = await createSubscription(user.id);
+    return NextResponse.json({ url: approvalUrl });
   } catch (e) {
     console.error("checkout error:", e);
     return NextResponse.json(
