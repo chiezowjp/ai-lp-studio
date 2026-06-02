@@ -317,7 +317,7 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
 
   const handleGenerate = async () => {
     if (!analysis) return;
-    const required: (keyof LPFormData)[] = ["serviceName", "industry", "target", "serviceDetail", "ctaLink"];
+    const required: (keyof LPFormData)[] = ["serviceName", "industry", "target", "serviceDetail"];
     const missing = required.find((k) => !form[k]);
     if (missing) { setError(`「${missing}」は必須です`); return; }
     const selected = sections.filter((s) => s.included);
@@ -453,18 +453,6 @@ export default function LPRefAnalyzer({ initialServiceData, onComplete }: Props)
             <Field label="強み">
               <textarea className={inp + " resize-none"} rows={2} value={form.strengths} onChange={setF("strengths")} placeholder="・駅徒歩2分&#10;・予約制で待ち時間なし" />
             </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="CTA種別">
-                <select className={inp} value={form.ctaType} onChange={(e) => setForm((p) => ({ ...p, ctaType: e.target.value as CTAType }))}>
-                  <option value="line">LINEで予約</option>
-                  <option value="phone">電話</option>
-                  <option value="contact">問い合わせフォーム</option>
-                </select>
-              </Field>
-              <Field label="CTAリンク" required>
-                <input className={inp} value={form.ctaLink} onChange={setF("ctaLink")} placeholder="https://lin.ee/xxx" />
-              </Field>
-            </div>
           </div>
         </div>
       )}
