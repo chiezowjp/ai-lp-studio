@@ -90,22 +90,20 @@ export default async function PublicLPPage({ params }: Props) {
   const rawHtml        = ((project.published_html as string | null) || (project.html as string)) || "";
 
   // ── サニタイズ ──────────────────────────────────────────────────────────────
-  // 1. フォーム送信を無効化
-  // 2. エディター由来の属性を除去（contenteditable / data-original-href / editor クラス）
-  // 3. javascript:void(0) になったリンクを data-original-href から復元
-  const html = rawHtml
-    .replace(/(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi, '$1 action="javascript:void(0)"')
-    .replace(/\s+contenteditable\s*=\s*["'][^"']*["']/gi, "")
-    .replace(/\s+data-original-href\s*=\s*["']([^"']*)["']/gi, (_, orig) =>
-      orig ? ` data-restored-href="${orig}"` : ""
-    )
-    .replace(/href\s*=\s*["']javascript:void\(0\)["']([^>]*?)data-restored-href\s*=\s*["']([^"']*)["']/gi,
-      (_, rest, orig) => `href="${orig}"${rest}`)
-    .replace(/\s+data-restored-href\s*=\s*["'][^"']*["']/gi, "")
-    .replace(/\bclass\s*=\s*["']([^"']*)\b(lp-ea|lp-eh)\b([^"']*)["']/g, (_, pre, _cls, post) => {
-      const cleaned = `${pre}${post}`.trim();
-      return cleaned ? `class="${cleaned}"` : "";
-    });
+  // 1. contenteditable を全形式で除去（"true"/"false"/値なし問わず）
+  // 2. data-original-href を元の href に復元（javascript:void(0) を修正）
+  // 3. フォーム送信を無効化
+  let html = rawHtml
+    // contenteditable をあらゆる形式で除去
+    .replace(/\s*contenteditable(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?/gi, "")
+    // data-original-href の値を href に戻す
+    .replace(/href\s*=\s*["']javascript:void\(0\)["']/gi, 'href=""')
+    .replace(/data-original-href\s*=\s*"([^"]*)"/gi, 'href="$1"')
+    .replace(/data-original-href\s*=\s*'([^']*)'/gi, "href='$1'")
+    // フォーム送信無効化
+    .replace(/(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi, '$1 action="javascript:void(0)"');
+  // 重複した href を除去（data-original-href 復元で二重になる場合）
+  html = html.replace(/href="[^"]*"\s+href="([^"]*)"/gi, 'href="$1"');
   const customCss      = (project.custom_css as string | null) || "";
   const customHeadHtml = (project.custom_head_html as string | null) || "";
   const formConfig     = (project.form_config as FormConfig | null);
