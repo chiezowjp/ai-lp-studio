@@ -98,13 +98,20 @@ export default async function PublicLPPage({ params }: Props) {
     .replace(/\s*contenteditable(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?/gi, "")
     // 2. href="javascript:void(0)" を削除マーカーに置換
     .replace(/href\s*=\s*["']javascript:void\(0\)["']/gi, 'href="__VOID__"')
-    // 3. data-original-href="..." を href="..." に変換（属性を昇格）
-    .replace(/data-original-href\s*=\s*"([^"]*)"/gi, 'href="$1"')
-    // 4. 削除マーカーを除去（data-original-href で上書きされなかった void を消す）
-    .replace(/\s*href\s*=\s*"__VOID__"/gi, "")
-    // 5. エディター用クラス(lp-eh/lp-ea)を除去
+    // 3. __VOID__ + data-original-href のペアを data-original-href の値に復元（順序AB両対応）
+    //    パターンA: href="__VOID__" ... data-original-href="orig" → href="orig"
+    .replace(/href="__VOID__"(\s[^>]*?)?data-original-href="([^"]*)"/gi,
+      (_, mid, orig) => `href="${orig}"${mid ?? ""}`)
+    //    パターンB: data-original-href="orig" ... href="__VOID__" → href="orig"
+    .replace(/data-original-href="([^"]*)"(\s[^>]*?)?href="__VOID__"/gi,
+      (_, orig, mid) => `href="${orig}"${mid ?? ""}`)
+    // 4. 残った __VOID__（data-original-href が無いもの）を除去
+    .replace(/\s*href="__VOID__"/gi, "")
+    // 5. 残った data-original-href（正しい href がすでにある場合）を除去
+    .replace(/\s*data-original-href="[^"]*"/gi, "")
+    // 6. エディター用クラス(lp-eh/lp-ea)を除去
     .replace(/\blp-e[ah]\b\s*/g, "")
-    // 6. フォーム送信無効化
+    // 7. フォーム送信無効化
     .replace(/(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi, '$1 action="javascript:void(0)"');
   const customCss      = (project.custom_css as string | null) || "";
   const customHeadHtml = (project.custom_head_html as string | null) || "";
