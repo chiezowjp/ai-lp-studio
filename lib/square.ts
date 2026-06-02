@@ -261,15 +261,7 @@ export async function createSubscription(
         customer_id: customerId,
         card_id: cardId,
         start_date: startDate,
-        phases: [
-          {
-            ordinal: 0,
-            price_money: {
-              amount: 2980,
-              currency: "JPY",
-            },
-          },
-        ],
+        phases: [{ ordinal: 0 }],
       }),
     },
   );
