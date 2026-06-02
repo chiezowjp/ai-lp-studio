@@ -584,7 +584,8 @@ const EDIT_JS = `(function () {
       // URLバー入力欄クリックによる blur が finish() を呼ぶ前に linkEditing を true にする。
       // postMessage(lp-link-bar-focus) は非同期なので、blur より後に届いて手遅れになるのを防ぐ。
       linkEditing = true;
-      window.parent.postMessage({ type: 'lp-link-focus', href: validHrefA }, '*');
+      var rectA = directA.getBoundingClientRect();
+      window.parent.postMessage({ type: 'lp-link-focus', href: validHrefA, rect: { top: rectA.top, bottom: rectA.bottom, left: rectA.left, right: rectA.right } }, '*');
     }
 
     var el = findTarget(e.target);
@@ -614,7 +615,8 @@ const EDIT_JS = `(function () {
       if (curLinkEl) {
         var rawHref = curLinkEl.getAttribute('data-original-href') || curLinkEl.getAttribute('href') || '';
         var validHref = /^(https?:\\/\\/|tel:|mailto:|\\/|#.+)/.test(rawHref) ? rawHref : '';
-        window.parent.postMessage({ type: 'lp-link-focus', href: validHref }, '*');
+        var rectEl = curLinkEl.getBoundingClientRect();
+        window.parent.postMessage({ type: 'lp-link-focus', href: validHref, rect: { top: rectEl.top, bottom: rectEl.bottom, left: rectEl.left, right: rectEl.right } }, '*');
       }
     }
   }, true);
@@ -770,6 +772,7 @@ const LPPreview = forwardRef<LPPreviewHandle, Props>(function LPPreview({
   // ─── Link bar state ───────────────────────────────────────────────────────
   // <a> クリック時にフローティングバーを表示し、リンク先URLを編集できるようにする
   const [linkBarHref, setLinkBarHref] = useState<string | null>(null);
+  const [linkBarRect, setLinkBarRect] = useState<{ top: number; bottom: number; left: number; right: number } | null>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
 
   const skipNextRef = useRef(false);
@@ -1206,6 +1209,7 @@ ${BUBBLE_GUIDE_CSS}
         // URLとして有効な値のみ表示（AIが誤ってボタンテキストをhrefにした場合などを除外）
         const validHref = /^(https?:\/\/|tel:|mailto:|\/|#.)/.test(raw) ? raw : "";
         setLinkBarHref(validHref);
+        setLinkBarRect((e.data.rect as { top: number; bottom: number; left: number; right: number } | undefined) ?? null);
         // 次フレームでinputにフォーカス
         setTimeout(() => linkInputRef.current?.focus(), 50);
       }
@@ -1304,8 +1308,16 @@ ${BUBBLE_GUIDE_CSS}
         {linkBarHref !== null && editable && !isMobile && (
           <div
             key={linkBarHref}
-            style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 50 }}
-            className="flex items-center gap-2 px-3 py-2.5 bg-white border-t-2 border-[#00AFCC] shadow-lg"
+            style={{
+              position: "absolute",
+              zIndex: 50,
+              left: 8,
+              right: 8,
+              ...(linkBarRect
+                ? { top: linkBarRect.bottom + 6 }
+                : { bottom: 0 }),
+            }}
+            className="flex items-center gap-2 px-3 py-2.5 bg-white border-2 border-[#00AFCC] rounded-xl shadow-xl"
           >
             <span className="text-[#00AFCC] shrink-0">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
