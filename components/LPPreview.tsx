@@ -596,7 +596,7 @@ const EDIT_JS = `(function () {
     el.classList.remove('lp-eh');
     el.classList.add('lp-ea');
     el.setAttribute('contenteditable','true');
-    el.focus();
+    el.focus({ preventScroll: true });
     if (document.caretRangeFromPoint) {
       var r = document.caretRangeFromPoint(e.clientX, e.clientY);
       if (r) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
