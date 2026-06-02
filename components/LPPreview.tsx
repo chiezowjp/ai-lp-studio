@@ -1308,15 +1308,15 @@ ${BUBBLE_GUIDE_CSS}
         {linkBarHref !== null && editable && !isMobile && (
           <div
             key={linkBarHref}
-            style={{
-              position: "absolute",
-              zIndex: 50,
-              left: 8,
-              right: 8,
-              ...(linkBarRect
-                ? { top: linkBarRect.bottom + 6 }
-                : { bottom: 0 }),
-            }}
+            style={(() => {
+              const w = 400;
+              if (linkBarRect) {
+                const cx = (linkBarRect.left + linkBarRect.right) / 2;
+                const l = Math.max(8, cx - w / 2);
+                return { position: "absolute" as const, zIndex: 50, top: linkBarRect.bottom + 6, left: l, width: w };
+              }
+              return { position: "absolute" as const, zIndex: 50, bottom: 0, left: 8, right: 8 };
+            })()}
             className="flex items-center gap-2 px-3 py-2.5 bg-white border-2 border-[#00AFCC] rounded-xl shadow-xl"
           >
             <span className="text-[#00AFCC] shrink-0">
