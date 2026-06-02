@@ -2366,6 +2366,12 @@ export default function Home() {
                   >
                     📬 リード管理
                   </button>
+                  <button
+                    onClick={() => router.push("/billing")}
+                    className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+                  >
+                    💳 プラン・課金
+                  </button>
                   <div className="border-t border-gray-100 my-1" />
                   <button
                     onClick={signOut}
