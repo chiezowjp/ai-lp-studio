@@ -41,6 +41,7 @@ import PublishPanel from "@/components/PublishPanel";
 import FormConfigPanel from "@/components/FormConfigPanel";
 import Tooltip from "@/components/Tooltip";
 import GalleryModal from "@/components/GalleryModal";
+import NewsBell from "@/components/NewsBell";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -2339,6 +2340,9 @@ export default function Home() {
                 </button>
               </Tooltip>
             )}
+
+            {/* お知らせ */}
+            <NewsBell />
 
             {/* ユーザー表示 / ログインボタン */}
             {user ? (
