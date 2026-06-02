@@ -200,7 +200,7 @@ export async function createCardOnFile(
   paymentId: string,
 ): Promise<string | null> {
   try {
-    const idempotencyKey = `card-${customerId}-${paymentId}`;
+    const idempotencyKey = `cof-${Date.now()}`;
     const data = await squareFetch<{ card: { id: string } }>(
       "/v2/cards",
       {
@@ -261,6 +261,15 @@ export async function createSubscription(
         customer_id: customerId,
         card_id: cardId,
         start_date: startDate,
+        phases: [
+          {
+            ordinal: 0,
+            price_money: {
+              amount: 2980,
+              currency: "JPY",
+            },
+          },
+        ],
       }),
     },
   );
