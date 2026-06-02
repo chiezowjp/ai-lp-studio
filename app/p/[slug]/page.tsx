@@ -112,6 +112,16 @@ export default async function PublicLPPage({ params }: Props) {
     .replace(/\s*data-original-href="[^"]*"/gi, "")
     // 6. エディター用クラス(lp-eh/lp-ea)を除去
     .replace(/\blp-e[ah]\b\s*/g, "")
+    // 9. 外部リンクを新しいタブで開く（target="_blank" + rel="noopener noreferrer" を付与）
+    .replace(/<a\b([^>]*?)>/gi, (match, attrs) => {
+      // すでに target がある場合はスキップ
+      if (/\btarget\s*=/i.test(attrs)) return match;
+      // anchor (#...) や javascript: は対象外
+      const hrefMatch = attrs.match(/href\s*=\s*["']([^"']*)["']/i);
+      const href = hrefMatch?.[1] ?? "";
+      if (!href || href.startsWith("#") || href.startsWith("javascript:") || href === "") return match;
+      return `<a${attrs} target="_blank" rel="noopener noreferrer">`;
+    })
     // 7. data-lp-onclick 等（buildContent が退避したイベントハンドラ）を元に戻す
     .replace(/data-lp-(onclick|onmousedown|onmouseup|onpointerdown|ontouchstart|onpointerup)\s*=\s*"([^"]*)"/gi,
       (_, attr, val) => `${attr}="${val}"`)
