@@ -606,6 +606,7 @@ const EDIT_JS = `(function () {
     }
     // スクロール位置を復元（focus/addRange による意図しないスクロールを打ち消す）
     window.scrollTo(savedScrollX, savedScrollY);
+    requestAnimationFrame(function() { window.scrollTo(savedScrollX, savedScrollY); });
     cur = el;
     // findTarget が <a> でない要素を返した場合は closest('a') で再チェック（directA で検出済みの場合は上書き不要）
     if (!directA) {
