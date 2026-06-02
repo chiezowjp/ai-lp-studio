@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 interface Message {
   role: "user" | "assistant";
@@ -14,7 +15,7 @@ const QUICK_QUESTIONS = [
   "Proプランの機能は？",
 ];
 
-export default function SupportChat() {
+function SupportChatInner() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -258,4 +259,10 @@ export default function SupportChat() {
       </button>
     </>
   );
+}
+
+export default function SupportChat() {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/p/")) return null;
+  return <SupportChatInner />;
 }
