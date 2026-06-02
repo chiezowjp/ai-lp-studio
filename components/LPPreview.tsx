@@ -578,6 +578,9 @@ const EDIT_JS = `(function () {
       curLinkEl = directA;
       var rawHrefA = directA.getAttribute('data-original-href') || directA.getAttribute('href') || '';
       var validHrefA = /^(https?:\\/\\/|tel:|mailto:|\\/|#.+)/.test(rawHrefA) ? rawHrefA : '';
+      // URLバー入力欄クリックによる blur が finish() を呼ぶ前に linkEditing を true にする。
+      // postMessage(lp-link-bar-focus) は非同期なので、blur より後に届いて手遅れになるのを防ぐ。
+      linkEditing = true;
       window.parent.postMessage({ type: 'lp-link-focus', href: validHrefA }, '*');
     }
 
