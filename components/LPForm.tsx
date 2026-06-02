@@ -123,28 +123,13 @@ export default function LPForm({ onSubmit, loading, importedValues }: Props) {
         />
       </Field>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="デザイン雰囲気">
-          <select className={inputClass} value={form.designMood} onChange={set("designMood")}>
-            {DESIGN_MOODS.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="CTA種別 *" required>
-          <select
-            className={inputClass}
-            value={form.ctaType}
-            onChange={(e) => setForm((prev) => ({ ...prev, ctaType: e.target.value as CTAType }))}
-            required
-          >
-            <option value="line">LINEで予約</option>
-            <option value="phone">電話</option>
-            <option value="contact">問い合わせフォーム</option>
-          </select>
-        </Field>
-      </div>
+      <Field label="デザイン雰囲気">
+        <select className={inputClass} value={form.designMood} onChange={set("designMood")}>
+          {DESIGN_MOODS.map((m) => (
+            <option key={m} value={m}>{m}</option>
+          ))}
+        </select>
+      </Field>
 
       <button
         type="submit"
