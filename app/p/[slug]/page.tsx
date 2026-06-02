@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { HeadInjector } from "./HeadInjector";
+import LPRenderer from "./LPRenderer";
 import FormWidget from "@/components/FormWidget";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import type { FormConfig } from "@/lib/form-schema";
@@ -111,7 +112,10 @@ export default async function PublicLPPage({ params }: Props) {
     .replace(/\s*data-original-href="[^"]*"/gi, "")
     // 6. エディター用クラス(lp-eh/lp-ea)を除去
     .replace(/\blp-e[ah]\b\s*/g, "")
-    // 7. フォーム送信無効化
+    // 7. data-lp-onclick 等（buildContent が退避したイベントハンドラ）を元に戻す
+    .replace(/data-lp-(onclick|onmousedown|onmouseup|onpointerdown|ontouchstart|onpointerup)\s*=\s*"([^"]*)"/gi,
+      (_, attr, val) => `${attr}="${val}"`)
+    // 8. フォーム送信無効化
     .replace(/(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi, '$1 action="javascript:void(0)"');
   const customCss      = (project.custom_css as string | null) || "";
   const customHeadHtml = (project.custom_head_html as string | null) || "";
@@ -131,8 +135,8 @@ export default async function PublicLPPage({ params }: Props) {
       <style dangerouslySetInnerHTML={{ __html: css }} />
       {customCss && <style dangerouslySetInnerHTML={{ __html: customCss }} />}
 
-      {/* LP 本体 HTML（SSR でレンダリング → SEO 対応）*/}
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+      {/* LP 本体 HTML（SSR + script 実行対応）*/}
+      <LPRenderer html={html} />
 
       {/* custom_head_html をクライアント側で <head> に注入 */}
       {customHeadHtml && <HeadInjector html={customHeadHtml} />}
