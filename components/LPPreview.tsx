@@ -679,9 +679,24 @@ const EDIT_JS = `(function () {
       // curLinkEl（最近祖 <a>）に href を反映
       if (curLinkEl) {
         curLinkEl.setAttribute('href', e.data.href || '');
+        // data-original-href も更新して次回クリック時に正しい値を返す
+        if (e.data.href) {
+          curLinkEl.removeAttribute('data-original-href');
+        }
       }
       linkEditing = false;
-      finish();
+      if (!cur && curLinkEl) {
+        // findTarget がボタン要素を非テキスト対象として early-return した場合、
+        // cur が null のまま finish() が空振りするため直接 HTML を送る
+        var clone2 = document.body.cloneNode(true);
+        clone2.querySelectorAll('[data-lp-editor]').forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
+        clone2.querySelectorAll('[contenteditable]').forEach(function(n) { n.removeAttribute('contenteditable'); });
+        window.parent.postMessage({ type: 'lp-html-update', html: clone2.innerHTML }, '*');
+        window.parent.postMessage({ type: 'lp-link-blur' }, '*');
+        curLinkEl = null;
+      } else {
+        finish();
+      }
     }
   });
 })();`;
