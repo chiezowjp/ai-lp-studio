@@ -668,6 +668,10 @@ const EDIT_JS = `(function () {
     var clone = document.body.cloneNode(true);
     clone.querySelectorAll('[data-lp-editor]').forEach(function(el) { el.parentNode && el.parentNode.removeChild(el); });
     clone.querySelectorAll('[contenteditable]').forEach(function(el) { el.removeAttribute('contenteditable'); });
+    // エディター用クラスを除去
+    clone.querySelectorAll('.lp-eh, .lp-ea').forEach(function(el) {
+      el.classList.remove('lp-eh', 'lp-ea');
+    });
     // <details open> を保存しない（開いた状態をHTMLに残さない）
     clone.querySelectorAll('details[open]').forEach(function(d) { d.removeAttribute('open'); });
     // buildContent で javascript:void(0) に置換したリンクを元の href に戻す

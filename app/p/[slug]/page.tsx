@@ -90,20 +90,24 @@ export default async function PublicLPPage({ params }: Props) {
   const rawHtml        = ((project.published_html as string | null) || (project.html as string)) || "";
 
   // ── サニタイズ ──────────────────────────────────────────────────────────────
-  // 1. contenteditable を全形式で除去（"true"/"false"/値なし問わず）
-  // 2. data-original-href を元の href に復元（javascript:void(0) を修正）
+  // 1. contenteditable を全形式で除去
+  // 2. href="javascript:void(0)" + data-original-href を元の href に復元（順序不問）
   // 3. フォーム送信を無効化
   let html = rawHtml
     // contenteditable をあらゆる形式で除去
     .replace(/\s*contenteditable(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?/gi, "")
-    // data-original-href の値を href に戻す
-    .replace(/href\s*=\s*["']javascript:void\(0\)["']/gi, 'href=""')
-    .replace(/data-original-href\s*=\s*"([^"]*)"/gi, 'href="$1"')
-    .replace(/data-original-href\s*=\s*'([^']*)'/gi, "href='$1'")
+    // パターンA: href="javascript:void(0)" data-original-href="..." → href="..."
+    .replace(/href\s*=\s*["']javascript:void\(0\)["'](\s+[^>]*?)?data-original-href\s*=\s*"([^"]*)"/gi,
+      (_m, mid, orig) => `href="${orig}"${mid ?? ""}`)
+    // パターンB: data-original-href="..." href="javascript:void(0)" → href="..."
+    .replace(/data-original-href\s*=\s*"([^"]*)"(\s+[^>]*?)?href\s*=\s*["']javascript:void\(0\)["']/gi,
+      (_, orig, mid) => `href="${orig}"${mid ?? ""}`)
+    // 残った data-original-href を除去
+    .replace(/\s*data-original-href\s*=\s*(?:"[^"]*"|'[^']*')/gi, "")
+    // エディター用クラス(lp-eh/lp-ea)を除去
+    .replace(/\blp-e[ah]\b\s*/g, "")
     // フォーム送信無効化
     .replace(/(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi, '$1 action="javascript:void(0)"');
-  // 重複した href を除去（data-original-href 復元で二重になる場合）
-  html = html.replace(/href="[^"]*"\s+href="([^"]*)"/gi, 'href="$1"');
   const customCss      = (project.custom_css as string | null) || "";
   const customHeadHtml = (project.custom_head_html as string | null) || "";
   const formConfig     = (project.form_config as FormConfig | null);
