@@ -378,10 +378,14 @@ export default function BillingPage() {
                   ? "猶予期間が終了しました。お支払い方法を更新してProプランを再開してください。"
                   : `${graceDaysLeft ?? 0}日以内にお支払い方法を更新してください。期限を過ぎると機能がロックされます。`}
               </p>
-              {/* TODO: Square のカード更新ページへのリンクを追加 */}
-              <div className="rounded-lg bg-amber-100 border border-amber-200 px-3 py-2 text-xs text-amber-700">
-                🚧 カード更新機能は近日対応予定です。お問い合わせください。
-              </div>
+              <a
+                href="https://www.paypal.com/jp/smarthelp/article/how-do-i-manage-my-automatic-payments-faq1766"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg transition-colors"
+              >
+                PayPal で支払い方法を更新する →
+              </a>
             </div>
           )}
 

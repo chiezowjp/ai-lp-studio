@@ -8,12 +8,47 @@ import { usePlan } from "@/lib/plan-context";
 import {
   PLAN_FEATURES,
   PLAN_PRICING,
-  PLAN_LIMITS,
-  PLAN_LABEL,
   trialDaysLeft,
   type PlanType,
   type FeatureValue,
 } from "@/lib/plans";
+
+const HIGHLIGHT_FEATURES = PLAN_FEATURES.filter((f) => f.highlight);
+
+function groupFeaturesByCategory() {
+  return PLAN_FEATURES.reduce<{ category: string; features: typeof PLAN_FEATURES }[]>((acc, f) => {
+    const cat = f.category ?? "";
+    const last = acc[acc.length - 1];
+    if (last && last.category === cat) {
+      last.features.push(f);
+    } else {
+      acc.push({ category: cat, features: [f] });
+    }
+    return acc;
+  }, []);
+}
+
+function getTrialAlertClasses(days: number) {
+  if (days <= 1) {
+    return {
+      container: "bg-red-50 border-red-200",
+      title: "text-red-800",
+      body: "text-red-600",
+    };
+  }
+  if (days <= 2) {
+    return {
+      container: "bg-amber-50 border-amber-200",
+      title: "text-amber-800",
+      body: "text-amber-600",
+    };
+  }
+  return {
+    container: "bg-[#E6F8FC] border-[#b3e8f4]",
+    title: "text-[#007a96]",
+    body: "text-[#00AFCC]",
+  };
+}
 
 // ─── Feature Value Display ─────────────────────────────────────────────────────
 
@@ -65,10 +100,7 @@ function PlanCard({
 }) {
   const isPro = planKey === "pro";
   const pricing = PLAN_PRICING[planKey];
-  const limits = PLAN_LIMITS[planKey];
   const isCurrent = currentPlan === planKey || (currentPlan === "expired" && planKey === "trial");
-
-  const highlights = PLAN_FEATURES.filter((f) => f.highlight);
 
   return (
     <div
@@ -136,7 +168,7 @@ function PlanCard({
 
       {/* Key highlights */}
       <ul className="space-y-2.5 mb-6 flex-1">
-        {highlights.map((f) => {
+        {HIGHLIGHT_FEATURES.map((f) => {
           const value = isPro ? f.pro : f.trial;
           const enabled = value !== false;
           return (
@@ -164,7 +196,14 @@ function PlanCard({
       </ul>
 
       {/* CTA */}
-      {isPro ? (
+      {isPro && isCurrent && currentPlan === "pro" ? (
+        <Link
+          href="/billing"
+          className="block w-full py-3 text-center text-sm font-semibold text-[#00AFCC] bg-[#E6F8FC] hover:bg-[#d0f2f9] rounded-xl border border-[#b3e8f4] transition-colors"
+        >
+          プラン・課金管理 →
+        </Link>
+      ) : isPro ? (
         <button
           onClick={onUpgradeClick}
           disabled={upgradeLoading}
@@ -199,6 +238,7 @@ export default function PricingPage() {
   const [checkoutError, setCheckoutError]     = useState<string | null>(null);
 
   const days = trialDaysLeft(trialEndsAt);
+  const trialAlertClasses = days !== null ? getTrialAlertClasses(days) : null;
 
   const handleUpgrade = useCallback(async () => {
     if (!session) {
@@ -224,17 +264,8 @@ export default function PricingPage() {
     }
   }, [session, signInWithGoogle]);
 
-  // カテゴリごとにグループ化
-  const grouped = PLAN_FEATURES.reduce<{ category: string; features: typeof PLAN_FEATURES }[]>((acc, f) => {
-    const cat = f.category ?? "";
-    const last = acc[acc.length - 1];
-    if (last && last.category === cat) {
-      last.features.push(f);
-    } else {
-      acc.push({ category: cat, features: [f] });
-    }
-    return acc;
-  }, []);
+  // Keep feature table rows in the same order as PLAN_FEATURES while grouping adjacent categories.
+  const grouped = groupFeaturesByCategory();
 
   return (
     <div className="min-h-screen bg-[#F5F5F2]">
@@ -297,22 +328,14 @@ export default function PricingPage() {
         )}
 
         {/* ── Trial alert ── */}
-        {!loading && planType === "trial" && days !== null && (
-          <div className={`mb-8 rounded-2xl px-5 py-4 flex items-center gap-3 border
-            ${days <= 1
-              ? "bg-red-50 border-red-200"
-              : days <= 2
-              ? "bg-amber-50 border-amber-200"
-              : "bg-[#E6F8FC] border-[#b3e8f4]"
-            }`}>
+        {!loading && planType === "trial" && days !== null && trialAlertClasses && (
+          <div className={`mb-8 rounded-2xl px-5 py-4 flex items-center gap-3 border ${trialAlertClasses.container}`}>
             <span className="text-xl shrink-0">{days === 0 ? "⚠️" : "⏱"}</span>
             <div className="flex-1">
-              <p className={`text-sm font-black
-                ${days <= 1 ? "text-red-800" : days <= 2 ? "text-amber-800" : "text-[#007a96]"}`}>
+              <p className={`text-sm font-black ${trialAlertClasses.title}`}>
                 {days === 0 ? "本日でトライアル終了です" : `トライアル期間 残り ${days} 日`}
               </p>
-              <p className={`text-xs mt-0.5
-                ${days <= 1 ? "text-red-600" : days <= 2 ? "text-amber-600" : "text-[#00AFCC]"}`}>
+              <p className={`text-xs mt-0.5 ${trialAlertClasses.body}`}>
                 Proにアップグレードすることでエクスポートなどの全機能が使えます
               </p>
             </div>
@@ -376,6 +399,7 @@ export default function PricingPage() {
             <span className="text-center text-[#00AFCC]">Pro</span>
           </div>
 
+          {/* Feature labels and plan values come from lib/plans.ts so plan copy stays centralized. */}
           {grouped.map(({ category, features }) => (
             <div key={category}>
               {category && (
@@ -439,13 +463,22 @@ export default function PricingPage() {
               <p className="font-black text-gray-900 text-base">Proプランで全機能を解放</p>
               <p className="text-xs text-gray-400 mt-1">月額 {PLAN_PRICING.pro.label}（税込）</p>
             </div>
-            <button
-              onClick={() => void handleUpgrade()}
-              disabled={checkoutLoading}
-              className="px-8 py-3 bg-[#00AFCC] hover:bg-[#0099b3] disabled:opacity-60 text-white font-black text-sm rounded-xl transition-colors shadow-sm"
-            >
-              {checkoutLoading ? "チェックアウトを準備中..." : "アップグレードを申し込む"}
-            </button>
+            {planType === "pro" ? (
+              <Link
+                href="/billing"
+                className="px-8 py-3 text-sm font-semibold text-[#00AFCC] bg-[#E6F8FC] hover:bg-[#d0f2f9] rounded-xl border border-[#b3e8f4] transition-colors"
+              >
+                プラン・課金管理 →
+              </Link>
+            ) : (
+              <button
+                onClick={() => void handleUpgrade()}
+                disabled={checkoutLoading}
+                className="px-8 py-3 bg-[#00AFCC] hover:bg-[#0099b3] disabled:opacity-60 text-white font-black text-sm rounded-xl transition-colors shadow-sm"
+              >
+                {checkoutLoading ? "チェックアウトを準備中..." : "アップグレードを申し込む"}
+              </button>
+            )}
             <Link href="/" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
               ← エディターに戻る
             </Link>
