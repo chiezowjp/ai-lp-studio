@@ -268,6 +268,9 @@ export default function BillingPage() {
           <Link href="/pricing" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
             料金プランを見る →
           </Link>
+          <Link href="/" className="text-xs font-semibold border border-gray-200 px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">
+            ← エディターへ
+          </Link>
         </div>
       </header>
 

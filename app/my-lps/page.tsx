@@ -203,6 +203,9 @@ export default function MyLPsPage() {
           <span className="text-xs text-gray-500 hidden sm:block shrink-0">
             {user.email}
           </span>
+          <Link href="/" className="text-xs font-semibold border border-gray-200 px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors shrink-0">
+            ← エディターへ
+          </Link>
           <button
             onClick={handleNew}
             className="px-3 py-1.5 text-xs font-semibold bg-[#00AFCC] text-white rounded-lg hover:bg-[#0099b3] transition-colors shrink-0"
