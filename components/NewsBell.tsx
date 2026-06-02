@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 
 const LAST_READ_KEY = "lastReadNewsAt";
 
-export default function NewsBell() {
-  const router = useRouter();
+function useUnreadNews() {
   const [hasUnread, setHasUnread] = useState(false);
 
   useEffect(() => {
@@ -20,6 +19,32 @@ export default function NewsBell() {
       })
       .catch(() => {});
   }, []);
+
+  return hasUnread;
+}
+
+/** ドロップダウン内のお知らせ項目（赤丸付き） */
+export function NewsDropdownItem() {
+  const router = useRouter();
+  const hasUnread = useUnreadNews();
+
+  return (
+    <button
+      onClick={() => router.push("/news")}
+      className="relative w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+    >
+      🔔 お知らせ
+      {hasUnread && (
+        <span className="absolute top-2 left-[3.5rem] w-2 h-2 bg-red-500 rounded-full" />
+      )}
+    </button>
+  );
+}
+
+/** 旧：ヘッダー直置きボタン（後方互換のため残す） */
+export default function NewsBell() {
+  const router = useRouter();
+  const hasUnread = useUnreadNews();
 
   return (
     <button

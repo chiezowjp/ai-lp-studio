@@ -42,6 +42,7 @@ import FormConfigPanel from "@/components/FormConfigPanel";
 import Tooltip from "@/components/Tooltip";
 import GalleryModal from "@/components/GalleryModal";
 import NewsBell from "@/components/NewsBell";
+import { NewsDropdownItem } from "@/components/NewsBell";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -2319,31 +2320,6 @@ export default function Home() {
               </Tooltip>
             )}
 
-            {/* 使い方 */}
-            <Tooltip text="操作マニュアルを見る" position="bottom">
-              <button
-                onClick={() => router.push("/how-to-use")}
-                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                ❓ 使い方
-              </button>
-            </Tooltip>
-
-            {/* マイLP */}
-            {user && (
-              <Tooltip text="保存済みのLPを管理する" position="bottom">
-                <button
-                  onClick={() => router.push("/my-lps")}
-                  className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
-                >
-                  📁 マイLP
-                </button>
-              </Tooltip>
-            )}
-
-            {/* お知らせ */}
-            <NewsBell />
-
             {/* ユーザー表示 / ログインボタン */}
             {user ? (
               <div className="relative group">
@@ -2355,8 +2331,8 @@ export default function Home() {
                     {user.email}
                   </span>
                 </div>
-                {/* ドロップダウン：pt-1 で視覚的な隙間を保ちつつ hover 領域を途切れさせない */}
-                <div className="absolute right-0 top-full pt-1 z-50 min-w-[160px] hidden group-hover:block">
+                {/* ドロップダウン */}
+                <div className="absolute right-0 top-full pt-1 z-50 min-w-[170px] hidden group-hover:block">
                 <div className="bg-white border border-gray-200 rounded-xl shadow-xl py-1">
                   <button
                     onClick={() => router.push("/my-lps")}
@@ -2376,6 +2352,14 @@ export default function Home() {
                   >
                     💳 プラン・課金
                   </button>
+                  <div className="border-t border-gray-100 my-1" />
+                  <button
+                    onClick={() => router.push("/how-to-use")}
+                    className="w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+                  >
+                    ❓ 使い方
+                  </button>
+                  <NewsDropdownItem />
                   <div className="border-t border-gray-100 my-1" />
                   <button
                     onClick={signOut}
