@@ -952,7 +952,7 @@ export default function Home() {
   const [hearingError, setHearingError] = useState<string | null>(null);
 
   // ── Auth ──
-  const { user, session, signInWithGoogle, signOut } = useAuth();
+  const { user, session, loading: authLoading, signInWithGoogle, signOut } = useAuth();
   const router = useRouter();
 
   // ── Plan ──
@@ -2847,7 +2847,12 @@ export default function Home() {
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
           {!result ? (
             /* ── Before generation: welcome / placeholder ── */
-            !user ? (
+            authLoading ? (
+              /* auth 読み込み中：スピナー表示（ランディングページをフラッシュさせない） */
+              <div className="flex-1 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-[#00AFCC] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : !user ? (
               /* 未ログイン：ウェルカム画面 */
               <div className="flex-1 overflow-y-auto">
                 <div className="max-w-xl mx-auto px-6 py-10 space-y-8">
