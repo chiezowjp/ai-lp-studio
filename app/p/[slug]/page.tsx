@@ -94,19 +94,17 @@ export default async function PublicLPPage({ params }: Props) {
   // 2. href="javascript:void(0)" + data-original-href を元の href に復元（順序不問）
   // 3. フォーム送信を無効化
   let html = rawHtml
-    // contenteditable をあらゆる形式で除去
+    // 1. contenteditable をあらゆる形式で除去
     .replace(/\s*contenteditable(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?/gi, "")
-    // パターンA: href="javascript:void(0)" data-original-href="..." → href="..."
-    .replace(/href\s*=\s*["']javascript:void\(0\)["'](\s+[^>]*?)?data-original-href\s*=\s*"([^"]*)"/gi,
-      (_m, mid, orig) => `href="${orig}"${mid ?? ""}`)
-    // パターンB: data-original-href="..." href="javascript:void(0)" → href="..."
-    .replace(/data-original-href\s*=\s*"([^"]*)"(\s+[^>]*?)?href\s*=\s*["']javascript:void\(0\)["']/gi,
-      (_, orig, mid) => `href="${orig}"${mid ?? ""}`)
-    // 残った data-original-href を除去
-    .replace(/\s*data-original-href\s*=\s*(?:"[^"]*"|'[^']*')/gi, "")
-    // エディター用クラス(lp-eh/lp-ea)を除去
+    // 2. href="javascript:void(0)" を削除マーカーに置換
+    .replace(/href\s*=\s*["']javascript:void\(0\)["']/gi, 'href="__VOID__"')
+    // 3. data-original-href="..." を href="..." に変換（属性を昇格）
+    .replace(/data-original-href\s*=\s*"([^"]*)"/gi, 'href="$1"')
+    // 4. 削除マーカーを除去（data-original-href で上書きされなかった void を消す）
+    .replace(/\s*href\s*=\s*"__VOID__"/gi, "")
+    // 5. エディター用クラス(lp-eh/lp-ea)を除去
     .replace(/\blp-e[ah]\b\s*/g, "")
-    // フォーム送信無効化
+    // 6. フォーム送信無効化
     .replace(/(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi, '$1 action="javascript:void(0)"');
   const customCss      = (project.custom_css as string | null) || "";
   const customHeadHtml = (project.custom_head_html as string | null) || "";

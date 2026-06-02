@@ -1341,13 +1341,7 @@ ${BUBBLE_GUIDE_CSS}
             <input
               ref={linkInputRef}
               type="url"
-              defaultValue={(() => {
-                if (!linkBarHref) return "";
-                if (typeof window === "undefined") return linkBarHref;
-                const o = window.location.origin;
-                const same = linkBarHref === "/" || linkBarHref === o || linkBarHref === o + "/" || linkBarHref.startsWith(o + "/");
-                return same ? "" : linkBarHref;
-              })()}
+              defaultValue={linkBarHref ?? ""}
               placeholder="https://..."
               onFocus={() => iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-bar-focus" }, "*")}
               onBlur={() => iframeRef.current?.contentWindow?.postMessage({ type: "lp-link-bar-blur" }, "*")}
