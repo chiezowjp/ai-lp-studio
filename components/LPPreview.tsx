@@ -569,6 +569,9 @@ const EDIT_JS = `(function () {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
+    // クリック時のスクロール位置を保存し、処理後に復元する（意図しないスクロール防止）
+    var savedScrollX = window.scrollX;
+    var savedScrollY = window.scrollY;
 
     // ── リンクバー: findTarget の結果に関わらず <a> を直接検索 ──
     // findTarget が null を返して早期 return しても、<a> クリック時は必ずリンクバーを表示する。
@@ -601,6 +604,8 @@ const EDIT_JS = `(function () {
       var r = document.caretRangeFromPoint(e.clientX, e.clientY);
       if (r) { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
     }
+    // スクロール位置を復元（focus/addRange による意図しないスクロールを打ち消す）
+    window.scrollTo(savedScrollX, savedScrollY);
     cur = el;
     // findTarget が <a> でない要素を返した場合は closest('a') で再チェック（directA で検出済みの場合は上書き不要）
     if (!directA) {
