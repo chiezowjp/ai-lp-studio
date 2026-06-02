@@ -666,10 +666,15 @@ const EDIT_JS = `(function () {
     curLinkEl = null;
     linkEditing = false;
     var clone = document.body.cloneNode(true);
-    clone.querySelectorAll('[data-lp-editor]').forEach(function(el) { el.parentNode.removeChild(el); });
+    clone.querySelectorAll('[data-lp-editor]').forEach(function(el) { el.parentNode && el.parentNode.removeChild(el); });
     clone.querySelectorAll('[contenteditable]').forEach(function(el) { el.removeAttribute('contenteditable'); });
     // <details open> を保存しない（開いた状態をHTMLに残さない）
     clone.querySelectorAll('details[open]').forEach(function(d) { d.removeAttribute('open'); });
+    // buildContent で javascript:void(0) に置換したリンクを元の href に戻す
+    clone.querySelectorAll('a[data-original-href]').forEach(function(a) {
+      var orig = a.getAttribute('data-original-href');
+      if (orig !== null) { a.setAttribute('href', orig); a.removeAttribute('data-original-href'); }
+    });
     window.parent.postMessage({ type: 'lp-html-update', html: clone.innerHTML }, '*');
     if (wasLink) {
       window.parent.postMessage({ type: 'lp-link-blur' }, '*');
@@ -699,6 +704,10 @@ const EDIT_JS = `(function () {
         var clone2 = document.body.cloneNode(true);
         clone2.querySelectorAll('[data-lp-editor]').forEach(function(n) { n.parentNode && n.parentNode.removeChild(n); });
         clone2.querySelectorAll('[contenteditable]').forEach(function(n) { n.removeAttribute('contenteditable'); });
+        clone2.querySelectorAll('a[data-original-href]').forEach(function(a) {
+          var orig = a.getAttribute('data-original-href');
+          if (orig !== null) { a.setAttribute('href', orig); a.removeAttribute('data-original-href'); }
+        });
         window.parent.postMessage({ type: 'lp-html-update', html: clone2.innerHTML }, '*');
         window.parent.postMessage({ type: 'lp-link-blur' }, '*');
         curLinkEl = null;
