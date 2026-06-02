@@ -88,12 +88,24 @@ export default async function PublicLPPage({ params }: Props) {
   // Phase 8: published_html/css を優先、なければ draft の html/css にフォールバック
   const css            = ((project.published_css as string | null) || (project.css as string)) || "";
   const rawHtml        = ((project.published_html as string | null) || (project.html as string)) || "";
-  // LP 内の native <form action="..."> を無効化（FormWidget を使うため）
-  // 任意の URL への意図しない POST を防ぐサニタイズ
-  const html           = rawHtml.replace(
-    /(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi,
-    '$1 action="javascript:void(0)"',
-  );
+
+  // ── サニタイズ ──────────────────────────────────────────────────────────────
+  // 1. フォーム送信を無効化
+  // 2. エディター由来の属性を除去（contenteditable / data-original-href / editor クラス）
+  // 3. javascript:void(0) になったリンクを data-original-href から復元
+  const html = rawHtml
+    .replace(/(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi, '$1 action="javascript:void(0)"')
+    .replace(/\s+contenteditable\s*=\s*["'][^"']*["']/gi, "")
+    .replace(/\s+data-original-href\s*=\s*["']([^"']*)["']/gi, (_, orig) =>
+      orig ? ` data-restored-href="${orig}"` : ""
+    )
+    .replace(/href\s*=\s*["']javascript:void\(0\)["']([^>]*?)data-restored-href\s*=\s*["']([^"']*)["']/gi,
+      (_, rest, orig) => `href="${orig}"${rest}`)
+    .replace(/\s+data-restored-href\s*=\s*["'][^"']*["']/gi, "")
+    .replace(/\bclass\s*=\s*["']([^"']*)\b(lp-ea|lp-eh)\b([^"']*)["']/g, (_, pre, _cls, post) => {
+      const cleaned = `${pre}${post}`.trim();
+      return cleaned ? `class="${cleaned}"` : "";
+    });
   const customCss      = (project.custom_css as string | null) || "";
   const customHeadHtml = (project.custom_head_html as string | null) || "";
   const formConfig     = (project.form_config as FormConfig | null);
