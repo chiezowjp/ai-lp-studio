@@ -674,15 +674,24 @@ const EDIT_JS = `(function () {
     });
     // <details open> を保存しない（開いた状態をHTMLに残さない）
     clone.querySelectorAll('details[open]').forEach(function(d) { d.removeAttribute('open'); });
-    // buildContent で javascript:void(0) に置換したリンクを元の href に戻し、
-    // data-original-href を完全に除去する（エディター専用属性を保存HTMLに残さない）
+    // buildContent で javascript:void(0) に置換したリンクを元の href に戻す
     clone.querySelectorAll('a[data-original-href]').forEach(function(a) {
       var orig = a.getAttribute('data-original-href');
-      // href が javascript:void(0) の場合のみ元に戻す（個別設定済みの href は維持）
       if (a.getAttribute('href') === 'javascript:void(0)' && orig !== null) {
         a.setAttribute('href', orig);
       }
       a.removeAttribute('data-original-href');
+    });
+    // buildContent で退避した onclick 等のイベントハンドラを元に戻す（公開ページで動作させるため）
+    var navAttrs = ['onclick','onmousedown','onmouseup','onpointerdown','ontouchstart','onpointerup'];
+    clone.querySelectorAll('a, button').forEach(function(el) {
+      navAttrs.forEach(function(attr) {
+        var stored = el.getAttribute('data-lp-' + attr);
+        if (stored !== null) {
+          el.setAttribute(attr, stored);
+          el.removeAttribute('data-lp-' + attr);
+        }
+      });
     });
     window.parent.postMessage({ type: 'lp-html-update', html: clone.innerHTML }, '*');
     if (wasLink) {
@@ -719,6 +728,13 @@ const EDIT_JS = `(function () {
             a.setAttribute('href', orig);
           }
           a.removeAttribute('data-original-href');
+        });
+        var navAttrs2 = ['onclick','onmousedown','onmouseup','onpointerdown','ontouchstart','onpointerup'];
+        clone2.querySelectorAll('a, button').forEach(function(el) {
+          navAttrs2.forEach(function(attr) {
+            var stored = el.getAttribute('data-lp-' + attr);
+            if (stored !== null) { el.setAttribute(attr, stored); el.removeAttribute('data-lp-' + attr); }
+          });
         });
         window.parent.postMessage({ type: 'lp-html-update', html: clone2.innerHTML }, '*');
         window.parent.postMessage({ type: 'lp-link-blur' }, '*');
