@@ -273,12 +273,7 @@ export default function PricingPage() {
       {/* ── Header ── */}
       <header className="bg-[#F7F7F4] border-b border-[#D8D8D2] sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center gap-3">
-          <button
-            onClick={() => router.push("/")}
-            className="w-9 h-9 rounded-xl bg-[#00AFCC] flex items-center justify-center text-white font-black text-[11px] shrink-0"
-          >
-            AI
-          </button>
+          <img src="/logo.png" alt="AI LP STUDIO" className="h-8 w-auto shrink-0 cursor-pointer" onClick={() => router.push("/")} />
           <h1 className="text-[15px] font-black text-gray-900 tracking-[0.15em] flex-1">
             AI LP STUDIO
           </h1>

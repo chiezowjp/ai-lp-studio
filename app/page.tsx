@@ -2178,9 +2178,7 @@ export default function Home() {
       <header className="flex-shrink-0 bg-[#F7F7F4] border-b border-[#D8D8D2] z-20">
         <div className="px-4 h-14 flex items-center gap-3">
           {/* Logo mark */}
-          <div className="w-9 h-9 rounded-xl bg-[#00AFCC] flex items-center justify-center text-white font-black text-[11px] tracking-tight shrink-0">
-            AI
-          </div>
+          <img src="/logo.png" alt="AI LP STUDIO" className="h-8 w-auto shrink-0" />
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <h1 className="text-[15px] font-black text-gray-900 leading-tight tracking-[0.15em]">AI LP STUDIO</h1>
             {user && <PlanBadge />}
