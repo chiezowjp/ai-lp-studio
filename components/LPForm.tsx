@@ -146,16 +146,6 @@ export default function LPForm({ onSubmit, loading, importedValues }: Props) {
         </Field>
       </div>
 
-      <Field label="CTAリンク *" required>
-        <input
-          className={inputClass}
-          placeholder="例：https://lin.ee/xxxxxxx"
-          value={form.ctaLink}
-          onChange={set("ctaLink")}
-          required
-        />
-      </Field>
-
       <button
         type="submit"
         disabled={loading}

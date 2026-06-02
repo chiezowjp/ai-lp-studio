@@ -37,7 +37,7 @@ function buildPrompt(data: LPFormData): string {
 - 強み: ${data.strengths}
 - デザイン雰囲気: ${data.designMood}
 - CTA種別: ${data.ctaType}（ラベル: ${ctaLabel}）
-- CTAリンク: ${data.ctaLink}
+- CTAリンク: すべてのCTAボタンの href は "#" にすること（ユーザーが後でエディターで設定）
 
 【HTML/CSS要件】
 1. WordPressのカスタムHTMLブロックに貼り付けられる完全なHTMLを生成すること
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     const sizeCheck = checkInputSize(data as unknown as Record<string, unknown>, { maxBodyBytes: 20 * 1024 });
     if (sizeCheck) return sizeCheck;
 
-    const required = ["industry", "target", "serviceName", "serviceDetail", "ctaType", "ctaLink"] as const;
+    const required = ["industry", "target", "serviceName", "serviceDetail", "ctaType"] as const;
     for (const key of required) {
       if (!data[key]) {
         return NextResponse.json({ error: `${key} は必須です` }, { status: 400 });
