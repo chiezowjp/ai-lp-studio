@@ -1714,11 +1714,15 @@ export default function Home() {
 
   const handleSaveRemote = useCallback(async () => {
     if (!session) return;
-    const payload = await buildCloudPayload();
-    if (!payload) return;
     setCloudStatus("saving");
     setIsSaving(true);
     setSaveMenuOpen(false);
+    const payload = await buildCloudPayload();
+    if (!payload) {
+      setIsSaving(false);
+      setCloudStatus("idle");
+      return;
+    }
     try {
       let res: Response;
       if (remoteProjectId) {
