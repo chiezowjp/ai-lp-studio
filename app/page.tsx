@@ -221,8 +221,9 @@ function buildImageCss(images: UploadedImage[], html: string = ""): string {
         }
       }
       if (img.placement !== "other" && bubbleIds.has(img.placement)) {
-        // 吹き出しセクション：人物画像を背景に contain で表示
-        return `${sel} { background-image: url("${img.url}") !important; background-size: contain !important; background-position: center !important; background-repeat: no-repeat !important; }`;
+        // 吹き出しセクション：PCは中央contain、スマホは下部に配置
+        return `${sel} { background-image: url("${img.url}") !important; background-size: contain !important; background-position: center !important; background-repeat: no-repeat !important; }
+@media (max-width: 767px) { ${sel} { background-size: 90% auto !important; background-position: center bottom !important; } }`;
       }
       return `${sel} { background-image: url("${img.url}") !important; background-size: cover !important; background-position: center !important; }`;
     })
