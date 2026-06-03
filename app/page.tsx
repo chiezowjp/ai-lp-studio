@@ -2361,6 +2361,14 @@ export default function Home() {
                   >
                     ❓ 使い方
                   </button>
+                  <a
+                    href="https://support.ailpstudio.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-left px-3 py-2.5 text-xs hover:bg-gray-50 transition-colors font-semibold text-gray-700"
+                  >
+                    📖 サポートサイト
+                  </a>
                   <NewsDropdownItem />
                   <div className="border-t border-gray-100 my-1" />
                   <button
