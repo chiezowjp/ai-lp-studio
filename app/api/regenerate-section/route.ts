@@ -179,13 +179,13 @@ export async function POST(req: NextRequest) {
   z-index: 1;
 }
 
-/* ─── スマホ：背景画像を上部、吹き出しを縦並びで下に ─── */
+/* ─── スマホ：吹き出しを上、背景画像を下に ─── */
 @media (max-width: 767px) {
   .lp-${sectionId} {
-    background-position: center top;
+    background-position: center bottom;
     background-size: 75vw auto;
-    padding-top: 75vw; /* 背景画像の高さ分スペース */
-    padding-bottom: 3rem;
+    padding-top: 2rem;
+    padding-bottom: calc(75vw + 2rem); /* 画像分のスペースを下部に確保 */
   }
   .lp-${sectionId}__board {
     position: static;

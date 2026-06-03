@@ -188,10 +188,10 @@ ${problemLayout === "bubble" ? `━━━━━━━━━━━━━━━━
 /* ─── スマホ：背景画像を上部、吹き出しを縦並びで下に ─── */
 @media (max-width: 767px) {
   .lp-problem {
-    background-position: center top;
+    background-position: center bottom;
     background-size: 75vw auto;
-    padding-top: 75vw;
-    padding-bottom: 3rem;
+    padding-top: 2rem;
+    padding-bottom: calc(75vw + 2rem);
   }
   .lp-problem__board {
     position: static; min-height: auto;
