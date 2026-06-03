@@ -7,9 +7,10 @@ import FormWidget from "@/components/FormWidget";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import type { FormConfig } from "@/lib/form-schema";
 
-// ─── キャッシュ設定（5分 ISR）────────────────────────────────────────────────
+// ─── キャッシュ設定（1時間 ISR）─────────────────────────────────────────────
+// 保存時に published_html/css も同時更新するため長めのキャッシュでも問題なし
 
-export const revalidate = 300;
+export const revalidate = 3600;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
