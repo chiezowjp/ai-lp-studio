@@ -179,7 +179,14 @@ function SupportChatInner() {
                       : "bg-white text-gray-700 rounded-tl-sm",
                   ].join(" ")}
                 >
-                  {msg.content || (
+                  {msg.content ? (
+                    // URL を自動リンク化
+                    msg.content.split(/(https?:\/\/[^\s]+)/g).map((part, j) =>
+                      /^https?:\/\//.test(part)
+                        ? <a key={j} href={part} target="_blank" rel="noopener noreferrer" className="underline break-all">{part}</a>
+                        : <span key={j}>{part}</span>
+                    )
+                  ) : (
                     <span className="flex gap-1 items-center">
                       <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:0ms]" />
                       <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce [animation-delay:150ms]" />
