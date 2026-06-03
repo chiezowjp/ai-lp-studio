@@ -189,9 +189,9 @@ ${problemLayout === "bubble" ? `━━━━━━━━━━━━━━━━
 @media (max-width: 767px) {
   .lp-problem {
     background-position: center bottom;
-    background-size: 75vw auto;
-    padding-top: 2rem;
-    padding-bottom: calc(75vw + 2rem);
+    background-size: 90% auto;
+    padding-top: 1.5rem;
+    padding-bottom: 140vw;
   }
   .lp-problem__board {
     position: static; min-height: auto;

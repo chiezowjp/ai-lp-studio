@@ -1641,6 +1641,9 @@ export default function Home() {
       label: labelMap.get(s.id) ?? s.id,
     })));
     setResult({ html: project.html, css: project.css });
+    // 吹き出しレイアウトの状態をHTMLから検出して復元
+    const hasBubble = project.html.includes('data-bubble-layout');
+    setRefProblemLayout(hasBubble ? "bubble" : "normal");
     setLastFormData(project.formData);
     setServiceName(project.formData.serviceName);
     setColorReplacements(project.colorReplacements);

@@ -183,9 +183,9 @@ export async function POST(req: NextRequest) {
 @media (max-width: 767px) {
   .lp-${sectionId} {
     background-position: center bottom;
-    background-size: 75vw auto;
-    padding-top: 2rem;
-    padding-bottom: calc(75vw + 2rem); /* 画像分のスペースを下部に確保 */
+    background-size: 90% auto;
+    padding-top: 1.5rem;
+    padding-bottom: 140vw; /* 人物画像（縦長）分のスペースを十分に確保 */
   }
   .lp-${sectionId}__board {
     position: static;
