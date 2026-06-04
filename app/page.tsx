@@ -1271,6 +1271,7 @@ export default function Home() {
       const generated = await generateWithRetry(data, (msg) => setRetryMessage(msg), session?.access_token);
       setResult(generated);
       setSectionOrder(parseSectionOrder(generated.html));
+      setRefProblemLayout("normal");
       setActiveTab("preview");
       recordUsage("generate");
     } catch (err: unknown) {
@@ -1299,6 +1300,7 @@ export default function Home() {
       const generated = await generateWithRetry(data, (msg) => setRetryMessage(msg), session?.access_token);
       setResult(generated);
       setSectionOrder(parseSectionOrder(generated.html));
+      setRefProblemLayout("normal");
       setActiveTab("preview");
       setRegenFormKey((k) => k + 1); // フォームを最新データで再初期化
       recordUsage("generate");
