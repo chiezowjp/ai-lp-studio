@@ -34,6 +34,37 @@ export async function GET(req: NextRequest) {
     .single();
 
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+
+  // 管理者に新規登録通知メールを送信（失敗しても登録自体は成功扱い）
+  try {
+    const resendKey = process.env.RESEND_API_KEY;
+    if (resendKey) {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${resendKey}`,
+        },
+        body: JSON.stringify({
+          from: process.env.FROM_EMAIL ?? "noreply@ailpstudio.com",
+          to: "chiezowjp@gmail.com",
+          subject: "【AI LP STUDIO】新規トライアル登録がありました",
+          html: `
+            <p>新規ユーザーがトライアル登録しました。</p>
+            <ul>
+              <li>メールアドレス: ${user.email ?? "不明"}</li>
+              <li>登録日時: ${new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</li>
+              <li>トライアル終了: ${new Date(trialEndsAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</li>
+            </ul>
+            <p><a href="https://bihvddyytggfdlgzcjtm.supabase.co/dashboard/project/bihvddyytggfdlgzcjtm/editor">Supabaseで確認する</a></p>
+          `,
+        }),
+      });
+    }
+  } catch {
+    // 通知失敗は無視
+  }
+
   return NextResponse.json(created);
 }
 
