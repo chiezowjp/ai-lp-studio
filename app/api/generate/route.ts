@@ -37,6 +37,11 @@ function buildPrompt(data: LPFormData): string {
 - 強み: ${data.strengths}
 - デザイン雰囲気: ${data.designMood}
 - CTAボタン: すべてのCTAボタンの href は "#" にすること（ユーザーが後でエディターで設定）。ラベルは「今すぐ試してみる」「お問い合わせはこちら」など行動を促す自然な表現にすること
+${(data.address || data.phone || data.businessHours) ? `- 店舗情報: 以下の情報をLP最下部（lp-ctaセクションの直前）に <section class="lp-info"> として必ず追加すること
+  住所: ${data.address || "なし"}
+  電話番号: ${data.phone || "なし"}
+  営業時間: ${data.businessHours || "なし"}
+  ※ 入力のある項目だけ表示すること` : ""}`
 
 【HTML/CSS要件】
 1. WordPressのカスタムHTMLブロックに貼り付けられる完全なHTMLを生成すること

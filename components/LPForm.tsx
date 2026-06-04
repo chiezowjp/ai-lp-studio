@@ -30,6 +30,9 @@ const emptyForm: LPFormData = {
   designMood: DESIGN_MOODS[0],
   ctaType: "line",
   ctaLink: "",
+  address: "",
+  phone: "",
+  businessHours: "",
 };
 
 export default function LPForm({ onSubmit, loading, importedValues }: Props) {
@@ -130,6 +133,39 @@ export default function LPForm({ onSubmit, loading, importedValues }: Props) {
           ))}
         </select>
       </Field>
+
+      {/* 店舗情報（任意）*/}
+      <div className="border-t border-gray-100 pt-4">
+        <p className="text-[11px] text-gray-400 font-semibold mb-3">店舗情報（入力するとLP最下部に自動で表示）</p>
+        <div className="space-y-3">
+          <Field label="住所">
+            <input
+              className={inputClass}
+              placeholder="例：東京都渋谷区〇〇1-2-3"
+              value={form.address ?? ""}
+              onChange={set("address")}
+            />
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="電話番号">
+              <input
+                className={inputClass}
+                placeholder="例：03-1234-5678"
+                value={form.phone ?? ""}
+                onChange={set("phone")}
+              />
+            </Field>
+            <Field label="営業時間">
+              <input
+                className={inputClass}
+                placeholder="例：10:00〜20:00（火曜定休）"
+                value={form.businessHours ?? ""}
+                onChange={set("businessHours")}
+              />
+            </Field>
+          </div>
+        </div>
+      </div>
 
       <button
         type="submit"
