@@ -2165,13 +2165,16 @@ export default function Home() {
         open={galleryOpen}
         onClose={() => setGalleryOpen(false)}
         onSelect={(img) => {
+          // 選択中のセクションに背景として設定。未選択の場合は先頭セクションを使用
+          const targetSection = activeSectionId ?? sectionOrder[0]?.id ?? "hero";
           const newImage = {
             id: `gallery-${Date.now()}`,
             url: img.src,
             name: img.alt,
-            placement: "gallery" as const,
+            placement: targetSection as UploadedImage["placement"],
           };
-          handleImageSelect(newImage as Parameters<typeof handleImageSelect>[0]);
+          handleImageSelect(newImage);
+          setGalleryOpen(false);
         }}
       />
       <ImagePromptAssistant
