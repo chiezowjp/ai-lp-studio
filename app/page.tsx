@@ -2438,7 +2438,7 @@ export default function Home() {
       )}
 
       {/* ── Body (up to three panels) ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
 
         {/* ═══ LEFT PANEL ═══ */}
         <aside className={`w-72 xl:w-80 shrink-0 flex flex-col bg-white border-r border-gray-200 overflow-y-auto z-10${!user ? " hidden" : ""}`}>
@@ -3141,7 +3141,7 @@ export default function Home() {
 
         {/* ═══ RIGHT PANEL — Image Insert ═══ */}
         {result && editMode === "image" && (
-          <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+          <aside className="absolute right-0 top-0 h-full w-72 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-20 shadow-lg">
             <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-end shrink-0">
               <a
                 href="/assets"
@@ -3165,7 +3165,7 @@ export default function Home() {
         {result && editMode === "style" && selectedElement &&
           !selectedElement.lpClasses?.includes("lp-freeblock") &&
           !selectedElement.lpClasses?.includes("lp-customhtml") && (
-          <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+          <aside className="absolute right-0 top-0 h-full w-72 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-20 shadow-lg">
             {/* FAQ セクション選択時: 質問追加・削除（テンプレート・AI生成 両対応） */}
             {selectedFaqSectionId && (
               <div className="px-4 py-3 border-b border-gray-100 shrink-0 space-y-2">
@@ -3252,7 +3252,7 @@ export default function Home() {
 
         {/* ═══ RIGHT PANEL — Free Block Editor ═══ */}
         {result && editMode === "style" && selectedElement?.lpClasses?.includes("lp-freeblock") && (
-          <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+          <aside className="absolute right-0 top-0 h-full w-72 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-20 shadow-lg">
             <FreeBlockPanel
               selector={selectedElement.selector}
               html={result.html}
@@ -3282,7 +3282,7 @@ export default function Home() {
 
         {/* ═══ RIGHT PANEL — Custom HTML Editor ═══ */}
         {result && editMode === "style" && selectedElement?.lpClasses?.includes("lp-customhtml") && (
-          <aside className="w-72 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+          <aside className="absolute right-0 top-0 h-full w-72 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-20 shadow-lg">
             <CustomHtmlPanel
               selector={selectedElement.selector}
               html={result.html}
@@ -3297,7 +3297,7 @@ export default function Home() {
 
         {/* Style mode hint when no element selected */}
         {result && editMode === "style" && !selectedElement && (
-          <aside className="w-64 shrink-0 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-10">
+          <aside className="absolute right-0 top-0 h-full w-64 flex flex-col bg-white border-l border-gray-200 overflow-hidden z-20 shadow-lg">
             <div className="flex items-center justify-end px-3 py-2 border-b border-gray-100 shrink-0">
               <button
                 onClick={() => setEditMode("text")}
