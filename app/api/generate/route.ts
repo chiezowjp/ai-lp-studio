@@ -23,7 +23,14 @@ const SYSTEM_PROMPT = `あなたはJSON APIです。
 - 出力はJSONパーサーで直接パースできる形式のみとすること`;
 
 function buildPrompt(data: LPFormData): string {
-  const ctaLabel = CTA_LABELS[data.ctaType] ?? "お問い合わせはこちら";
+  const storeInfoLines: string[] = [];
+  if (data.address)       storeInfoLines.push(`  住所: ${data.address}`);
+  if (data.phone)         storeInfoLines.push(`  電話番号: ${data.phone}`);
+  if (data.businessHours) storeInfoLines.push(`  営業時間: ${data.businessHours}`);
+
+  const storeInfoSection = storeInfoLines.length > 0
+    ? `- 店舗情報: 以下の情報をLP最下部（lp-ctaセクションの直前）に <section class="lp-info"> として必ず追加すること\n${storeInfoLines.join("\n")}\n  ※ 入力のある項目だけ表示すること`
+    : "";
 
   return `以下の情報をもとに、小規模店舗向けの日本語LP（ランディングページ）のHTML・CSSを生成してください。
 
@@ -37,11 +44,8 @@ function buildPrompt(data: LPFormData): string {
 - 強み: ${data.strengths}
 - デザイン雰囲気: ${data.designMood}
 - CTAボタン: すべてのCTAボタンの href は "#" にすること（ユーザーが後でエディターで設定）。ラベルは「今すぐ試してみる」「お問い合わせはこちら」など行動を促す自然な表現にすること
-${(data.address || data.phone || data.businessHours) ? `- 店舗情報: 以下の情報をLP最下部（lp-ctaセクションの直前）に <section class="lp-info"> として必ず追加すること
-  住所: ${data.address || "なし"}
-  電話番号: ${data.phone || "なし"}
-  営業時間: ${data.businessHours || "なし"}
-  ※ 入力のある項目だけ表示すること` : ""}`
+${storeInfoSection}
+
 
 【HTML/CSS要件】
 1. WordPressのカスタムHTMLブロックに貼り付けられる完全なHTMLを生成すること

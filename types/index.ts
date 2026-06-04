@@ -14,6 +14,9 @@ export interface LPFormData {
   designMood: string;
   ctaType: CTAType;
   ctaLink: string;
+  address?: string;
+  phone?: string;
+  businessHours?: string;
 }
 
 export interface GeneratedLP {
