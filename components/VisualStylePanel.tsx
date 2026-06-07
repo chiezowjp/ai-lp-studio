@@ -258,7 +258,7 @@ function buildTextShadow(type: ShadowType, strength: number, blur: number): stri
     case "black-shadow":
       return `2px 2px ${b}px rgba(0,0,0,${op})`;
     case "white-glow":
-      return `0 0 ${b}px rgba(255,255,255,${op})`;
+      return `0 0 ${b}px rgba(255,255,255,${op}), 0 0 ${b}px rgba(255,255,255,${op}), 0 0 ${Math.round(b * 2)}px rgba(255,255,255,${op2})`;
     case "black-glow":
       return `0 0 ${b}px rgba(0,0,0,${op})`;
     case "soft-shadow":
@@ -277,9 +277,21 @@ function parseTextShadow(css: string): { type: ShadowType; strength: number; blu
   try {
     const parts = css.split(/,(?![^(]*\))/); // rgba 内のカンマは無視して分割
     if (parts.length > 1) {
-      // strong-shadow
-      const blurM = parts[0].match(/\d+px\s+\d+px\s+([\d.]+)px/);
-      const opM   = parts[0].match(/rgba?\([^)]+,\s*([\d.]+)\)/);
+      const first = parts[0].trim();
+      const blurM = first.match(/[\d.]+px\s+[\d.]+px\s+([\d.]+)px/);
+      const opM   = first.match(/rgba?\([^)]+,\s*([\d.]+)\)/);
+      const rgbM  = first.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      const xOff  = parseFloat(first.split(/\s+/)[0]) || 0;
+      const yOff  = parseFloat(first.split(/\s+/)[1]) || 0;
+      const isGlow = Math.abs(xOff) < 0.5 && Math.abs(yOff) < 0.5;
+      const isWhite = parseInt(rgbM?.[1] ?? "0") > 200;
+      if (isGlow && isWhite) {
+        return {
+          type: "white-glow",
+          strength: Math.round(parseFloat(opM?.[1] ?? "0.5") * 100),
+          blur: parseFloat(blurM?.[1] ?? "12"),
+        };
+      }
       return {
         type: "strong-shadow",
         strength: Math.round(parseFloat(opM?.[1] ?? "0.5") * 100),

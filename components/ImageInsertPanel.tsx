@@ -1589,12 +1589,25 @@ export default function ImageInsertPanel({
           />
         ) : (
           /* ヒント */
+          <div className="flex flex-col flex-1">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <span className="text-base">📷</span>
+                <span className="text-sm font-bold text-gray-800">画像挿入モード</span>
+              </div>
+              <button
+                onClick={onDeselect}
+                className="text-gray-400 hover:text-gray-600 text-xs px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
           <div className="flex flex-col items-center justify-center flex-1 p-5 text-center gap-3">
             <div className="w-14 h-14 rounded-2xl bg-[#E6F8FC] flex items-center justify-center text-2xl">
               📷
             </div>
             <div>
-              <p className="text-sm font-bold text-gray-700">画像挿入モード</p>
+              <p className="text-sm font-bold text-gray-700">要素をクリックして挿入</p>
               <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
                 プレビュー内の要素をクリックして<br />
                 挿入位置を選んでください
@@ -1608,6 +1621,7 @@ export default function ImageInsertPanel({
                 </div>
               ))}
             </div>
+          </div>
           </div>
         )}
       </div>
