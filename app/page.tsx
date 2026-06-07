@@ -3156,7 +3156,7 @@ export default function Home() {
               selectedElement={selectedElement}
               html={result.html}
               onUpdate={(newHtml) => applyHtml(newHtml, true)}
-              onDeselect={() => setSelectedElement(null)}
+              onDeselect={() => { setSelectedElement(null); setEditMode("text"); }}
             />
           </aside>
         )}
