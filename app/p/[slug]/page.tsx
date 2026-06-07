@@ -6,6 +6,7 @@ import LPRenderer from "./LPRenderer";
 import FormWidget from "@/components/FormWidget";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import type { FormConfig } from "@/lib/form-schema";
+import { buildTrackingHeadHtml } from "@/lib/tracking";
 
 // ─── キャッシュ設定（1時間 ISR）─────────────────────────────────────────────
 // 保存時に published_html/css も同時更新するため長めのキャッシュでも問題なし
@@ -23,7 +24,7 @@ async function getPublishedProject(slug: string) {
   const { data } = await admin
     .from("projects")
     .select(
-      "id, title, html, css, published_html, published_css, seo_title, seo_description, og_image, favicon_url, custom_css, custom_head_html, noindex, published_at, form_config, user_id",
+      "id, title, html, css, published_html, published_css, seo_title, seo_description, og_image, favicon_url, custom_css, custom_head_html, noindex, published_at, form_config, user_id, meta_pixel_id, ga4_id, gtm_id",
     )
     .eq("slug", slug)
     .eq("is_published", true)
@@ -129,7 +130,12 @@ export default async function PublicLPPage({ params }: Props) {
     // 8. フォーム送信無効化
     .replace(/(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi, '$1 action="javascript:void(0)"');
   const customCss      = (project.custom_css as string | null) || "";
-  const customHeadHtml = (project.custom_head_html as string | null) || "";
+  const customHeadHtml = buildTrackingHeadHtml({
+    metaPixelId:   project.meta_pixel_id as string | null,
+    ga4Id:         project.ga4_id        as string | null,
+    gtmId:         project.gtm_id        as string | null,
+    customHeadHtml: project.custom_head_html as string | null,
+  });
   const formConfig     = (project.form_config as FormConfig | null);
   const userId         = project.user_id as string;
   const projectId      = project.id as string;

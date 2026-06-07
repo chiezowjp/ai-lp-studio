@@ -157,7 +157,7 @@ export async function GET(req: NextRequest, ctx: RouteCtx) {
 
   const { data, error } = await admin
     .from("projects")
-    .select("id, user_id, slug, is_published, published_at, seo_title, seo_description, og_image, favicon_url, custom_css, custom_head_html, noindex")
+    .select("id, user_id, slug, is_published, published_at, seo_title, seo_description, og_image, favicon_url, custom_css, custom_head_html, noindex, meta_pixel_id, ga4_id, gtm_id")
     .eq("id", id)
     .maybeSingle();
 

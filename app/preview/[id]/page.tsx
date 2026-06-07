@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { createAdminClient } from "@/lib/supabase-admin";
 import { HeadInjector } from "@/app/p/[slug]/HeadInjector";
+import { buildTrackingHeadHtml } from "@/lib/tracking";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -13,7 +14,7 @@ async function getProjectForPreview(id: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from("projects")
-    .select("id, title, html, css, published_css, project_json, custom_css, custom_head_html, slug, is_published")
+    .select("id, title, html, css, published_css, project_json, custom_css, custom_head_html, slug, is_published, meta_pixel_id, ga4_id, gtm_id")
     .eq("id", id)
     .maybeSingle();
   return data;
@@ -54,7 +55,13 @@ export default async function PreviewPage({ params }: Props) {
     /(<form\b[^>]*?)\s+action\s*=\s*(?:"[^"]*"|'[^']*')/gi,
     '$1 action="javascript:void(0)"',
   );
-  const customHeadHtml = (project.custom_head_html as string | null) || "";
+  // プレビューでは自動生成タグ（Pixel/GA4/GTM）はスキップ。カスタムHeadコードのみ注入。
+  const customHeadHtml = buildTrackingHeadHtml({
+    metaPixelId:    project.meta_pixel_id as string | null,
+    ga4Id:          project.ga4_id        as string | null,
+    gtmId:          project.gtm_id        as string | null,
+    customHeadHtml: project.custom_head_html as string | null,
+  }, /* isPreview */ true);
   const isPublished   = project.is_published as boolean;
   const slug          = project.slug as string | null;
 

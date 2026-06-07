@@ -36,6 +36,9 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
     custom_css?: string | null;
     custom_head_html?: string | null;
     noindex?: boolean;
+    meta_pixel_id?: string | null;
+    ga4_id?: string | null;
+    gtm_id?: string | null;
   };
 
   // 許可フィールドのみを更新（他のフィールドは無視）
@@ -76,12 +79,15 @@ export async function PATCH(req: NextRequest, ctx: RouteCtx) {
   if ("custom_css"       in body) patch.custom_css       = body.custom_css       ?? null;
   if ("custom_head_html" in body) patch.custom_head_html = body.custom_head_html ?? null;
   if ("noindex"          in body) patch.noindex          = body.noindex          ?? false;
+  if ("meta_pixel_id"    in body) patch.meta_pixel_id    = body.meta_pixel_id    ?? null;
+  if ("ga4_id"           in body) patch.ga4_id           = body.ga4_id           ?? null;
+  if ("gtm_id"           in body) patch.gtm_id           = body.gtm_id           ?? null;
 
   const { data, error } = await admin
     .from("projects")
     .update(patch)
     .eq("id", id)
-    .select("id, slug, seo_title, seo_description, og_image, favicon_url, custom_css, custom_head_html, noindex")
+    .select("id, slug, seo_title, seo_description, og_image, favicon_url, custom_css, custom_head_html, noindex, meta_pixel_id, ga4_id, gtm_id")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

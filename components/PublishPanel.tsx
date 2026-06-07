@@ -18,6 +18,9 @@ interface PublishSettings {
   custom_css: string | null;
   custom_head_html: string | null;
   noindex: boolean;
+  meta_pixel_id: string | null;
+  ga4_id: string | null;
+  gtm_id: string | null;
 }
 
 interface Props {
@@ -109,6 +112,7 @@ export default function PublishPanel({
   const [error, setError]           = useState<string | null>(null);
   const [toast, setToast]           = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced]       = useState(false);
+  const [showTracking, setShowTracking]       = useState(false);;
   /** 初回公開の確認ステップを表示中か */
   const [confirmingPublish, setConfirmingPublish] = useState(false);
 
@@ -207,6 +211,9 @@ export default function PublishPanel({
           custom_css:       settings.custom_css,
           custom_head_html: settings.custom_head_html,
           noindex:          settings.noindex,
+          meta_pixel_id:    settings.meta_pixel_id,
+          ga4_id:           settings.ga4_id,
+          gtm_id:           settings.gtm_id,
         }),
       });
       if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? "保存失敗");
@@ -451,6 +458,73 @@ export default function PublishPanel({
               {!settings.is_published && (
                 <PrePublishChecklist settings={settings} title={projectTitle} />
               )}
+
+              {/* ── アクセス解析・広告タグ設定 ── */}
+              <div className="border border-gray-100 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setShowTracking((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-xs font-semibold text-gray-500 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span>📊</span>
+                    アクセス解析・広告タグ設定
+                  </span>
+                  <span className={`transition-transform ${showTracking ? "rotate-180" : ""}`}>▾</span>
+                </button>
+                {showTracking && (
+                  <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
+                    <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
+                      Meta Pixel、Google Analytics、Google Tag Managerなどの計測タグを設定できます。広告配信やアクセス解析を行う場合に使用します。
+                    </p>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-500 mb-1">
+                        Meta Pixel ID
+                        <span className="ml-1 text-gray-400 font-normal">（例: 123456789012345）</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.meta_pixel_id ?? ""}
+                        onChange={(e) => updateField("meta_pixel_id", e.target.value || null)}
+                        placeholder="数字15桁"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00AFCC]/30 focus:border-[#00AFCC] font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-500 mb-1">
+                        Google Analytics 4 測定ID
+                        <span className="ml-1 text-gray-400 font-normal">（例: G-XXXXXXXXXX）</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.ga4_id ?? ""}
+                        onChange={(e) => updateField("ga4_id", e.target.value || null)}
+                        placeholder="G-XXXXXXXXXX"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00AFCC]/30 focus:border-[#00AFCC] font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-gray-500 mb-1">
+                        Google Tag Manager ID
+                        <span className="ml-1 text-gray-400 font-normal">（例: GTM-XXXXXXX）</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.gtm_id ?? ""}
+                        onChange={(e) => updateField("gtm_id", e.target.value || null)}
+                        placeholder="GTM-XXXXXXX"
+                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00AFCC]/30 focus:border-[#00AFCC] font-mono"
+                      />
+                    </div>
+
+                    <p className="text-[10px] text-gray-400 leading-relaxed">
+                      ※ プレビューページでは計測タグは発火しません。公開LP上でのみ動作します。
+                    </p>
+                  </div>
+                )}
+              </div>
 
               {/* ── SEO / OGP 設定 ── */}
               <div className="space-y-3">
