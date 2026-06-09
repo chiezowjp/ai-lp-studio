@@ -1165,7 +1165,7 @@ export default function Home() {
 
   // ── 削除保護セクション（hero 常時・CTA は1つだけなら保護）──
   const protectedSectionIds = useMemo(() => {
-    const ids = new Set<string>(["hero"]);
+    const ids = new Set<string>();
     // CTA 系（id が "cta" を含む）が1つ以下なら保護
     const ctaSections = sectionOrder.filter(
       (s) => s.id === "cta" || s.id.startsWith("cta") || s.id.endsWith("cta")
