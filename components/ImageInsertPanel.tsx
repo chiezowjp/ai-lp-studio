@@ -67,7 +67,7 @@ function buildWrapper(doc: Document, cfg: InsertedImageConfig): HTMLElement {
 
   if (cfg.linkUrl) {
     const a = doc.createElement("a");
-    a.href = cfg.linkUrl;
+    a.setAttribute("href", cfg.linkUrl);
     a.setAttribute("target", "_blank");
     a.setAttribute("rel", "noopener noreferrer");
     a.style.cssText = "display:inline-block;";
@@ -186,7 +186,8 @@ function parseInsertedImageFromDoc(doc: Document, imageId: string): InsertedImag
     : (img.parentElement?.tagName === "PICTURE" && img.parentElement.parentElement?.tagName === "A")
       ? img.parentElement.parentElement as HTMLAnchorElement
       : null;
-  const linkUrl = parentA?.href && !parentA.href.startsWith("javascript:") ? parentA.getAttribute("href") ?? "" : "";
+  const rawHref = parentA?.getAttribute("href") ?? "";
+  const linkUrl = rawHref && !rawHref.startsWith("javascript:") ? rawHref : "";
 
   return {
     id: imageId,
@@ -450,7 +451,7 @@ function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditPro
         <div>
           <label className="block text-[10px] font-semibold text-gray-500 mb-1">🔗 リンクURL</label>
           <input
-            type="url" value={cfg.linkUrl}
+            type="text" value={cfg.linkUrl}
             onChange={(e) => upd({ linkUrl: e.target.value })}
             placeholder="https://example.com（省略可）"
             className="w-full text-[10px] border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00AFCC] placeholder-gray-300"
