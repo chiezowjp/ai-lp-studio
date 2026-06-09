@@ -504,6 +504,7 @@ export interface ImgBlockCfg {
   paddingTop: string;
   paddingBottom: string;
   paddingH: string;
+  linkUrl: string; // "" = リンクなし
 }
 
 /** padding shorthand → 上下左右 */
@@ -541,10 +542,14 @@ function buildImgBlockHtml(cfg: ImgBlockCfg, uniqueClass?: string | null): strin
   const innerImg = cfg.mobileImageUrl
     ? `<picture>\n      <source media="(max-width: 640px)" srcset="${cfg.mobileImageUrl}">\n      ${imgTag}\n    </picture>`
     : imgTag;
+  const wrappedImg = cfg.linkUrl
+    ? `<a href="${cfg.linkUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;">${innerImg}</a>`
+    : innerImg;
   const mobileDataAttr = cfg.mobileImageUrl ? ` data-imgblock-mobile-src="${cfg.mobileImageUrl}"` : "";
-  return `<section class="${classAttr}"${mobileDataAttr} style="${sectionStyle}">
+  const linkDataAttr = cfg.linkUrl ? ` data-imgblock-link="${cfg.linkUrl}"` : "";
+  return `<section class="${classAttr}"${mobileDataAttr}${linkDataAttr} style="${sectionStyle}">
   <div class="lp-imgblock-inner lp-imgblock-inner--${alignMod}">
-    ${innerImg}
+    ${wrappedImg}
   </div>
 </section>`;
 }
@@ -578,6 +583,13 @@ export function parseImgBlockFromHtml(html: string, uniqueClass?: string | null)
     || (section.querySelector("picture > source[media]") as HTMLSourceElement | null)?.getAttribute("srcset")
     || "";
 
+  // リンクURL: data属性（確実）→ aタグ href（旧形式フォールバック）
+  const linkUrl = section.getAttribute("data-imgblock-link")
+    ?? (img.parentElement?.tagName === "A" ? img.parentElement.getAttribute("href") ?? "" : "")
+    ?? (img.parentElement?.tagName === "PICTURE" && img.parentElement.parentElement?.tagName === "A"
+        ? img.parentElement.parentElement.getAttribute("href") ?? "" : "")
+    ?? "";
+
   return {
     imageUrl: img.getAttribute("src") ?? "",
     mobileImageUrl,
@@ -589,6 +601,7 @@ export function parseImgBlockFromHtml(html: string, uniqueClass?: string | null)
     paddingTop,
     paddingBottom,
     paddingH,
+    linkUrl,
   };
 }
 
@@ -631,6 +644,42 @@ export function replaceImgBlockInHtml(html: string, cfg: ImgBlockCfg, uniqueClas
     img.setAttribute("style", imgStyleParts.join(";"));
   } else {
     img.removeAttribute("style");
+  }
+
+  // linkUrl の data属性を更新
+  if (cfg.linkUrl) {
+    section.setAttribute("data-imgblock-link", cfg.linkUrl);
+  } else {
+    section.removeAttribute("data-imgblock-link");
+  }
+
+  // aタグラップの付け外し
+  const currentAnchor = img.parentElement?.tagName === "A"
+    ? img.parentElement
+    : (img.parentElement?.tagName === "PICTURE" && img.parentElement.parentElement?.tagName === "A")
+      ? img.parentElement.parentElement
+      : null;
+  if (cfg.linkUrl) {
+    if (currentAnchor) {
+      currentAnchor.setAttribute("href", cfg.linkUrl);
+    } else {
+      // aタグで囲む（imgまたはpicture）
+      const target = img.closest("picture") ?? img;
+      const a = doc.createElement("a");
+      a.setAttribute("href", cfg.linkUrl);
+      a.setAttribute("target", "_blank");
+      a.setAttribute("rel", "noopener noreferrer");
+      a.style.cssText = "display:inline-block;";
+      target.parentNode!.insertBefore(a, target);
+      a.appendChild(target);
+    }
+  } else {
+    if (currentAnchor) {
+      // aタグを解除して中身だけ残す
+      const child = currentAnchor.firstElementChild;
+      if (child) currentAnchor.parentNode!.insertBefore(child, currentAnchor);
+      currentAnchor.remove();
+    }
   }
 
   // スマホ用画像の <picture> ラップを更新（同一ドキュメント内で操作）
@@ -866,6 +915,21 @@ function ImgBlockEditPanel({ html, onUpdate, onDeselect, uniqueClass }: ImgBlock
             placeholder="画像の説明（省略可）"
             className="w-full text-[10px] border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00AFCC] placeholder-gray-300"
           />
+        </div>
+
+        {/* リンクURL */}
+        <div>
+          <label className="block text-[10px] font-semibold text-gray-500 mb-1">🔗 リンクURL</label>
+          <input
+            type="text"
+            value={cfg.linkUrl}
+            onChange={(e) => upd({ linkUrl: e.target.value })}
+            placeholder="https://example.com（省略可）"
+            className="w-full text-[10px] border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00AFCC] placeholder-gray-300"
+          />
+          {cfg.linkUrl && (
+            <p className="text-[10px] text-gray-400 mt-0.5">クリックで別タブに開きます</p>
+          )}
         </div>
 
         {/* 配置 */}

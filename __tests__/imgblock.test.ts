@@ -155,7 +155,7 @@ describe("replaceImgBlockInHtml - スマホ画像登録（最重要）", () => {
     const cfg: ImgBlockCfg = {
       imageUrl: "", mobileImageUrl: MOBILE_URL, alt: "", alignment: "center",
       width: "100%", height: "auto", borderRadius: "0",
-      paddingTop: "0", paddingBottom: "0", paddingH: "0",
+      paddingTop: "0", paddingBottom: "0", paddingH: "0", linkUrl: "",
     };
     const result = replaceImgBlockInHtml(html, cfg, "lp-imgblock_notfound");
     expect(result).toBe(html);
