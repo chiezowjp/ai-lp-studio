@@ -25,6 +25,7 @@ const BASE_CFG: InsertedImageConfig = {
   alignment: "center",
   borderRadius: 8,
   marginV: 16,
+  linkUrl: "",
 };
 
 /** 典型的な LP セクション HTML */

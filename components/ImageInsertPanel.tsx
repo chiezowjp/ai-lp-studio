@@ -14,6 +14,7 @@ export interface InsertedImageConfig {
   alignment: "left" | "center" | "right";
   borderRadius: number;
   marginV: number;
+  linkUrl: string; // "" = リンクなし
 }
 
 type InsertPosition = "before" | "after" | "section_end";
@@ -49,6 +50,8 @@ function buildWrapper(doc: Document, cfg: InsertedImageConfig): HTMLElement {
     ].join(";"),
   );
 
+  // 画像またはpictureをaタグでラップするか直接追加するか決定
+  let imgOrPicture: HTMLElement = img;
   if (cfg.mobileImageUrl) {
     // スマホ用画像がある場合は <picture> でラップ
     const picture = doc.createElement("picture");
@@ -57,11 +60,21 @@ function buildWrapper(doc: Document, cfg: InsertedImageConfig): HTMLElement {
     source.setAttribute("srcset", cfg.mobileImageUrl);
     picture.appendChild(source);
     picture.appendChild(img);
-    div.appendChild(picture);
+    imgOrPicture = picture;
     // data属性にも保存: DOMParser が srcset を特別扱いする場合でも確実に復元できる
     div.setAttribute("data-inserted-mobile-src", cfg.mobileImageUrl);
+  }
+
+  if (cfg.linkUrl) {
+    const a = doc.createElement("a");
+    a.href = cfg.linkUrl;
+    a.setAttribute("target", "_blank");
+    a.setAttribute("rel", "noopener noreferrer");
+    a.style.cssText = "display:inline-block;";
+    a.appendChild(imgOrPicture);
+    div.appendChild(a);
   } else {
-    div.appendChild(img);
+    div.appendChild(imgOrPicture);
   }
   return div;
 }
@@ -167,6 +180,14 @@ function parseInsertedImageFromDoc(doc: Document, imageId: string): InsertedImag
     (wrapper?.querySelector("picture > source[media]") as HTMLSourceElement | null)?.getAttribute("srcset") ||
     (img.closest("picture")?.querySelector("source[srcset]") as HTMLSourceElement | null)?.getAttribute("srcset") ||
     "";
+  // imgの親がaタグならリンクURL取得
+  const parentA = img.parentElement?.tagName === "A"
+    ? img.parentElement as HTMLAnchorElement
+    : (img.parentElement?.tagName === "PICTURE" && img.parentElement.parentElement?.tagName === "A")
+      ? img.parentElement.parentElement as HTMLAnchorElement
+      : null;
+  const linkUrl = parentA?.href && !parentA.href.startsWith("javascript:") ? parentA.getAttribute("href") ?? "" : "";
+
   return {
     id: imageId,
     url: img.src,
@@ -176,6 +197,7 @@ function parseInsertedImageFromDoc(doc: Document, imageId: string): InsertedImag
     alignment: (ws.match(/text-align:\s*(left|center|right)/)?.[1] ?? "center") as InsertedImageConfig["alignment"],
     borderRadius: parseInt(is.match(/border-radius:(\d+)px/)?.[1] ?? "8", 10),
     marginV: parseInt(ws.match(/margin-top:\s*(\d+)px/)?.[1] ?? "16", 10),
+    linkUrl,
   };
 }
 
@@ -375,8 +397,19 @@ function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditPro
 
         <div>
           <label className="block text-[10px] font-semibold text-gray-500 mb-1">横幅</label>
+          {/* 幅いっぱいボタン（バナー設定）*/}
+          <button
+            onClick={() => upd({ width: "100%", alignment: "center", marginV: 0, borderRadius: 0 })}
+            className={`w-full py-1.5 text-[10px] font-semibold rounded-lg border mb-1 transition-colors ${
+              cfg.width === "100%"
+                ? "bg-[#00AFCC] text-white border-[#00AFCC]"
+                : "border-gray-200 text-gray-500 hover:border-[#00AFCC] hover:text-[#00AFCC]"
+            }`}
+          >
+            ↔ 幅いっぱい（バナー）
+          </button>
           <div className="flex gap-1 mb-1">
-            {WIDTH_PRESETS.map((w) => (
+            {(["50%", "80%"] as const).map((w) => (
               <button
                 key={w}
                 onClick={() => upd({ width: w })}
@@ -392,7 +425,7 @@ function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditPro
           </div>
           <input
             type="text"
-            value={WIDTH_PRESETS.includes(cfg.width as (typeof WIDTH_PRESETS)[number]) ? "" : cfg.width}
+            value={cfg.width === "100%" || cfg.width === "50%" || cfg.width === "80%" ? "" : cfg.width}
             onChange={(e) => upd({ width: e.target.value })}
             placeholder="例: 320px"
             className="w-full text-[10px] border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00AFCC] placeholder-gray-300"
@@ -412,6 +445,19 @@ function InsertedImageEditPanel({ imageId, html, onUpdate, onDeselect }: EditPro
             placeholder="画像の説明（省略可）"
             className="w-full text-[10px] border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00AFCC] placeholder-gray-300"
           />
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-semibold text-gray-500 mb-1">🔗 リンクURL</label>
+          <input
+            type="url" value={cfg.linkUrl}
+            onChange={(e) => upd({ linkUrl: e.target.value })}
+            placeholder="https://example.com（省略可）"
+            className="w-full text-[10px] border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#00AFCC] placeholder-gray-300"
+          />
+          {cfg.linkUrl && (
+            <p className="text-[10px] text-gray-400 mt-0.5">クリックで別タブに開きます</p>
+          )}
         </div>
 
         <div>
@@ -1362,6 +1408,7 @@ function InsertFlow({ selectedElement, html, onUpdate, onDeselect }: InsertFlowP
         alignment: "center",
         borderRadius: 8,
         marginV: 16,
+        linkUrl: "",
       };
       onUpdate(insertImageAdjacentToElement(
         html, selectedElement.selector, pendingPos, cfg, selectedElement.elementId,
