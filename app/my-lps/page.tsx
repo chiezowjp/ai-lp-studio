@@ -44,8 +44,14 @@ export default function MyLPsPage() {
       const res = await fetch("/api/projects", {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "取得失敗");
-      setProjects(await res.json());
+      const json = await res.json();
+      if (!res.ok) {
+        const msg = res.status === 401
+          ? "セッションの有効期限が切れました。一度ログアウトして再ログインしてください。"
+          : (json.error ?? "取得失敗");
+        throw new Error(msg);
+      }
+      setProjects(json);
     } catch (e) {
       setError(e instanceof Error ? e.message : "取得に失敗しました");
     } finally {
